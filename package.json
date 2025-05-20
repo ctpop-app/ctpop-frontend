@@ -1,0 +1,40 @@
+{
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-firebase/app": "^22.2.0",
+    "@react-native-firebase/auth": "^22.2.0",
+    "@react-navigation/bottom-tabs": "^6.5.11",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/stack": "^6.3.20",
+    "axios": "^1.6.7",
+    "expo": "53.0.9",
+    "expo-firebase-recaptcha": "^2.3.1",
+    "expo-image-picker": "~16.1.4",
+    "expo-web-browser": "~14.1.6",
+    "firebase": "^10.14.1",
+    "metro": "^0.82.0",
+    "metro-core": "^0.76.8",
+    "metro-react-native-babel-transformer": "^0.76.8",
+    "metro-resolver": "^0.76.8",
+    "metro-runtime": "^0.76.8",
+    "react": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-device-info": "^14.0.4",
+    "react-native-dotenv": "^3.4.11",
+    "react-native-gesture-handler": "~2.24.0",
+    "react-native-reanimated": "~3.17.4",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.10.0",
+    "react-native-webview": "13.13.5",
+    "zustand": "^4.5.1"
+  },
+  "name": "ctpop",
+  "version": "1.0.0",
+  "scripts": {
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "start": "expo start",
+    "web": "expo start --web",
+    "clear": "expo start --clear"
+  }
+}
