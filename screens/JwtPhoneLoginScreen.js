@@ -17,6 +17,7 @@ import useUserStore from '../store/userStore';
 import config from '../utils/config';
 import { discoverServer, resetServerIp } from '../utils/discovery';
 import { updateApiUrl } from '../utils/config';
+import { profileService } from '../services/profileService';
 
 export default function JwtPhoneLoginScreen({ navigation }) {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -59,12 +60,21 @@ export default function JwtPhoneLoginScreen({ navigation }) {
       if (apiUrl) {
         // 발견된 서버로 API URL 업데이트
         updateApiUrl(apiUrl);
-        setNetworkStatus({ connected: true });
         
-        Alert.alert(
-          '연결 성공', 
-          `서버와 연결되었습니다.\n발견된 서버: ${apiUrl}`
-        );
+        // API URL이 제대로 적용되었는지 테스트
+        setTimeout(async () => {
+          const networkTest = await testNetworkConnection();
+          if (networkTest.connected) {
+            setNetworkStatus({ connected: true });
+            Alert.alert(
+              '연결 성공', 
+              `서버와 연결되었습니다.\n발견된 서버: ${apiUrl}\n현재 baseURL: ${config.API_URL}`
+            );
+          } else {
+            setNetworkStatus({ connected: false, error: networkTest.error });
+            Alert.alert('연결 실패', `서버는 발견되었으나 API 연결에 실패했습니다: ${networkTest.error}`);
+          }
+        }, 500); // API Client가 업데이트될 시간을 주기 위해 약간의 딜레이 추가
       } else {
         setNetworkStatus({ connected: false, error: '서버를 찾을 수 없습니다.' });
         
@@ -136,11 +146,56 @@ export default function JwtPhoneLoginScreen({ navigation }) {
         };
         setUser(userInfo);
         
-        // Navigate to main app
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Main' }],
-        });
+        // Firestore에서 사용자 프로필이 존재하는지 확인
+        const profileCheck = await profileService.checkProfileExists(phoneNumber);
+        
+        if (profileCheck.success) {
+          if (profileCheck.exists) {
+            // 프로필이 존재하면 메인으로 이동
+            console.log('기존 프로필이 있어 메인 화면으로 이동합니다.');
+            
+            // 프로필 데이터를 저장
+            useUserStore.getState().updateUserProfile(phoneNumber, profileCheck.data);
+            
+            // 메인 화면으로 바로 이동하지 않고 App.js에서 처리하도록 함
+            Alert.alert('로그인 성공', '인증이 완료되었습니다.', [
+              {
+                text: '확인',
+                onPress: () => {
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }], // Login으로 돌아가면 useEffect에서 인증 체크가 다시 실행됨
+                  });
+                }
+              }
+            ]);
+          } else {
+            // 프로필이 없으면 프로필 설정 페이지로 이동
+            console.log('프로필이 없어 프로필 설정 페이지로 이동합니다.');
+            Alert.alert('회원가입', '프로필을 설정해주세요.', [
+              {
+                text: '확인',
+                onPress: () => {
+                  navigation.navigate('ProfileSetup', { phoneNumber });
+                }
+              }
+            ]);
+          }
+        } else {
+          // 프로필 확인 중 오류 발생
+          console.error('프로필 확인 중 오류:', profileCheck.error);
+          Alert.alert('오류', `프로필 확인 중 오류가 발생했습니다: ${profileCheck.error}`, [
+            {
+              text: '확인',
+              onPress: () => {
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }],
+                });
+              }
+            }
+          ]);
+        }
       } else {
         Alert.alert('인증 실패', result.message || '인증번호가 올바르지 않습니다.');
       }
@@ -182,7 +237,7 @@ export default function JwtPhoneLoginScreen({ navigation }) {
 
           <Text style={styles.label}>📱 전화번호</Text>
           <TextInput
-            placeholder="+821012345678"
+            placeholder="01012345678"
             onChangeText={setPhoneNumber}
             keyboardType="phone-pad"
             style={styles.input}

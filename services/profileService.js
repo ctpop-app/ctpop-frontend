@@ -25,6 +25,44 @@ const profilesRef = collection(db, PROFILES_COLLECTION);
  */
 export const profileService = {
   /**
+   * 사용자 전화번호로 프로필이 존재하는지 확인합니다.
+   * @param {string} phoneNumber - 사용자 전화번호
+   * @returns {Promise<Object>} - 성공 여부와 프로필 존재 여부
+   */
+  async checkProfileExists(phoneNumber) {
+    try {
+      console.log('Firestore에서 프로필 확인 중:', phoneNumber);
+      
+      // uid로 프로필 조회
+      const q = query(profilesRef, where('uid', '==', phoneNumber), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const profileData = Profile.fromFirestore(querySnapshot.docs[0]);
+        console.log('프로필이 존재합니다:', profileData);
+        return { 
+          success: true, 
+          exists: true,
+          data: profileData
+        };
+      } else {
+        console.log('프로필이 존재하지 않습니다');
+        return { 
+          success: true, 
+          exists: false 
+        };
+      }
+    } catch (error) {
+      console.error('프로필 확인 오류:', error);
+      return { 
+        success: false, 
+        exists: false,
+        error: error.message 
+      };
+    }
+  },
+
+  /**
    * 사용자 ID로 프로필 조회
    * @param {string} uid 사용자 ID (전화번호 또는 Firebase Auth UID)
    * @returns {Promise<Profile|null>} 프로필 객체 또는 null
@@ -164,7 +202,7 @@ export const profileService = {
    */
   async createDummyProfiles(count = 10) {
     try {
-      const preferences = ['트젠', 'CD', '러버', '트젠/러버', 'CD/러버'];
+      const orientations = ['트젠', '시디', '러버'];
       const locations = [
         '서울', '부산', '인천', '대구', 
         '광주', '대전', '울산', '세종',
@@ -175,7 +213,7 @@ export const profileService = {
       const profiles = [];
       
       for (let i = 0; i < count; i++) {
-        const preference = preferences[Math.floor(Math.random() * preferences.length)];
+        const orientation = orientations[Math.floor(Math.random() * orientations.length)];
         const location = locations[Math.floor(Math.random() * locations.length)];
         // 키는 150-190 사이
         const height = Math.floor(Math.random() * 41) + 150;
@@ -189,9 +227,14 @@ export const profileService = {
           height,
           weight,
           location,
-          preference,
+          orientation,
           bio: `안녕하세요! 저는 ${location}에 사는 테스트 프로필 ${i+1}입니다. 잘 부탁드려요!`,
-          photoURL: `https://picsum.photos/id/${(i % 100) + 1}/300/300`, // 랜덤 이미지
+          mainPhotoURL: `https://picsum.photos/id/${(i % 100) + 1}/300/300`, // 대표 이미지
+          photoURLs: [
+            `https://picsum.photos/id/${((i+1) % 100) + 1}/300/300`,
+            `https://picsum.photos/id/${((i+2) % 100) + 1}/300/300`,
+            `https://picsum.photos/id/${((i+3) % 100) + 1}/300/300`,
+          ], // 추가 이미지
           isActive: Math.random() > 0.2, // 80%는 활성 상태
         });
         

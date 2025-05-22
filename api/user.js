@@ -1,4 +1,43 @@
 import apiClient, { handleApiResponse, handleApiError } from './client';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+
+/**
+ * Firestore에서 사용자 프로필이 존재하는지 확인합니다.
+ * @param {string} phoneNumber - 사용자 전화번호
+ * @returns {Promise<Object>} - 성공 여부와 프로필 존재 여부
+ */
+export const checkProfileExists = async (phoneNumber) => {
+  try {
+    console.log('Firestore에서 프로필 확인 중:', phoneNumber);
+    
+    // 전화번호를 document ID로 사용
+    const userDocRef = doc(db, 'users', phoneNumber);
+    const userDoc = await getDoc(userDocRef);
+    
+    if (userDoc.exists()) {
+      console.log('프로필이 존재합니다:', userDoc.data());
+      return { 
+        success: true, 
+        exists: true,
+        data: userDoc.data()
+      };
+    } else {
+      console.log('프로필이 존재하지 않습니다');
+      return { 
+        success: true, 
+        exists: false 
+      };
+    }
+  } catch (error) {
+    console.error('프로필 확인 오류:', error);
+    return { 
+      success: false, 
+      exists: false,
+      error: error.message 
+    };
+  }
+};
 
 /**
  * 사용자 프로필 정보를 가져옵니다.

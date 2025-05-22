@@ -10,6 +10,7 @@ import useUserStore from './store/userStore';
 
 // Auth service
 import * as authApi from './api/auth';
+import { profileService } from './services/profileService';
 
 // 디스커버리 서비스와 설정
 import { discoverServer } from './utils/discovery';
@@ -46,12 +47,7 @@ export default function App() {
           setServerDiscovered(true);
           console.log('서버 디스커버리 성공:', apiUrl);
         } else {
-          // 서버를 찾지 못한 경우 기본값 사용 (이미 config.js에 설정됨)
-          console.log('서버를 찾지 못했습니다. 기본 설정을 사용합니다.');
-          Alert.alert(
-            '서버 연결 실패',
-            '서버를 찾을 수 없습니다. 기본 서버 설정을 사용합니다.'
-          );
+          console.warn('서버를 찾을 수 없음. 기본 설정 사용.');
         }
         
         // 인증 상태 확인 진행
@@ -88,9 +84,27 @@ export default function App() {
           setUser({ uid: phoneNumber, phoneNumber });
           setIsLoggedIn(true);
           
-          // TODO: 프로필 정보 가져오기 (백엔드 API 구현 필요)
-          // 현재는 항상 프로필이 있다고 가정
-          setHasProfile(true);
+          // Firestore에서 프로필 확인
+          const profileCheck = await profileService.checkProfileExists(phoneNumber);
+          
+          if (profileCheck.success) {
+            if (profileCheck.exists) {
+              // 프로필이 존재하면 Main으로 이동
+              console.log('기존 프로필이 있어 메인 화면으로 이동합니다.');
+              setHasProfile(true);
+              
+              // 프로필 데이터 저장
+              useUserStore.getState().updateUserProfile(phoneNumber, profileCheck.data);
+            } else {
+              // 프로필이 없으면 프로필 설정 필요
+              console.log('프로필이 없어 프로필 설정이 필요합니다.');
+              setHasProfile(false);
+            }
+          } else {
+            // 프로필 확인 실패 시 기본적으로 프로필 설정 화면으로 이동
+            console.error('프로필 확인 중 오류:', profileCheck.error);
+            setHasProfile(false);
+          }
         } else {
           // 토큰 갱신 실패 - 로그아웃 상태로 처리
           setIsLoggedIn(false);

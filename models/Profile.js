@@ -2,58 +2,52 @@
  * 사용자 프로필 데이터 모델
  */
 export class Profile {
-  constructor(data = {}) {
-    this.id = data.id || null;
-    this.uid = data.uid || null;         // Firebase 인증 ID 또는 전화번호
-    this.nickname = data.nickname || ''; // 닉네임 (필수)
-    this.age = data.age || null;         // 나이
-    this.height = data.height || null;   // 키 (cm)
-    this.weight = data.weight || null;   // 몸무게 (kg)
-    this.location = data.location || ''; // 지역 (광역시도)
-    this.bio = data.bio || '';           // 소개
-    this.preference = data.preference || ''; // 성향 (트젠, CD, 러버)
-    this.photoURL = data.photoURL || null; // 프로필 사진
-    this.createdAt = data.createdAt || new Date();
-    this.updatedAt = data.updatedAt || new Date();
-    this.isActive = data.isActive !== undefined ? data.isActive : true;
-    this.lastActive = data.lastActive || new Date();
+  /**
+   * 프로필 생성자
+   * @param {Object} props 프로필 속성
+   */
+  constructor(props = {}) {
+    this.id = props.id || null;
+    this.uid = props.uid || null;         // Firebase 인증 ID 또는 전화번호
+    this.nickname = props.nickname || ''; // 닉네임 (필수)
+    this.age = props.age || null;         // 나이
+    this.height = props.height || null;   // 키 (cm)
+    this.weight = props.weight || null;   // 몸무게 (kg)
+    this.location = props.location || ''; // 지역 (광역시도)
+    this.bio = props.bio || '';           // 소개
+    this.orientation = props.orientation || props.preference || ''; // 성향 (트젠, 시디, 러버)
+    this.mainPhotoURL = props.mainPhotoURL || props.photoURL || null; // 대표 프로필 사진 (필수)
+    this.photoURLs = props.photoURLs || []; // 추가 프로필 사진들 (최대 5개)
+    this.isActive = props.isActive !== undefined ? props.isActive : true;
+    this.createdAt = props.createdAt || null;
+    this.updatedAt = props.updatedAt || null;
+    this.lastActive = props.lastActive || null;
   }
 
   /**
-   * Firestore 문서에서 프로필 객체 생성
+   * Firestore 문서에서 Profile 객체 생성
    * @param {Object} doc Firestore 문서 스냅샷
-   * @returns {Profile} 프로필 객체
+   * @returns {Profile} Profile 객체
    */
   static fromFirestore(doc) {
     const data = doc.data();
     return new Profile({
       id: doc.id,
       ...data,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
-      lastActive: data.lastActive?.toDate() || new Date()
+      // Firestore 타임스탬프를 JavaScript Date 객체로 변환
+      createdAt: data.createdAt?.toDate() || null,
+      updatedAt: data.updatedAt?.toDate() || null,
+      lastActive: data.lastActive?.toDate() || null
     });
   }
 
   /**
-   * Firestore에 저장할 수 있는 객체로 변환
-   * @returns {Object} Firestore에 저장할 객체
+   * Profile 객체를 Firestore에 저장할 수 있는 형태로 변환
+   * @returns {Object} Firestore 문서 데이터
    */
   toFirestore() {
-    return {
-      uid: this.uid,
-      nickname: this.nickname,
-      age: this.age,
-      height: this.height,
-      weight: this.weight,
-      location: this.location,
-      bio: this.bio,
-      preference: this.preference,
-      photoURL: this.photoURL,
-      createdAt: this.createdAt,
-      updatedAt: new Date(),
-      isActive: this.isActive,
-      lastActive: this.lastActive
-    };
+    // id는 문서 ID이므로 제외
+    const { id, createdAt, updatedAt, lastActive, ...data } = this;
+    return data;
   }
 } 

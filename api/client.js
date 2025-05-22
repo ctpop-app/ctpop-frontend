@@ -13,6 +13,17 @@ const apiClient = axios.create({
   },
 });
 
+/**
+ * API 클라이언트의 baseURL을 업데이트합니다.
+ * @param {string} newBaseUrl - 새 base URL
+ */
+export const updateBaseUrl = (newBaseUrl) => {
+  if (newBaseUrl) {
+    apiClient.defaults.baseURL = newBaseUrl;
+    console.log('API 클라이언트 baseURL 업데이트됨:', newBaseUrl);
+  }
+};
+
 // 네트워크 연결 확인 함수
 export const testNetworkConnection = async () => {
   try {

@@ -45,6 +45,18 @@ export const updateApiUrl = (apiUrl) => {
   config.CHAT_API_URL = `${apiUrl}/chats`;
   
   console.log('API URL이 업데이트됨:', apiUrl);
+  
+  // apiClient의 baseURL도 함께 업데이트하기 위해 이벤트를 발생시킴
+  setTimeout(() => {
+    try {
+      const { updateBaseUrl } = require('../api/client');
+      if (typeof updateBaseUrl === 'function') {
+        updateBaseUrl(apiUrl);
+      }
+    } catch (err) {
+      console.error('apiClient baseURL 업데이트 실패:', err);
+    }
+  }, 0);
 };
 
 export default config; 

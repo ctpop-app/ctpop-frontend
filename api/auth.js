@@ -89,6 +89,16 @@ export const refreshToken = async () => {
     return null;
   } catch (error) {
     console.error('토큰 갱신 오류:', error);
+    
+    // 네트워크 오류인 경우, 기존 토큰을 그대로 사용 (오프라인 모드 지원)
+    if (error.message === 'Network Error') {
+      const existingToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      if (existingToken) {
+        console.log('네트워크 오류로 인해 기존 토큰을 사용합니다');
+        return existingToken;
+      }
+    }
+    
     return null;
   }
 };
