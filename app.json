@@ -23,8 +23,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.ctpop",
-      "googleServicesFile": "./google-services.json"
+      "package": "com.anonymous.ctpop"
     },
     "extra": {
       "eas": {
