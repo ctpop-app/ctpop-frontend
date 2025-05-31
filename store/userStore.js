@@ -1,55 +1,65 @@
 // userStore.js
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const useUserStore = create((set) => ({
-  user: null,
-  userProfile: null,
-  loading: false,
-  error: null,
-  
-  // 인증 후 사용자 정보 설정
-  setUser: (user) => set({ user }),
-  
-  // 사용자 정보 초기화
-  clearUser: () => set({ user: null, userProfile: null }),
-  
-  // 사용자 프로필 가져오기 (백엔드 API 구현 시 수정 필요)
-  fetchUserProfile: async (userId) => {
-    try {
-      console.log('프로필 정보 가져오는 중:', userId);
+const useUserStore = create(
+  persist(
+    (set) => ({
+      // 상태
+      user: null,        // 현재 로그인한 사용자 정보
+      userProfile: null, // 사용자 프로필 정보
+      loading: false,    // 로딩 상태
+      error: null,       // 에러 상태
       
-      // 프로필 데이터가 AsyncStorage에 저장되어 있는지 확인
-      const profileData = await AsyncStorage.getItem(`user_profile_${userId}`);
+      // 액션
+      setUser: (user) => set({ user }),
+      setUserProfile: (profile) => set({ userProfile: profile }),
       
-      if (profileData) {
-        const parsedProfile = JSON.parse(profileData);
-        console.log('프로필 정보 가져오기 성공');
-        set({ userProfile: parsedProfile });
-        return parsedProfile;
-      } else {
-        console.log('프로필이 존재하지 않습니다');
-        return null;
-      }
-    } catch (error) {
-      console.error('프로필 가져오기 오류:', error);
-      return null;
+      // 사용자 정보 업데이트
+      updateUser: (userData) => set((state) => ({
+        user: { ...state.user, ...userData }
+      })),
+      
+      // 프로필 정보 업데이트
+      updateUserProfile: async (userId, profileData) => {
+        set({ loading: true, error: null });
+        try {
+          await AsyncStorage.setItem(`user_profile_${userId}`, JSON.stringify(profileData));
+          set({ userProfile: profileData, loading: false });
+          return true;
+        } catch (error) {
+          set({ error: error.message, loading: false });
+          return false;
+        }
+      },
+      
+      // 로그아웃
+      logout: () => set({ user: null, userProfile: null }),
+      
+      // 회원 탈퇴
+      withdraw: () => set({ user: null, userProfile: null })
+    }),
+    {
+      name: 'user-storage',
+      storage: {
+        getItem: async (name) => {
+          const value = await AsyncStorage.getItem(name);
+          return value ? JSON.parse(value) : null;
+        },
+        setItem: async (name, value) => {
+          await AsyncStorage.setItem(name, JSON.stringify(value));
+        },
+        removeItem: async (name) => {
+          await AsyncStorage.removeItem(name);
+        },
+      },
+      partialize: (state) => ({ 
+        user: state.user,
+        userProfile: state.userProfile
+      })
     }
-  },
-  
-  // 사용자 프로필 생성 또는 업데이트 (백엔드 API 구현 시 수정 필요)
-  updateUserProfile: async (userId, profileData) => {
-    set({ loading: true, error: null });
-    try {
-      // 실제 백엔드 API 대신 임시로 AsyncStorage에 저장
-      await AsyncStorage.setItem(`user_profile_${userId}`, JSON.stringify(profileData));
-      set({ userProfile: profileData, loading: false });
-      return true;
-    } catch (error) {
-      set({ error: error.message, loading: false });
-      return false;
-    }
-  },
-}));
+  )
+);
 
 export default useUserStore; 

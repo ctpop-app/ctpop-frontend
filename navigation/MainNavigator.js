@@ -1,19 +1,35 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import { ROUTES, HEADER_OPTIONS } from './constants';
 
-// 메인 탭 네비게이션
+// 메인 관련 화면들
 import MainTabs from './MainTabs';
-// ProfileTestScreen 추가
 import ProfileTestScreen from '../screens/ProfileTestScreen';
+import ProfileSetupScreen from '../screens/ProfileSetupScreen';
 
 const Stack = createStackNavigator();
 
 const MainNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MainTabs" component={MainTabs} />
-      {/* 여기에 메인 탭 외의 화면들을 추가할 수 있습니다 (예: 상세 프로필, 채팅 창 등) */}
-      <Stack.Screen name="ProfileTest" component={ProfileTestScreen} />
+    <Stack.Navigator 
+      initialRouteName={ROUTES.MAIN.STACK}
+      screenOptions={HEADER_OPTIONS.MAIN}
+    >
+      <Stack.Screen 
+        name={ROUTES.MAIN.STACK} 
+        component={MainTabs}
+        options={{ title: '홈' }}
+      />
+      <Stack.Screen 
+        name={ROUTES.MAIN.PROFILE_TEST} 
+        component={ProfileTestScreen}
+        options={{ title: '프로필 테스트' }}
+      />
+      <Stack.Screen 
+        name={ROUTES.AUTH.PROFILE_SETUP} 
+        component={ProfileSetupScreen}
+        options={{ title: '프로필 설정' }}
+      />
     </Stack.Navigator>
   );
 };

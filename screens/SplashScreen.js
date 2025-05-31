@@ -5,7 +5,6 @@ const SplashScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>CTpop</Text>
-      <Text style={styles.subtitle}>성소수자를 위한 매칭 및 커뮤니티</Text>
       
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FF6B6B" />

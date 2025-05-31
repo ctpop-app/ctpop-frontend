@@ -2,7 +2,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
-import { StatusBar, View, Text, StyleSheet, Alert } from 'react-native';
+import { StatusBar, View, Text, StyleSheet } from 'react-native';
 import 'react-native-gesture-handler';
 
 // State management
@@ -21,12 +21,23 @@ import JwtPhoneLoginScreen from './screens/JwtPhoneLoginScreen';
 import ProfileSetupScreen from './screens/ProfileSetupScreen';
 import MainNavigator from './navigation/MainNavigator';
 import SplashScreen from './screens/SplashScreen';
+import AuthNavigator from './navigation/AuthNavigator';
+import { ROUTES } from './navigation/constants';
 
 const Stack = createStackNavigator();
 
+// 에러 화면 컴포넌트
+const ErrorScreen = ({ error }) => (
+  <View style={styles.errorContainer}>
+    <Text style={styles.errorTitle}>초기화 오류</Text>
+    <Text style={styles.errorMessage}>{error}</Text>
+    <Text style={styles.errorHint}>앱을 다시 시작하거나 네트워크 연결을 확인해주세요.</Text>
+  </View>
+);
+
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
-  const { setUser, fetchUserProfile } = useUserStore();
+  const { user, setUser } = useUserStore();
   const [hasProfile, setHasProfile] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState(null);
@@ -73,84 +84,95 @@ export default function App() {
       if (authenticated) {
         console.log('인증된 사용자 발견');
         
-        // 토큰 정보 가져오기
-        const { phoneNumber } = await authApi.getAuthInfo();
-        
-        // 토큰 갱신 시도
-        const newToken = await authApi.refreshToken();
-        
-        if (newToken) {
-          // 사용자 정보 설정
-          setUser({ uid: phoneNumber, phoneNumber });
-          setIsLoggedIn(true);
+        try {
+          // 토큰 정보 가져오기
+          const { phoneNumber } = await authApi.getAuthInfo();
           
-          // Firestore에서 프로필 확인
-          const profileCheck = await profileService.checkProfileExists(phoneNumber);
+          // 토큰 갱신 시도
+          const newToken = await authApi.refreshToken();
           
-          if (profileCheck.success) {
-            if (profileCheck.exists) {
-              // 프로필이 존재하면 Main으로 이동
-              console.log('기존 프로필이 있어 메인 화면으로 이동합니다.');
-              setHasProfile(true);
-              
-              // 프로필 데이터 저장
-              useUserStore.getState().updateUserProfile(phoneNumber, profileCheck.data);
+          if (newToken) {
+            // Firestore에서 프로필 확인
+            const profileCheck = await profileService.checkProfileExists(phoneNumber);
+            
+            if (profileCheck.success) {
+              if (profileCheck.exists) {
+                // 프로필이 존재하면 Main으로 이동
+                console.log('기존 프로필이 있어 메인 화면으로 이동합니다.');
+                setUser({ uid: phoneNumber, phoneNumber });
+                setIsLoggedIn(true);
+                setHasProfile(true);
+                
+                // 프로필 데이터 저장
+                useUserStore.getState().updateUserProfile(phoneNumber, profileCheck.data);
+              } else {
+                // 프로필이 없으면 로그아웃 처리
+                console.log('프로필이 없어 로그아웃 처리합니다.');
+                await handleLogout();
+              }
             } else {
-              // 프로필이 없으면 프로필 설정 필요
-              console.log('프로필이 없어 프로필 설정이 필요합니다.');
-              setHasProfile(false);
+              // 프로필 확인 실패 시 로그아웃 처리
+              console.error('프로필 확인 중 오류:', profileCheck.error);
+              await handleLogout();
             }
           } else {
-            // 프로필 확인 실패 시 기본적으로 프로필 설정 화면으로 이동
-            console.error('프로필 확인 중 오류:', profileCheck.error);
-            setHasProfile(false);
+            // 토큰 갱신 실패 - 로그아웃 처리
+            await handleLogout();
           }
-        } else {
-          // 토큰 갱신 실패 - 로그아웃 상태로 처리
-          setIsLoggedIn(false);
+        } catch (error) {
+          console.error('인증 정보 처리 중 오류:', error);
+          await handleLogout();
         }
       } else {
         console.log('인증되지 않은 사용자');
-        setIsLoggedIn(false);
+        await handleLogout();
       }
       
       setIsInitialized(true);
     } catch (error) {
       console.error('인증 확인 오류:', error);
-      setError(error.message);
+      await handleLogout();
     } finally {
       setIsLoading(false);
     }
   };
 
+  // 로그아웃 처리
+  const handleLogout = async () => {
+    try {
+      // 로그아웃 처리
+      await authApi.logout();
+      
+      // 사용자 상태 초기화
+      setUser(null);
+      setIsLoggedIn(false);
+      setHasProfile(false);
+      
+      console.log('로그아웃 처리 완료');
+    } catch (error) {
+      console.error('로그아웃 처리 중 오류:', error);
+      // 에러가 발생하더라도 로컬 상태는 초기화
+      setUser(null);
+      setIsLoggedIn(false);
+      setHasProfile(false);
+    }
+  };
+
   // 오류 발생 시 표시할 화면
   if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>초기화 오류</Text>
-        <Text style={styles.errorMessage}>{error}</Text>
-        <Text style={styles.errorHint}>앱을 다시 시작하거나 네트워크 연결을 확인해주세요.</Text>
-      </View>
-    );
-  }
-
-  // 로딩 중인 경우
-  if (isLoading) {
-    return <SplashScreen />;
+    return <ErrorScreen error={error} />;
   }
 
   return (
     <NavigationContainer>
       <StatusBar style="auto" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isLoggedIn ? (
-          hasProfile ? (
-            <Stack.Screen name="Main" component={MainNavigator} />
-          ) : (
-            <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-          )
+        {isLoading ? (
+          <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} />
+        ) : user && isLoggedIn ? (
+          <Stack.Screen name={ROUTES.MAIN.STACK} component={MainNavigator} />
         ) : (
-          <Stack.Screen name="Login" component={JwtPhoneLoginScreen} />
+          <Stack.Screen name={ROUTES.AUTH.LOGIN} component={AuthNavigator} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
@@ -166,10 +188,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   errorTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#d32f2f',
-    marginBottom: 15,
+    color: '#FF6B6B',
+    marginBottom: 10,
   },
   errorMessage: {
     fontSize: 16,
@@ -179,7 +201,7 @@ const styles = StyleSheet.create({
   },
   errorHint: {
     fontSize: 14,
-    color: '#888',
+    color: '#999',
     textAlign: 'center',
   },
 }); 

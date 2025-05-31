@@ -37,7 +37,7 @@ export default function JwtPhoneLoginScreen({ navigation }) {
           // Navigate to home if already logged in
           navigation.reset({
             index: 0,
-            routes: [{ name: 'Main' }],
+            routes: [{ name: 'MainStack' }],
           });
         }
       } catch (error) {
@@ -210,7 +210,6 @@ export default function JwtPhoneLoginScreen({ navigation }) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>CTpop</Text>
-        <Text style={styles.subtitle}>성소수자를 위한 매칭 및 커뮤니티</Text>
         <ActivityIndicator size="large" color="#FF6B6B" />
       </View>
     );
@@ -223,7 +222,6 @@ export default function JwtPhoneLoginScreen({ navigation }) {
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Text style={styles.title}>CTpop</Text>
-        <Text style={styles.subtitle}>성소수자를 위한 매칭 및 커뮤니티</Text>
 
         <View style={styles.formContainer}>
           {/* 네트워크 연결 테스트 버튼 */}

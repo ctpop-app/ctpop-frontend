@@ -6,48 +6,109 @@ export class Profile {
    * 프로필 생성자
    * @param {Object} props 프로필 속성
    */
-  constructor(props = {}) {
-    this.id = props.id || null;
-    this.uid = props.uid || null;         // Firebase 인증 ID 또는 전화번호
-    this.nickname = props.nickname || ''; // 닉네임 (필수)
-    this.age = props.age || null;         // 나이
-    this.height = props.height || null;   // 키 (cm)
-    this.weight = props.weight || null;   // 몸무게 (kg)
-    this.location = props.location || ''; // 지역 (광역시도)
-    this.bio = props.bio || '';           // 소개
-    this.orientation = props.orientation || props.preference || ''; // 성향 (트젠, 시디, 러버)
-    this.mainPhotoURL = props.mainPhotoURL || props.photoURL || null; // 대표 프로필 사진 (필수)
-    this.photoURLs = props.photoURLs || []; // 추가 프로필 사진들 (최대 5개)
-    this.isActive = props.isActive !== undefined ? props.isActive : true;
-    this.createdAt = props.createdAt || null;
-    this.updatedAt = props.updatedAt || null;
-    this.lastActive = props.lastActive || null;
+  constructor({
+    uid, // UUID (사용자 식별자)
+    nickname,
+    age,
+    height,
+    weight,
+    location,
+    bio,
+    orientation,
+    mainPhotoURL,
+    photoURLs = [],
+    isActive = true,
+    createdAt,
+    updatedAt,
+    lastActive
+  }) {
+    this.uid = uid;
+    this.nickname = nickname;
+    this.age = age;
+    this.height = height;
+    this.weight = weight;
+    this.location = location;
+    this.bio = bio;
+    this.orientation = orientation;
+    this.mainPhotoURL = mainPhotoURL;
+    this.photoURLs = photoURLs;
+    this.isActive = isActive;
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
+    this.lastActive = lastActive;
   }
 
   /**
    * Firestore 문서에서 Profile 객체 생성
-   * @param {Object} doc Firestore 문서 스냅샷
+   * @param {DocumentSnapshot} doc Firestore 문서
    * @returns {Profile} Profile 객체
    */
   static fromFirestore(doc) {
     const data = doc.data();
     return new Profile({
-      id: doc.id,
+      uid: doc.id,
       ...data,
-      // Firestore 타임스탬프를 JavaScript Date 객체로 변환
-      createdAt: data.createdAt?.toDate() || null,
-      updatedAt: data.updatedAt?.toDate() || null,
-      lastActive: data.lastActive?.toDate() || null
+      createdAt: data.createdAt?.toDate(),
+      updatedAt: data.updatedAt?.toDate(),
+      lastActive: data.lastActive?.toDate()
     });
   }
 
   /**
-   * Profile 객체를 Firestore에 저장할 수 있는 형태로 변환
-   * @returns {Object} Firestore 문서 데이터
+   * Firestore에 저장할 데이터 객체 생성
+   * @returns {Object} Firestore 데이터
    */
   toFirestore() {
-    // id는 문서 ID이므로 제외
-    const { id, createdAt, updatedAt, lastActive, ...data } = this;
-    return data;
+    return {
+      uid: this.uid,
+      nickname: this.nickname,
+      age: this.age,
+      height: this.height,
+      weight: this.weight,
+      location: this.location,
+      bio: this.bio,
+      orientation: this.orientation,
+      mainPhotoURL: this.mainPhotoURL,
+      photoURLs: this.photoURLs,
+      isActive: this.isActive,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+      lastActive: this.lastActive
+    };
+  }
+
+  /**
+   * 프로필 데이터 유효성 검사
+   * @returns {Object} { isValid: boolean, errors: string[] }
+   */
+  validate() {
+    const errors = [];
+
+    // 필수 필드 검사
+    if (!this.nickname) errors.push('닉네임은 필수입니다.');
+    if (!this.mainPhotoURL) errors.push('메인 사진은 필수입니다.');
+    if (!this.location) errors.push('지역은 필수입니다.');
+    if (!this.orientation) errors.push('성향은 필수입니다.');
+
+    // 숫자 필드 범위 검사
+    if (this.age && (this.age < 18 || this.age > 100)) {
+      errors.push('나이는 18세 이상 100세 이하여야 합니다.');
+    }
+    if (this.height && (this.height < 140 || this.height > 220)) {
+      errors.push('키는 140cm 이상 220cm 이하여야 합니다.');
+    }
+    if (this.weight && (this.weight < 30 || this.weight > 200)) {
+      errors.push('체중은 30kg 이상 200kg 이하여야 합니다.');
+    }
+
+    // 사진 URL 개수 검사
+    if (this.photoURLs && this.photoURLs.length > 5) {
+      errors.push('추가 사진은 최대 5장까지 가능합니다.');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   }
 } 
