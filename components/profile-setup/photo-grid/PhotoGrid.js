@@ -27,17 +27,19 @@ export const PhotoGrid = ({
     y: useSharedValue(0)
   }));
 
+  // 마지막으로 사용된 사진의 인덱스를 찾는 함수
+  const getLastUsedIndex = () => {
+    const lastIndex = photos.findIndex(photo => photo === null);
+    return lastIndex === -1 ? MAX_PHOTOS - 1 : lastIndex - 1;
+  };
+
   const moveItem = (fromIdx, toIdx) => {
     if (fromIdx < 0 || toIdx < 0 || fromIdx >= MAX_PHOTOS || toIdx >= MAX_PHOTOS) {
       console.log('Invalid move attempted:', { fromIdx, toIdx });
       return;
     }
 
-    const lastUsedIndex = photos.findIndex(photo => photo === null) - 1;
-    if (lastUsedIndex === -2) {
-      lastUsedIndex = MAX_PHOTOS - 1;
-    }
-
+    const lastUsedIndex = getLastUsedIndex();
     if (toIdx > lastUsedIndex) {
       console.log('Invalid move: Cannot move beyond the last used photo');
       return;
@@ -111,7 +113,18 @@ export const PhotoGrid = ({
     };
   });
 
-  const data = photos.map((p, i) => ({ key: `${i}`, uri: p, empty: p === null, idx: i }));
+  const data = photos.map((p, i) => {
+    const lastUsedIndex = getLastUsedIndex();
+    const isAddable = i === lastUsedIndex + 1;
+    
+    return { 
+      key: `${i}`, 
+      uri: p?.uri || null, 
+      empty: p === null, 
+      idx: i,
+      isAddable
+    };
+  });
 
   return (
     <View style={styles.photoGrid}>
@@ -128,7 +141,7 @@ export const PhotoGrid = ({
             <PhotoItem
               item={item}
               index={index}
-              onPress={onPhotoPress}
+              onPress={item.isAddable ? onPhotoPress : undefined}
               onRemove={onPhotoRemove}
             />
           </Animated.View>

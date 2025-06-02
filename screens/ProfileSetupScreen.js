@@ -1,179 +1,358 @@
-import React, { useState, useEffect } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-import { GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView, Alert, Text, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import { ROUTES } from '../navigation/constants';
+import { useProfileForm } from '../hooks/useProfileForm';
+import { usePhotoGrid } from '../hooks/usePhotoGrid';
 import { PhotoGrid } from '../components/profile-setup/photo-grid/PhotoGrid';
 import { FormInput } from '../components/profile-setup/form-inputs/FormInput';
 import { OptionSelector } from '../components/profile-setup/form-inputs/OptionSelector';
-import { ProfileHeader } from '../components/profile-setup/common/ProfileHeader';
-import { SaveButton } from '../components/profile-setup/common/SaveButton';
-import { usePhotoGrid } from '../hooks/usePhotoGrid';
-import { useProfileForm } from '../hooks/useProfileForm';
-import { 
-  MAX_PHOTOS, 
-  ORIENTATION_OPTIONS
-} from '../components/profile-setup/constants';
 import { LocationSelector } from '../components/profile-setup/form-inputs/LocationSelector';
+import { Button } from '../components/Button';
+import { ProfileHeader } from '../components/profile-setup/common/ProfileHeader';
+import useUserStore from '../store/userStore';
+import { ORIENTATION_OPTIONS, MAX_PHOTOS } from '../components/profile-setup/constants';
 
-export default function ProfileSetupScreen({ route, navigation }) {
-  const { phoneNumber, isEdit, currentProfile } = route.params || {};
-  const [selectedCity, setSelectedCity] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  
-  // 모든 훅을 컴포넌트 최상단에서 선언
-  const {
-    photos,
-    pickImage,
-    removePhoto,
-    movePhoto
-  } = usePhotoGrid(MAX_PHOTOS);
+const ProfileSetupScreen = () => {
+  const navigation = useNavigation();
+  const { user, setHasProfile } = useUserStore();
+  const [isSaving, setIsSaving] = useState(false);
+  const [photoList, setPhotoList] = useState(Array(MAX_PHOTOS).fill(null));
 
   const {
     formData,
-    saving,
+    errors,
+    isLoading: isFormLoading,
     updateField,
-    saveProfile
-  } = useProfileForm(phoneNumber, navigation);
+    handleSubmit
+  } = useProfileForm(user?.uuid);
 
-  useEffect(() => {
-    if (isEdit && currentProfile) {
-      // 기존 프로필 데이터로 폼 초기화
-      updateField('nickname', currentProfile.nickname || '');
-      updateField('age', currentProfile.age?.toString() || '');
-      updateField('height', currentProfile.height?.toString() || '');
-      updateField('weight', currentProfile.weight?.toString() || '');
-      updateField('location', currentProfile.location || '');
-      updateField('orientation', currentProfile.orientation || '');
-      updateField('bio', currentProfile.bio || '');
+  const {
+    photos,
+    isLoading: isPhotoLoading,
+    error: photoError,
+    addPhoto,
+    removePhoto,
+    uploadPhotos
+  } = usePhotoGrid(user?.uuid);
 
-      // 기존 사진들 로드
-      const existingPhotos = [
-        currentProfile.mainPhotoURL,
-        ...(currentProfile.photoURLs || [])
-      ].filter(Boolean);
-      setPhotos(existingPhotos);
-    }
-  }, [isEdit, currentProfile]);
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
-
+  const handlePhotoPress = async (index) => {
     try {
-      // 위치 정보 업데이트
-      updateField('location', `${selectedCity} ${selectedDistrict}`.trim());
-      
-      // 프로필 저장
-      await saveProfile(photos);
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('권한 필요', '사진 접근 권한이 필요합니다.');
+        return;
+      }
 
-      // 프로필 저장 성공
-      Alert.alert(
-        '성공',
-        isEdit ? '프로필이 수정되었습니다.' : '프로필이 저장되었습니다.',
-        [
-          {
-            text: '확인',
-            onPress: () => {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'MainStack' }],
-              });
-            }
-          }
-        ]
-      );
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        const photo = {
+          uri: result.assets[0].uri,
+          type: 'image/jpeg/png',
+          name: `photo_${Date.now()}.jpg`
+        };
+        
+        // photoList 업데이트
+        const newPhotoList = [...photoList];
+        newPhotoList[index] = photo;
+        setPhotoList(newPhotoList);
+        
+        // usePhotoGrid의 addPhoto 호출
+        addPhoto(photo);
+      }
     } catch (error) {
-      Alert.alert('오류', error.message || '프로필 저장 중 오류가 발생했습니다.');
+      Alert.alert('오류', '사진 선택 중 오류가 발생했습니다.');
     }
   };
 
-  const validateForm = () => {
-    // 필수 항목 검증
-    if (!formData.nickname?.trim()) {
-      Alert.alert('오류', '닉네임을 입력해주세요');
-      return false;
+  const handlePhotoRemove = (index) => {
+    removePhoto(index);
+    const newPhotoList = [...photoList];
+    newPhotoList[index] = null;
+    setPhotoList(newPhotoList);
+  };
+
+  const handlePhotoMove = (fromIndex, toIndex) => {
+    const newPhotoList = [...photoList];
+    const [movedPhoto] = newPhotoList.splice(fromIndex, 1);
+    newPhotoList.splice(toIndex, 0, movedPhoto);
+    setPhotoList(newPhotoList);
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return;
+
+    try {
+      setIsSaving(true);
+      console.log('프로필 저장 시작:', { user, formData, photoList });
+
+      // 1. 사진 업로드
+      const photosToUpload = photoList.filter(photo => photo !== null);
+      console.log('업로드할 사진:', photosToUpload);
+      
+      // usePhotoGrid의 photos 배열 업데이트
+      photosToUpload.forEach(photo => {
+        if (!photos.find(p => p.uri === photo.uri)) {
+          addPhoto(photo);
+        }
+      });
+      
+      let photoUrls = [];
+      if (photosToUpload.length > 0) {
+        photoUrls = await uploadPhotos();
+        console.log('사진 업로드 결과:', photoUrls);
+        
+        if (!photoUrls || photoUrls.length === 0) {
+          throw new Error('사진 업로드에 실패했습니다.');
+        }
+      }
+
+      // 2. 프로필 정보 저장 (사진 URL 포함)
+      const profileData = await handleSubmit({
+        mainPhotoURL: photoUrls[0] || '',
+        photoURLs: photoUrls
+      });
+      console.log('프로필 저장 결과:', profileData);
+      
+      if (!profileData) {
+        throw new Error('프로필 저장에 실패했습니다.');
+      }
+
+      // 3. 프로필 생성 완료 상태로 변경
+      setHasProfile(true);
+      console.log('프로필 저장 완료');
+
+      // 4. 홈 화면으로 이동
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [
+            {
+              name: ROUTES.MAIN.STACK,
+              state: {
+                routes: [
+                  {
+                    name: ROUTES.MAIN.HOME
+                  }
+                ]
+              }
+            }
+          ]
+        })
+      );
+    } catch (error) {
+      console.error('프로필 저장 중 오류:', error);
+      Alert.alert('오류', error.message);
+    } finally {
+      setIsSaving(false);
     }
-    if (!photos[0]) {
-      Alert.alert('오류', '대표사진을 등록해주세요');
-      return false;
-    }
-    return true;
   };
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 10 }}>
-        <ProfileHeader />
+    <SafeAreaView style={styles.safeArea}>
+      <ProfileHeader
+        title="프로필 생성"
+        subtitle="나를 표현하는 프로필을 만들어보세요"
+      />
+      <View style={styles.scrollContainer}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingView}
+        >
+          <ScrollView 
+            style={styles.container}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.content}>
+              <View style={styles.photoSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>프로필 사진</Text>
+                  <View style={styles.requiredBadge}>
+                    <Text style={styles.requiredText}>필수</Text>
+                  </View>
+                </View>
+                <Text style={styles.sectionSubtitle}>
+                  최대 6장까지 등록 가능합니다
+                  <Text style={styles.requiredNote}> (대표사진 필수)</Text>
+                </Text>
+                <PhotoGrid
+                  photos={photoList}
+                  onPhotoPress={handlePhotoPress}
+                  onPhotoRemove={handlePhotoRemove}
+                  onPhotoMove={handlePhotoMove}
+                  isLoading={isPhotoLoading}
+                  error={photoError}
+                />
+              </View>
 
-        <PhotoGrid
-          photos={photos}
-          onPhotoPress={pickImage}
-          onPhotoRemove={removePhoto}
-          onPhotoMove={movePhoto}
-        />
-        
-        <View style={styles.form}>
-          <FormInput
-            value={formData.nickname}
-            onChangeText={(value) => updateField('nickname', value)}
-            placeholder="닉네임 *"
-          />
-          <FormInput
-            value={formData.age}
-            onChangeText={(value) => updateField('age', value)}
-            placeholder="나이"
-            keyboardType="number-pad"
-          />
-          <View style={styles.row}>
-            <FormInput
-              style={styles.inputHalf}
-              value={formData.height}
-              onChangeText={(value) => updateField('height', value)}
-              placeholder="키(cm)"
-              keyboardType="number-pad"
-            />
-            <FormInput
-              style={styles.inputHalf}
-              value={formData.weight}
-              onChangeText={(value) => updateField('weight', value)}
-              placeholder="몸무게(kg)"
-              keyboardType="number-pad"
-            />
-          </View>
+              <View style={styles.form}>
+                <Text style={styles.sectionTitle}>기본 정보</Text>
+                <FormInput
+                  value={formData.nickname}
+                  onChangeText={(value) => updateField('nickname', value)}
+                  placeholder="닉네임 *"
+                  error={errors.nickname}
+                  editable={!isFormLoading}
+                />
 
-          <OptionSelector
-            label="성향"
-            options={ORIENTATION_OPTIONS}
-            selectedValue={formData.orientation}
-            onSelect={(value) => updateField('orientation', value)}
-          />
+                <FormInput
+                  value={formData.age}
+                  onChangeText={(value) => updateField('age', value)}
+                  placeholder="나이"
+                  keyboardType="number-pad"
+                  error={errors.age}
+                  editable={!isFormLoading}
+                />
 
-          <LocationSelector
-            selectedCity={selectedCity}
-            selectedDistrict={selectedDistrict}
-            onCitySelect={setSelectedCity}
-            onDistrictSelect={setSelectedDistrict}
-          />
+                <View style={styles.row}>
+                  <FormInput
+                    style={styles.inputHalf}
+                    value={formData.height}
+                    onChangeText={(value) => updateField('height', value)}
+                    placeholder="키(cm)"
+                    keyboardType="number-pad"
+                    error={errors.height}
+                    editable={!isFormLoading}
+                  />
+                  <FormInput
+                    style={styles.inputHalf}
+                    value={formData.weight}
+                    onChangeText={(value) => updateField('weight', value)}
+                    placeholder="체중(kg)"
+                    keyboardType="number-pad"
+                    error={errors.weight}
+                    editable={!isFormLoading}
+                  />
+                </View>
 
-          <FormInput
-            value={formData.bio}
-            onChangeText={(value) => updateField('bio', value)}
-            placeholder="자기소개를 입력하세요"
-            multiline
-            numberOfLines={4}
-          />
+                <Text style={styles.sectionTitle}>성향</Text>
+                <OptionSelector
+                  options={ORIENTATION_OPTIONS}
+                  selectedValue={formData.orientation}
+                  onSelect={(value) => updateField('orientation', value)}
+                  disabled={isFormLoading}
+                />
 
-          <SaveButton
-            onPress={handleSave}
-            disabled={saving}
-            loading={saving}
-          />
-        </View>
-      </ScrollView>
-    </GestureHandlerRootView>
+                <Text style={styles.sectionTitle}>지역</Text>
+                <View style={styles.locationContainer}>
+                  <LocationSelector
+                    selectedCity={formData.city}
+                    selectedDistrict={formData.district}
+                    onCitySelect={(value) => updateField('city', value)}
+                    onDistrictSelect={(value) => updateField('district', value)}
+                    disabled={isFormLoading}
+                  />
+                </View>
+
+                <Text style={styles.sectionTitle}>자기소개</Text>
+                <FormInput
+                  value={formData.bio}
+                  onChangeText={(value) => updateField('bio', value)}
+                  placeholder="자기소개를 입력하세요"
+                  multiline
+                  numberOfLines={4}
+                  error={errors.bio}
+                  editable={!isFormLoading}
+                />
+              </View>
+
+              <Button
+                title="저장하기"
+                onPress={handleSave}
+                disabled={isSaving || isFormLoading || isPhotoLoading}
+                loading={isSaving}
+                style={styles.saveButton}
+              />
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  form: { padding: 20 },
-  row: { flexDirection: 'row', justifyContent: 'space-between' },
-  inputHalf: { width: '48%' }
-}); 
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContainer: {
+    flex: 1,
+    marginTop: Platform.OS === 'ios' ? 110 : 100,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 80,
+  },
+  content: {
+    padding: 16,
+  },
+  photoSection: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 8,
+  },
+  requiredBadge: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  requiredText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  requiredNote: {
+    color: '#FF6B6B',
+    fontWeight: '500',
+  },
+  form: {
+    marginTop: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  inputHalf: {
+    width: '48%',
+  },
+  locationContainer: {
+    marginVertical: 8,
+  },
+  saveButton: {
+    marginTop: 24,
+    marginBottom: 16,
+  },
+});
+
+export default ProfileSetupScreen; 

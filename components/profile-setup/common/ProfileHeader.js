@@ -1,48 +1,50 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Platform } from 'react-native';
 
 export const ProfileHeader = ({ 
   title = '프로필 설정',
-  subtitle = '프로필을 완성하여 매칭을 시작하세요',
-  photoTitle = '프로필 사진 (최대 6장)',
-  instruction = '사진을 탭해서 추가하세요'
+  subtitle = '프로필을 완성하여 매칭을 시작하세요'
 }) => {
   return (
     <View style={styles.header}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
-      <Text style={styles.photoTitle}>{photoTitle}</Text>
-      <Text style={styles.instruction}>{instruction}</Text>
+      <View style={styles.headerContent}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+        </View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  header: { 
-    padding: 20, 
-    paddingTop: 60, 
-    alignItems: 'center' 
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    paddingBottom: 15,
+    zIndex: 1000,
   },
-  title: { 
-    fontSize: 24, 
-    fontWeight: 'bold', 
-    color: '#FF6B6B', 
-    marginBottom: 8 
+  headerContent: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
   },
-  subtitle: { 
-    fontSize: 14, 
-    color: '#666', 
-    marginBottom: 20 
+  titleContainer: {
+    alignItems: 'center',
   },
-  photoTitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
-    color: '#333', 
-    marginBottom: 5 
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
   },
-  instruction: { 
-    fontSize: 12, 
-    color: '#FF6B6B', 
-    marginBottom: 15 
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
   }
 }); 

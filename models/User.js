@@ -3,8 +3,8 @@
  */
 export class User {
   constructor(props = {}) {
-    this.uid = props.uid || null;              // 전화번호 (인증용)
-    this.uuid = props.uuid || null;            // 고유 식별자
+    this.id = props.id || null;              // Firestore 문서 ID (자동 생성)
+    this.uuid = props.uuid || null;          // 고유 식별자 (User와 Profile 연결용)
     this.firstAuthAt = props.firstAuthAt || null; // 최초 인증 시간
     this.lastAuthAt = props.lastAuthAt || null;   // 마지막 인증 시간
     this.isActive = props.isActive !== undefined ? props.isActive : true;
@@ -13,7 +13,7 @@ export class User {
   static fromFirestore(doc) {
     const data = doc.data();
     return new User({
-      uid: doc.id,
+      id: doc.id,
       ...data,
       firstAuthAt: data.firstAuthAt?.toDate() || null,
       lastAuthAt: data.lastAuthAt?.toDate() || null
@@ -21,7 +21,7 @@ export class User {
   }
 
   toFirestore() {
-    const { uid, ...data } = this;
+    const { id, ...data } = this;
     return data;
   }
 } 

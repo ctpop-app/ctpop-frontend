@@ -14,53 +14,56 @@ export const PhotoItem = ({
   onPress, 
   onRemove
 }) => {
+  const { uri, empty, isAddable } = item;
   const isMainPhoto = index === 0;
 
   const handlePress = () => {
-    if (item.empty) {
-      onPress(index);
+    if (empty) {
+      if (isAddable) {
+        onPress(index);
+      }
     } else {
       onPress(index);
     }
   };
 
+  if (empty) {
+    return (
+      <TouchableOpacity
+        style={[styles.container, styles.emptyContainer]}
+        onPress={isAddable ? handlePress : undefined}
+        disabled={!isAddable}
+      >
+        <Ionicons 
+          name="add-circle-outline" 
+          size={32} 
+          color={isAddable ? "#666" : "#ccc"} 
+        />
+      </TouchableOpacity>
+    );
+  }
+
   return (
-    <TouchableOpacity
-      style={styles.container}
-      onPress={handlePress}
-      activeOpacity={0.7}
-    >
-      {item.empty ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons 
-            name="add-circle-outline" 
-            size={32} 
-            color="#666" 
-          />
+    <View style={styles.container}>
+      <Image
+        source={{ uri }}
+        style={styles.image}
+        resizeMode="cover"
+      />
+      {isMainPhoto && (
+        <View style={styles.mainPhotoBadge}>
+          <Ionicons name="star" size={12} color="#fff" />
         </View>
-      ) : (
-        <>
-          <Image
-            source={{ uri: item.uri }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-          {isMainPhoto && (
-            <View style={styles.mainPhotoBadge}>
-              <Ionicons name="star" size={12} color="#fff" />
-            </View>
-          )}
-          {!isMainPhoto && (
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={() => onRemove(index)}
-            >
-              <Ionicons name="close" size={16} color="#fff" />
-            </TouchableOpacity>
-          )}
-        </>
       )}
-    </TouchableOpacity>
+      {!isMainPhoto && (
+        <TouchableOpacity
+          style={styles.removeButton}
+          onPress={() => onRemove(index)}
+        >
+          <Ionicons name="close" size={16} color="#fff" />
+        </TouchableOpacity>
+      )}
+    </View>
   );
 };
 

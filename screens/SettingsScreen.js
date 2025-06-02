@@ -7,13 +7,14 @@ import { useNavigation } from '@react-navigation/native';
 import useUserStore from '../store/userStore';
 import { profileService } from '../services/profileService';
 import { userService } from '../services/userService';
+import { ROUTES } from '../navigation/constants';
 
 // 기본 프로필 이미지 URL
 const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
-  const { user, userProfile, logout, withdraw } = useUserStore();
+  const { user, userProfile, logout, withdrawUser } = useUserStore();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -64,7 +65,7 @@ const SettingsScreen = () => {
               logout();
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'Auth' }]
+                routes: [{ name: ROUTES.AUTH.LOGIN }]
               });
             } catch (error) {
               console.error('로그아웃 실패:', error);
@@ -91,14 +92,40 @@ const SettingsScreen = () => {
           onPress: async () => {
             try {
               if (!user?.phoneNumber) {
-                throw new Error('사용자 정보를 찾을 수 없습니다.');
+                // 사용자 정보가 없는 경우 로그인 화면으로 이동
+                withdrawUser();
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: ROUTES.AUTH.LOGIN }]
+                });
+                return;
               }
 
-              await profileService.deactivateProfile(user.phoneNumber);
-              withdraw();
+              // 프로필 존재 여부 확인
+              const profileCheck = await profileService.checkProfileExists(user.phoneNumber);
+              if (!profileCheck.success) {
+                // 프로필 확인 실패 시 로그인 화면으로 이동
+                withdrawUser();
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: ROUTES.AUTH.LOGIN }]
+                });
+                return;
+              }
+
+              // 프로필이 있는 경우에만 비활성화
+              if (profileCheck.exists) {
+                await profileService.deactivateProfile(user.phoneNumber);
+              }
+
+              // 사용자 비활성화
+              await userService.deactivateUser(user.phoneNumber);
+
+              // 로컬 상태 초기화 및 로그인 화면으로 이동
+              withdrawUser();
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'Auth' }]
+                routes: [{ name: ROUTES.AUTH.LOGIN }]
               });
             } catch (error) {
               console.error('회원 탈퇴 실패:', error);
@@ -212,9 +239,9 @@ const SettingsScreen = () => {
         {/* 로그아웃 및 회원탈퇴 */}
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>계정</Text>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutText}>로그아웃</Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutText}>로그아웃</Text>
+        </TouchableOpacity>
           <TouchableOpacity style={styles.withdrawButton} onPress={handleWithdraw}>
             <Text style={styles.withdrawalText}>회원탈퇴</Text>
           </TouchableOpacity>
@@ -348,6 +375,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 20,
   },
-});
+}); 
 
 export default SettingsScreen; 

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '../utils/config';
-import { refreshAccessToken } from '../utils/authService';
+import { refreshAccessToken } from '../services/authService';
 
 // 기본 Axios 인스턴스 생성
 const apiClient = axios.create({

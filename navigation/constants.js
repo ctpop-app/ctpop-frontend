@@ -1,3 +1,9 @@
+/**
+ * 네비게이션 관련 상수 정의
+ * 이 파일은 앱의 전체 화면 구조와 네비게이션 설정을 정의합니다.
+ * 새로운 화면을 추가할 때는 이 파일의 ROUTES 객체에 먼저 추가해야 합니다.
+ */
+
 import { Ionicons } from '@expo/vector-icons';
 
 // 네비게이션 라우트 상수
@@ -5,7 +11,8 @@ export const ROUTES = {
   // 인증 관련
   AUTH: {
     LOGIN: 'Login',
-    PROFILE_SETUP: 'ProfileSetup'
+    PROFILE_SETUP: 'ProfileSetup',
+    OTP_VERIFICATION: 'OtpVerification'
   },
   
   // 메인 관련
@@ -14,14 +21,46 @@ export const ROUTES = {
     HOME: 'Home',
     MESSAGES: 'Messages',
     SETTINGS: 'Settings',
-    PROFILE_TEST: 'ProfileTest'
+    PROFILE_TEST: 'ProfileTest',
+    BOARD: 'Board',
+    PROFILE_EDIT: 'ProfileEdit',
+    CHAT: 'Chat',
+    CHAT_LIST: 'ChatList',
+    NOTIFICATIONS: 'Notifications'
+  },
+  
+  // 프로필 관련
+  PROFILE: {
+    VIEW: 'ProfileView',
+    EDIT: 'ProfileEdit',
+    PHOTOS: 'ProfilePhotos',
+    SETTINGS: 'ProfileSettings'
+  },
+  
+  // 게시판 관련
+  BOARD: {
+    LIST: 'BoardList',
+    DETAIL: 'BoardDetail',
+    WRITE: 'BoardWrite',
+    EDIT: 'BoardEdit'
+  },
+  
+  // 채팅 관련
+  CHAT: {
+    LIST: 'ChatList',
+    ROOM: 'ChatRoom',
+    CREATE: 'ChatCreate'
   },
   
   // 공통
-  SPLASH: 'Splash'
+  SPLASH: 'Splash',
+  ERROR: 'Error'
 };
 
-// 네비게이션 헤더 설정
+/**
+ * 각 화면의 헤더 설정
+ * 화면별로 다른 헤더 스타일을 적용할 수 있습니다.
+ */
 export const HEADER_OPTIONS = {
   AUTH: {
     headerShown: false,
@@ -29,10 +68,37 @@ export const HEADER_OPTIONS = {
   },
   MAIN: {
     headerShown: false
+  },
+  PROFILE: {
+    headerShown: true,
+    headerStyle: {
+      backgroundColor: '#fff',
+      elevation: 0,
+      shadowOpacity: 0
+    }
+  },
+  BOARD: {
+    headerShown: true,
+    headerStyle: {
+      backgroundColor: '#fff',
+      elevation: 0,
+      shadowOpacity: 0
+    }
+  },
+  CHAT: {
+    headerShown: true,
+    headerStyle: {
+      backgroundColor: '#fff',
+      elevation: 0,
+      shadowOpacity: 0
+    }
   }
 };
 
-// 탭 네비게이션 설정
+/**
+ * 탭 네비게이션 설정
+ * 하단 탭 바의 아이콘과 라벨을 정의합니다.
+ */
 export const TAB_OPTIONS = {
   [ROUTES.MAIN.HOME]: {
     tabBarLabel: '홈',
@@ -66,7 +132,10 @@ export const TAB_OPTIONS = {
   }
 };
 
-// 네비게이션 유틸리티 함수
+/**
+ * 네비게이션 유틸리티 함수
+ * 화면 전환과 관련된 공통 함수들을 제공합니다.
+ */
 export const navigationUtils = {
   // 화면 이동
   navigate: (navigation, routeName, params = {}) => {

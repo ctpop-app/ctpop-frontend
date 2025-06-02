@@ -1,89 +1,120 @@
-import { useState, useCallback } from 'react';
-import { useNavigation } from '@react-navigation/native';
-import { useUserStore } from '../store/userStore';
-import { profileService } from '../services/profileService';
+import { useState } from 'react';
+import { profile } from '../api';
 
-export const useProfileForm = (initialData = {}) => {
-  const navigation = useNavigation();
-  const { user } = useUserStore();
-  const [formData, setFormData] = useState(initialData);
+export const useProfileForm = (uuid) => {
+  const [formData, setFormData] = useState({
+    nickname: '',
+    age: '',
+    height: '',
+    weight: '',
+    city: '',
+    district: '',
+    orientation: '',
+    bio: '',
+    mainPhotoURL: '',
+    photoURLs: []
+  });
+
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const validateForm = useCallback(() => {
-    const newErrors = {};
-    
-    // 필수 필드 검증
-    if (!formData.nickname) {
-      newErrors.nickname = '닉네임은 필수입니다.';
-    }
-    if (!formData.mainPhotoURL) {
-      newErrors.mainPhotoURL = '대표 사진은 필수입니다.';
-    }
-    if (!formData.location) {
-      newErrors.location = '지역은 필수입니다.';
-    }
-    if (!formData.orientation) {
-      newErrors.orientation = '성향은 필수입니다.';
-    }
-
-    // 숫자 필드 검증
-    if (formData.age && (formData.age < 18 || formData.age > 100)) {
-      newErrors.age = '나이는 18세 이상 100세 이하여야 합니다.';
-    }
-    if (formData.height && (formData.height < 140 || formData.height > 220)) {
-      newErrors.height = '키는 140cm 이상 220cm 이하여야 합니다.';
-    }
-    if (formData.weight && (formData.weight < 30 || formData.weight > 200)) {
-      newErrors.weight = '체중은 30kg 이상 200kg 이하여야 합니다.';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [formData]);
-
-  const handleSubmit = useCallback(async () => {
-    if (!validateForm()) return;
-    if (!user?.phoneNumber) {
-      setErrors({ submit: '사용자 정보를 찾을 수 없습니다.' });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const profileData = {
-        ...formData,
-        isActive: true
-      };
-
-      const savedProfile = await profileService.createProfile(user.phoneNumber, profileData);
-      
-      if (savedProfile) {
-        navigation.navigate('Main');
-      } else {
-        setErrors({ submit: '프로필 저장에 실패했습니다.' });
-      }
-    } catch (error) {
-      console.error('프로필 저장 실패:', error);
-      setErrors({ submit: error.message || '프로필 저장에 실패했습니다.' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [formData, user, navigation, validateForm]);
-
-  const updateField = useCallback((field, value) => {
+  const updateField = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-    // 필드가 업데이트되면 해당 필드의 에러를 초기화
+    // 필드 업데이트 시 해당 필드의 에러 제거
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
-        [field]: undefined
+        [field]: null
       }));
     }
-  }, [errors]);
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    // 필수 필드 검증
+    if (!formData.nickname) {
+      newErrors.nickname = '닉네임을 입력해주세요.';
+    }
+
+    // 선택적 필드 검증
+    if (formData.age) {
+      const age = parseInt(formData.age);
+      if (isNaN(age) || age < 18 || age > 100) {
+        newErrors.age = '나이는 18-100세 사이여야 합니다.';
+      }
+    }
+
+    if (formData.height) {
+      const height = parseInt(formData.height);
+      if (isNaN(height) || height < 140 || height > 220) {
+        newErrors.height = '키는 140-220cm 사이여야 합니다.';
+      }
+    }
+
+    if (formData.weight) {
+      const weight = parseInt(formData.weight);
+      if (isNaN(weight) || weight < 30 || weight > 150) {
+        newErrors.weight = '체중은 30-150kg 사이여야 합니다.';
+      }
+    }
+
+    if (formData.bio && formData.bio.length > 500) {
+      newErrors.bio = '자기소개는 500자 이내여야 합니다.';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (photoData = {}) => {
+    if (isLoading) return;
+
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      // 필수 필드 검증
+      const requiredFields = ['nickname', 'age', 'height', 'weight', 'city', 'district'];
+      const newErrors = {};
+
+      requiredFields.forEach(field => {
+        if (!formData[field]) {
+          newErrors[field] = `${fieldLabels[field]}을(를) 입력해주세요.`;
+        }
+      });
+
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        return null;
+      }
+
+      // 프로필 데이터 생성
+      const profileData = {
+        ...formData,
+        ...photoData, // 사진 URL 데이터 추가
+        uuid: userUuid
+      };
+
+      // 프로필 저장
+      const response = await profile.createProfile(profileData);
+      
+      if (!response.success) {
+        throw new Error(response.error);
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('프로필 저장 실패:', error);
+      setErrors({ submit: error.message });
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return {
     formData,

@@ -8,10 +8,10 @@ import ProfileSetupScreen from '../screens/ProfileSetupScreen';
 
 const Stack = createStackNavigator();
 
-const AuthNavigator = () => {
+const AuthNavigator = ({ initialRouteName = ROUTES.AUTH.LOGIN }) => {
   return (
     <Stack.Navigator 
-      initialRouteName={ROUTES.AUTH.LOGIN}
+      initialRouteName={initialRouteName}
       screenOptions={HEADER_OPTIONS.AUTH}
     >
       <Stack.Screen 

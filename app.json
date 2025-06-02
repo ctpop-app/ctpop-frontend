@@ -16,14 +16,31 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.ctpop"
+      "bundleIdentifier": "com.anonymous.ctpop",
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "인증번호를 자동으로 입력하기 위해 SMS 접근 권한이 필요합니다.",
+        "NSCameraUsageDescription": "프로필 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다.",
+        "NSPhotoLibraryUsageDescription": "프로필 사진을 선택하기 위해 사진 라이브러리 접근 권한이 필요합니다.",
+        "NSLocationWhenInUseUsageDescription": "서버 검색을 위해 위치 정보 접근 권한이 필요합니다."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.ctpop"
+      "package": "com.anonymous.ctpop",
+      "permissions": [
+        "RECEIVE_SMS",
+        "READ_SMS",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "extra": {
       "eas": {

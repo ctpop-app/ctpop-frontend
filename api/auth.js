@@ -1,136 +1,148 @@
-import apiClient, { handleApiResponse, handleApiError } from './client';
+import apiClient from './client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { toE164Format } from '../services/authService';
+import { AUTH_KEYS } from '../utils/constants';
+import { jwtDecode } from 'jwt-decode';
 
-// AsyncStorage 키 상수
-const ACCESS_TOKEN_KEY = 'auth_access_token';
-const REFRESH_TOKEN_KEY = 'auth_refresh_token';
-const PHONE_NUMBER_KEY = 'auth_phone_number';
+/**
+ * 서버 연결을 테스트합니다.
+ * @returns {Promise<Object>} - 성공 여부와 메시지가 포함된 객체
+ */
+export const testConnection = async () => {
+  try {
+    const response = await apiClient.get('/auth/echo?message=test', { 
+      authenticated: false,
+      timeout: 5000
+    });
+    return { 
+      success: true, 
+      message: '서버에 연결되었습니다.',
+      data: response.data
+    };
+  } catch (error) {
+    console.error('서버 연결 테스트 실패:', error);
+    return { 
+      success: false, 
+      message: error.message || '서버 연결에 실패했습니다.'
+    };
+  }
+};
 
 /**
  * 전화번호로 인증번호를 발송합니다.
- * @param {string} phoneNumber - 국가 코드가 포함된 전화번호 (예: +821012345678)
+ * @param {string} phoneNumber - 전화번호
  * @returns {Promise<Object>} - 응답 객체
  */
 export const sendOtp = async (phoneNumber) => {
   try {
-    console.log('API 요청 시작: /auth/otp/send', { phone: phoneNumber });
-    console.log('API URL:', apiClient.defaults.baseURL);
-    
-    const response = await apiClient.post('/auth/otp/send', { phone: phoneNumber }, { authenticated: false });
-    console.log('API 응답 성공:', response.data);
-    return { success: true, ...handleApiResponse(response) };
+    const formattedPhone = toE164Format(phoneNumber);
+    const response = await apiClient.post('/auth/otp/send', 
+      { phone: formattedPhone }, 
+      { authenticated: false }
+    );
+    return { success: true, data: response.data };
   } catch (error) {
     console.error('OTP 전송 오류:', error);
-    console.error('오류 세부정보:', error.message);
-    if (error.response) {
-      console.error('서버 응답:', error.response.data);
-      console.error('상태 코드:', error.response.status);
-    } else if (error.request) {
-      console.error('요청은 전송되었으나 응답이 없음:', error.request);
-    }
-    return handleApiError(error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'OTP 전송 중 오류가 발생했습니다.' 
+    };
   }
 };
 
 /**
  * 인증번호를 확인하고 JWT 토큰을 받아옵니다.
- * @param {string} phoneNumber - 국가 코드가 포함된 전화번호
+ * @param {string} phoneNumber - 전화번호
  * @param {string} code - 인증 코드
  * @returns {Promise<Object>} - 성공 여부와 토큰 정보가 포함된 객체
  */
 export const verifyOtp = async (phoneNumber, code) => {
   try {
+    const formattedPhone = toE164Format(phoneNumber);
     const response = await apiClient.post('/auth/otp/verify', 
-      { phone: phoneNumber, code }, 
+      { phone: formattedPhone, code }, 
       { authenticated: false }
     );
     
-    const data = handleApiResponse(response);
+    const data = response.data;
     
-    // 토큰 저장
     if (data.accessToken) {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
-      await AsyncStorage.setItem(PHONE_NUMBER_KEY, phoneNumber);
+      await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, data.accessToken);
+      await AsyncStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
+      await AsyncStorage.setItem(AUTH_KEYS.PHONE_NUMBER, formattedPhone);
     }
     
     return { success: true, data };
   } catch (error) {
     console.error('OTP 확인 오류:', error);
-    return handleApiError(error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'OTP 확인 중 오류가 발생했습니다.' 
+    };
   }
 };
 
 /**
  * 토큰을 갱신합니다.
- * @returns {Promise<string|null>} - 새 액세스 토큰 또는 실패 시 null
+ * @returns {Promise<Object>} - 성공 여부와 새 토큰 정보가 포함된 객체
  */
 export const refreshToken = async () => {
   try {
-    // 저장된 토큰 정보 가져오기
-    const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-    const phoneNumber = await AsyncStorage.getItem(PHONE_NUMBER_KEY);
+    const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
+    const phoneNumber = await AsyncStorage.getItem(AUTH_KEYS.PHONE_NUMBER);
     
-    if (!refreshToken || !phoneNumber) return null;
+    if (!refreshToken || !phoneNumber) {
+      return { success: false, message: '토큰 정보가 없습니다.' };
+    }
     
     const response = await apiClient.post('/auth/refresh', 
       { refreshToken, phone: phoneNumber },
       { authenticated: false }
     );
     
-    const data = handleApiResponse(response);
+    const data = response.data;
     
-    // 새 액세스 토큰 저장
     if (data.accessToken) {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-      return data.accessToken;
+      await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, data.accessToken);
+      return { success: true, data };
     }
     
-    return null;
+    return { success: false, message: '토큰 갱신에 실패했습니다.' };
   } catch (error) {
     console.error('토큰 갱신 오류:', error);
-    
-    // 네트워크 오류인 경우, 기존 토큰을 그대로 사용 (오프라인 모드 지원)
-    if (error.message === 'Network Error') {
-      const existingToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-      if (existingToken) {
-        console.log('네트워크 오류로 인해 기존 토큰을 사용합니다');
-        return existingToken;
-      }
-    }
-    
-    return null;
+    return { 
+      success: false, 
+      message: error.response?.data?.message || '토큰 갱신 중 오류가 발생했습니다.' 
+    };
   }
 };
 
 /**
  * 사용자를 로그아웃합니다.
- * @returns {Promise<boolean>} - 성공 여부
+ * @returns {Promise<Object>} - 성공 여부가 포함된 객체
  */
 export const logout = async () => {
   try {
-    const phoneNumber = await AsyncStorage.getItem(PHONE_NUMBER_KEY);
+    const phoneNumber = await AsyncStorage.getItem(AUTH_KEYS.PHONE_NUMBER);
     
     if (phoneNumber) {
-      // 로그아웃 API 호출
       await apiClient.post('/auth/logout', { phone: phoneNumber });
     }
     
-    // 토큰 정보 삭제
-    await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
-    await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
-    await AsyncStorage.removeItem(PHONE_NUMBER_KEY);
+    await AsyncStorage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
+    await AsyncStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
+    await AsyncStorage.removeItem(AUTH_KEYS.PHONE_NUMBER);
+    await AsyncStorage.removeItem(AUTH_KEYS.USER);
     
-    return true;
+    return { success: true };
   } catch (error) {
     console.error('로그아웃 오류:', error);
-    
-    // API 호출이 실패하더라도 로컬 토큰은 삭제
-    await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
-    await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
-    await AsyncStorage.removeItem(PHONE_NUMBER_KEY);
-    
-    return true;
+    // 로그아웃 실패해도 로컬 데이터는 삭제
+    await AsyncStorage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
+    await AsyncStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
+    await AsyncStorage.removeItem(AUTH_KEYS.PHONE_NUMBER);
+    await AsyncStorage.removeItem(AUTH_KEYS.USER);
+    return { success: true };
   }
 };
 
@@ -140,8 +152,17 @@ export const logout = async () => {
  */
 export const isAuthenticated = async () => {
   try {
-    const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-    return !!accessToken;
+    // 1. 리프레시 토큰 확인
+    const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
+    if (!refreshToken) return false;
+
+    // 2. 리프레시 토큰 만료 시간 확인
+    const decoded = jwtDecode(refreshToken);
+    const expirationTime = decoded.exp * 1000; // 초를 밀리초로 변환
+    const currentTime = Date.now();
+    
+    // 3. 리프레시 토큰이 만료되지 않았다면 인증된 것으로 간주
+    return expirationTime > currentTime;
   } catch (error) {
     console.error('인증 확인 오류:', error);
     return false;
@@ -149,18 +170,28 @@ export const isAuthenticated = async () => {
 };
 
 /**
- * 저장된 인증 정보를 가져옵니다.
- * @returns {Promise<Object>}
+ * 저장된 사용자 정보를 가져옵니다.
+ * @returns {Promise<Object|null>}
  */
-export const getAuthInfo = async () => {
+export const getStoredUser = async () => {
   try {
-    const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-    const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-    const phoneNumber = await AsyncStorage.getItem(PHONE_NUMBER_KEY);
-    
-    return { accessToken, refreshToken, phoneNumber };
+    const userStr = await AsyncStorage.getItem(AUTH_KEYS.USER);
+    return userStr ? JSON.parse(userStr) : null;
   } catch (error) {
-    console.error('인증 정보 가져오기 오류:', error);
-    return { accessToken: null, refreshToken: null, phoneNumber: null };
+    console.error('사용자 정보 조회 오류:', error);
+    return null;
+  }
+};
+
+/**
+ * 사용자 정보를 저장합니다.
+ * @param {Object} user - 저장할 사용자 정보
+ * @returns {Promise<void>}
+ */
+export const storeUser = async (user) => {
+  try {
+    await AsyncStorage.setItem(AUTH_KEYS.USER, JSON.stringify(user));
+  } catch (error) {
+    console.error('사용자 정보 저장 오류:', error);
   }
 }; 

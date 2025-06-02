@@ -2,182 +2,174 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
-import { StatusBar, View, Text, StyleSheet } from 'react-native';
+import { StatusBar, View, Text, StyleSheet, LogBox, TouchableOpacity } from 'react-native';
 import 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // State management
 import useUserStore from './store/userStore';
+import { useAuth } from './hooks/useAuth';
 
-// Auth service
-import * as authApi from './api/auth';
-import { profileService } from './services/profileService';
-
-// 디스커버리 서비스와 설정
+// 서버 설정
 import { discoverServer } from './utils/discovery';
-import { updateApiUrl } from './utils/config';
+import { updateApiUrl, initializeConfig } from './utils/config';
 
-// 네비게이션 컴포넌트들
-import JwtPhoneLoginScreen from './screens/JwtPhoneLoginScreen';
-import ProfileSetupScreen from './screens/ProfileSetupScreen';
+// 네비게이션
 import MainNavigator from './navigation/MainNavigator';
-import SplashScreen from './screens/SplashScreen';
 import AuthNavigator from './navigation/AuthNavigator';
-import { ROUTES } from './navigation/constants';
+import SplashScreen from './screens/SplashScreen';
+import ProfileSetupScreen from './screens/ProfileSetupScreen';
+import { ROUTES, HEADER_OPTIONS } from './navigation/constants';
+
+// 전역 스타일
+import { COLORS } from './components/profile-setup/constants';
+import { refreshAccessToken } from './services/authService';
+import { AUTH_KEYS } from './utils/constants';
 
 const Stack = createStackNavigator();
 
+// 경고 메시지 무시 설정
+LogBox.ignoreLogs([
+  'Sending `onAnimatedValueUpdate` with no listeners registered',
+  'Non-serializable values were found in the navigation state',
+]);
+
 // 에러 화면 컴포넌트
-const ErrorScreen = ({ error }) => (
+const ErrorScreen = ({ error, onRetry }) => (
   <View style={styles.errorContainer}>
     <Text style={styles.errorTitle}>초기화 오류</Text>
     <Text style={styles.errorMessage}>{error}</Text>
     <Text style={styles.errorHint}>앱을 다시 시작하거나 네트워크 연결을 확인해주세요.</Text>
+    {onRetry && (
+      <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+        <Text style={styles.retryButtonText}>다시 시도</Text>
+      </TouchableOpacity>
+    )}
   </View>
 );
 
 export default function App() {
+  // 상태 관리
   const [isLoading, setIsLoading] = useState(true);
-  const { user, setUser } = useUserStore();
-  const [hasProfile, setHasProfile] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [serverDiscovered, setServerDiscovered] = useState(false);
+  const { authState, checkAuth } = useAuth();
+  const { setUser, checkProfileStatus, clearUser, hasProfile } = useUserStore();
 
-  // 서버 디스커버리 및 초기화
+  // 앱 초기화
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        console.log('서버 디스커버리 실행 중...');
-        // 서버 디스커버리 실행
-        const apiUrl = await discoverServer();
+        console.log('=== 앱 초기화 시작 ===');
+        setIsLoading(true);
         
+        // 1. 서버 설정 초기화
+        console.log('1. 서버 설정 초기화');
+        await initializeConfig();
+        
+        // 2. 서버 디스커버리
+        console.log('2. 서버 디스커버리');
+        const apiUrl = await discoverServer();
         if (apiUrl) {
-          // 발견된 서버로 API URL 업데이트
+          console.log('서버 URL:', apiUrl);
           updateApiUrl(apiUrl);
-          setServerDiscovered(true);
-          console.log('서버 디스커버리 성공:', apiUrl);
-        } else {
-          console.warn('서버를 찾을 수 없음. 기본 설정 사용.');
         }
         
-        // 인증 상태 확인 진행
-        checkAuthentication();
+        // 3. 인증 상태 확인
+        console.log('3. 인증 상태 확인');
+        const isAuthenticated = await checkAuth();
+        console.log('인증 상태 확인 결과:', isAuthenticated);
+        console.log('현재 authState:', authState);
+
+        if (isAuthenticated && authState.user) {
+          // 4. 프로필 상태 확인
+          console.log('4. 프로필 상태 확인');
+          const hasProfile = await checkProfileStatus(authState.user.uuid);
+          console.log('프로필 상태:', hasProfile);
+        } else {
+          clearUser();
+        }
+
+        // 5. 토큰 갱신 시도
+        const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
+        if (accessToken) {
+          const result = await refreshAccessToken();
+          if (result.success) {
+            console.log('토큰 갱신 성공');
+          }
+        }
       } catch (err) {
-        console.error('앱 초기화 오류:', err);
-        setError('앱 초기화 중 오류가 발생했습니다.');
+        console.error('앱 초기화 실패:', err);
+        setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
+      } finally {
         setIsLoading(false);
       }
     };
 
     initializeApp();
-  }, []);
+  }, [checkAuth, authState, checkProfileStatus, clearUser]);
 
-  // 인증 상태 확인
-  const checkAuthentication = async () => {
-    try {
-      console.log('인증 상태 확인 중...');
-      
-      // 인증 확인 및 토큰 갱신 시도
-      const authenticated = await authApi.isAuthenticated();
-      
-      if (authenticated) {
-        console.log('인증된 사용자 발견');
-        
-        try {
-          // 토큰 정보 가져오기
-          const { phoneNumber } = await authApi.getAuthInfo();
-          
-          // 토큰 갱신 시도
-          const newToken = await authApi.refreshToken();
-          
-          if (newToken) {
-            // Firestore에서 프로필 확인
-            const profileCheck = await profileService.checkProfileExists(phoneNumber);
-            
-            if (profileCheck.success) {
-              if (profileCheck.exists) {
-                // 프로필이 존재하면 Main으로 이동
-                console.log('기존 프로필이 있어 메인 화면으로 이동합니다.');
-                setUser({ uid: phoneNumber, phoneNumber });
-                setIsLoggedIn(true);
-                setHasProfile(true);
-                
-                // 프로필 데이터 저장
-                useUserStore.getState().updateUserProfile(phoneNumber, profileCheck.data);
-              } else {
-                // 프로필이 없으면 로그아웃 처리
-                console.log('프로필이 없어 로그아웃 처리합니다.');
-                await handleLogout();
-              }
-            } else {
-              // 프로필 확인 실패 시 로그아웃 처리
-              console.error('프로필 확인 중 오류:', profileCheck.error);
-              await handleLogout();
-            }
-          } else {
-            // 토큰 갱신 실패 - 로그아웃 처리
-            await handleLogout();
-          }
-        } catch (error) {
-          console.error('인증 정보 처리 중 오류:', error);
-          await handleLogout();
-        }
-      } else {
-        console.log('인증되지 않은 사용자');
-        await handleLogout();
-      }
-      
-      setIsInitialized(true);
-    } catch (error) {
-      console.error('인증 확인 오류:', error);
-      await handleLogout();
-    } finally {
-      setIsLoading(false);
-    }
+  // 재시도 핸들러
+  const handleRetry = () => {
+    console.log('재시도 요청');
+    setError(null);
   };
 
-  // 로그아웃 처리
-  const handleLogout = async () => {
-    try {
-      // 로그아웃 처리
-      await authApi.logout();
-      
-      // 사용자 상태 초기화
-      setUser(null);
-      setIsLoggedIn(false);
-      setHasProfile(false);
-      
-      console.log('로그아웃 처리 완료');
-    } catch (error) {
-      console.error('로그아웃 처리 중 오류:', error);
-      // 에러가 발생하더라도 로컬 상태는 초기화
-      setUser(null);
-      setIsLoggedIn(false);
-      setHasProfile(false);
-    }
-  };
+  // 화면 선택 로직
+  let currentScreen = null;
 
-  // 오류 발생 시 표시할 화면
   if (error) {
-    return <ErrorScreen error={error} />;
+    currentScreen = (
+      <Stack.Screen name={ROUTES.ERROR} options={{ headerShown: false }}>
+        {() => <ErrorScreen error={error} onRetry={handleRetry} />}
+      </Stack.Screen>
+    );
+  } else if (isLoading) {
+    currentScreen = (
+      <Stack.Screen name={ROUTES.SPLASH} options={{ headerShown: false }}>
+        {() => <SplashScreen />}
+      </Stack.Screen>
+    );
+  } else if (authState.isAuthenticated && hasProfile) {
+    // 인증됨 + 프로필 있음 -> 메인 화면
+    currentScreen = (
+      <Stack.Screen name={ROUTES.MAIN.STACK} options={{ headerShown: false }}>
+        {() => <MainNavigator />}
+      </Stack.Screen>
+    );
+  } else {
+    // 인증 안됨 또는 프로필 없음 -> 로그인 화면
+    currentScreen = (
+      <Stack.Screen name="AuthFlow" options={{ headerShown: false }}>
+        {() => <AuthNavigator />}
+      </Stack.Screen>
+    );
   }
+
+  console.log('=== 렌더링 상태 ===');
+  console.log('isLoading:', isLoading);
+  console.log('error:', error);
+  console.log('authState:', authState);
+  console.log('hasProfile:', hasProfile);
+  console.log('선택된 화면:', currentScreen?.props?.name);
 
   return (
     <NavigationContainer>
-      <StatusBar style="auto" />
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isLoading ? (
-          <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} />
-        ) : user && isLoggedIn ? (
-          <Stack.Screen name={ROUTES.MAIN.STACK} component={MainNavigator} />
-        ) : (
-          <Stack.Screen name={ROUTES.AUTH.LOGIN} component={AuthNavigator} />
-        )}
+      <StatusBar 
+        style="auto" 
+        backgroundColor={COLORS.background.primary}
+        barStyle="dark-content"
+      />
+      <Stack.Navigator 
+        screenOptions={{
+          ...HEADER_OPTIONS.MAIN,
+          cardStyle: { backgroundColor: COLORS.background.primary }
+        }}
+      >
+        {currentScreen}
       </Stack.Navigator>
     </NavigationContainer>
   );
-}
+} 
 
 const styles = StyleSheet.create({
   errorContainer: {
@@ -203,5 +195,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 

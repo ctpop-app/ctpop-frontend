@@ -1,21 +1,64 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // 서버 IP 저장용 키
 const SERVER_IP_KEY = 'server_ip_address';
 const SERVER_PORT = '8080';
 
-// 알려진 IP 목록 (개발자 컴퓨터들의 IP와 일반적인 로컬 주소)
-const KNOWN_IPS = [
-  '192.168.219.54', // 현재 IP (새로 추가)
-  '192.168.219.208', // 현재 IP (새로 추가)
-  '172.30.1.26',   // 카페 IP
-  '192.168.0.7',   // 이전 개발 환경
-  '192.168.1.5',   // 다른 가능한 환경
+// 기본 IP 목록
+const DEFAULT_IPS = [
   '10.0.2.2',      // 안드로이드 에뮬레이터용
   'localhost',     // 로컬 개발용
-  '127.0.0.1'      // 로컬호스트 대체
+  '127.0.0.1',      // 로컬호스트 대체
+  '192.168.219.50',
+  '172.30.1.26'
 ];
+
+// IP 목록 저장용 키
+const KNOWN_IPS_KEY = 'known_server_ips';
+
+/**
+ * 알려진 IP 목록을 가져옵니다.
+ * @returns {Promise<string[]>} IP 목록
+ */
+const getKnownIps = async () => {
+  try {
+    const savedIps = await AsyncStorage.getItem(KNOWN_IPS_KEY);
+    return savedIps ? JSON.parse(savedIps) : DEFAULT_IPS;
+  } catch (error) {
+    console.error('저장된 IP 목록 조회 실패:', error);
+    return DEFAULT_IPS;
+  }
+};
+
+/**
+ * 알려진 IP 목록을 저장합니다.
+ * @param {string[]} ips 저장할 IP 목록
+ */
+const saveKnownIps = async (ips) => {
+  try {
+    await AsyncStorage.setItem(KNOWN_IPS_KEY, JSON.stringify(ips));
+  } catch (error) {
+    console.error('IP 목록 저장 실패:', error);
+  }
+};
+
+/**
+ * 새로운 IP를 알려진 목록에 추가합니다.
+ * @param {string} ip 추가할 IP
+ */
+const addKnownIp = async (ip) => {
+  try {
+    const currentIps = await getKnownIps();
+    if (!currentIps.includes(ip)) {
+      currentIps.push(ip);
+      await saveKnownIps(currentIps);
+    }
+  } catch (error) {
+    console.error('IP 추가 실패:', error);
+  }
+};
 
 /**
  * 알려진 IP 목록에서 서버를 자동으로 검색
@@ -36,8 +79,11 @@ export const discoverServer = async () => {
     console.log(`저장된 서버가 응답하지 않습니다. 다른 서버 검색 중...`);
   }
   
-  // 2. 알려진 IP 목록 순회하며 테스트
-  for (const ip of KNOWN_IPS) {
+  // 2. 알려진 IP 목록 가져오기
+  const knownIps = await getKnownIps();
+  
+  // 3. 알려진 IP 목록 순회하며 테스트
+  for (const ip of knownIps) {
     console.log(`서버 검색 중: ${ip}`);
     const isValid = await testServerConnection(ip);
     if (isValid) {
@@ -78,6 +124,7 @@ const testServerConnection = async (ip) => {
  */
 export const setServerIp = async (ip) => {
   await AsyncStorage.setItem(SERVER_IP_KEY, ip);
+  await addKnownIp(ip);
   console.log(`서버 IP가 수동으로 설정됨: ${ip}`);
 };
 

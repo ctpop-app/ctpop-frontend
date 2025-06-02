@@ -1,9 +1,14 @@
 // API 주소 설정 파일
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// 서버 IP 저장용 키
+const SERVER_IP_KEY = 'server_ip_address';
+const SERVER_PORT = '8080';
 
 // 기본 설정값 (서버를 찾지 못했을 때 폴백으로 사용)
-const DEFAULT_IP = '192.168.0.7';
-const DEFAULT_PORT = '8080';
+const DEFAULT_IP = 'localhost';
+const DEFAULT_PORT = SERVER_PORT;
 
 // 개발 환경
 const DEV = {
@@ -30,6 +35,33 @@ const config = {
   AUTH_API_URL: `${currentEnv.API_URL}/auth`,
   USER_API_URL: `${currentEnv.API_URL}/users`,
   CHAT_API_URL: `${currentEnv.API_URL}/chats`,
+};
+
+/**
+ * 저장된 서버 IP를 가져옵니다.
+ * @returns {Promise<string>} 서버 IP
+ */
+const getSavedServerIp = async () => {
+  try {
+    return await AsyncStorage.getItem(SERVER_IP_KEY) || DEFAULT_IP;
+  } catch (error) {
+    console.error('저장된 서버 IP 조회 실패:', error);
+    return DEFAULT_IP;
+  }
+};
+
+/**
+ * 초기 설정을 로드합니다.
+ */
+export const initializeConfig = async () => {
+  try {
+    const savedIp = await getSavedServerIp();
+    if (savedIp && savedIp !== DEFAULT_IP) {
+      updateApiUrl(`http://${savedIp}:${SERVER_PORT}/api`);
+    }
+  } catch (error) {
+    console.error('설정 초기화 실패:', error);
+  }
 };
 
 /**
