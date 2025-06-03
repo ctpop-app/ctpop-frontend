@@ -23,7 +23,7 @@ import { ROUTES, HEADER_OPTIONS } from './navigation/constants';
 
 // 전역 스타일
 import { COLORS } from './components/profile-setup/constants';
-import { refreshAccessToken } from './services/authService';
+import { refreshAccessToken, isRefreshTokenExpired, clearTokens } from './services/authService';
 import { AUTH_KEYS } from './utils/constants';
 
 const Stack = createStackNavigator();
@@ -48,109 +48,84 @@ const ErrorScreen = ({ error, onRetry }) => (
   </View>
 );
 
+// 앱 초기화 함수
+const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, clearUser) => {
+  try {
+    setIsLoading(true);
+    
+    // 1. 서버 설정 초기화
+    await initializeConfig();
+    
+    // 2. 서버 디스커버리
+    const apiUrl = await discoverServer();
+    if (apiUrl) {
+      updateApiUrl(apiUrl);
+    }
+    
+    // 3. 리프레시 토큰 만료 확인
+    const isExpired = await isRefreshTokenExpired();
+    if (isExpired) {
+      console.log('리프레시 토큰이 만료되었습니다.');
+      await clearTokens();
+      await clearUser();
+      return;
+    }
+    
+    // 4. 인증 상태 확인
+    await checkAuth();
+
+    // 5. 토큰 갱신 시도
+    const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
+    if (accessToken) {
+      const result = await refreshAccessToken();
+      if (!result.success) {
+        console.log('토큰 갱신 실패:', result.message);
+        await clearTokens();
+        await clearUser();
+      } else {
+        console.log('토큰 갱신 성공');
+      }
+    }
+
+  } catch (err) {
+    console.error('앱 초기화 실패:', err);
+    setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 export default function App() {
   // 상태 관리
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { authState, checkAuth } = useAuth();
-  const { setUser, checkProfileStatus, clearUser, hasProfile } = useUserStore();
+  const { checkAuth } = useAuth();
+  
+  // Zustand store 사용
+  const userStore = useUserStore();
+  const isAuthenticated = userStore.isAuthenticated;
+  const hasProfile = userStore.hasProfile;
+  const clearUser = userStore.clearUser;
 
   // 앱 초기화
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        console.log('=== 앱 초기화 시작 ===');
-        setIsLoading(true);
-        
-        // 1. 서버 설정 초기화
-        console.log('1. 서버 설정 초기화');
-        await initializeConfig();
-        
-        // 2. 서버 디스커버리
-        console.log('2. 서버 디스커버리');
-        const apiUrl = await discoverServer();
-        if (apiUrl) {
-          console.log('서버 URL:', apiUrl);
-          updateApiUrl(apiUrl);
-        }
-        
-        // 3. 인증 상태 확인
-        console.log('3. 인증 상태 확인');
-        const isAuthenticated = await checkAuth();
-        console.log('인증 상태 확인 결과:', isAuthenticated);
-        console.log('현재 authState:', authState);
-
-        if (isAuthenticated && authState.user) {
-          // 4. 프로필 상태 확인
-          console.log('4. 프로필 상태 확인');
-          const hasProfile = await checkProfileStatus(authState.user.uuid);
-          console.log('프로필 상태:', hasProfile);
-        } else {
-          clearUser();
-        }
-
-        // 5. 토큰 갱신 시도
-        const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
-        if (accessToken) {
-          const result = await refreshAccessToken();
-          if (result.success) {
-            console.log('토큰 갱신 성공');
-          }
-        }
-      } catch (err) {
-        console.error('앱 초기화 실패:', err);
-        setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeApp();
-  }, [checkAuth, authState, checkProfileStatus, clearUser]);
+    initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser);
+  }, []);
 
   // 재시도 핸들러
   const handleRetry = () => {
     console.log('재시도 요청');
     setError(null);
+    setIsLoading(true);
+    initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser);
   };
 
-  // 화면 선택 로직
-  let currentScreen = null;
-
-  if (error) {
-    currentScreen = (
-      <Stack.Screen name={ROUTES.ERROR} options={{ headerShown: false }}>
-        {() => <ErrorScreen error={error} onRetry={handleRetry} />}
-      </Stack.Screen>
-    );
-  } else if (isLoading) {
-    currentScreen = (
-      <Stack.Screen name={ROUTES.SPLASH} options={{ headerShown: false }}>
-        {() => <SplashScreen />}
-      </Stack.Screen>
-    );
-  } else if (authState.isAuthenticated && hasProfile) {
-    // 인증됨 + 프로필 있음 -> 메인 화면
-    currentScreen = (
-      <Stack.Screen name={ROUTES.MAIN.STACK} options={{ headerShown: false }}>
-        {() => <MainNavigator />}
-      </Stack.Screen>
-    );
-  } else {
-    // 인증 안됨 또는 프로필 없음 -> 로그인 화면
-    currentScreen = (
-      <Stack.Screen name="AuthFlow" options={{ headerShown: false }}>
-        {() => <AuthNavigator />}
-      </Stack.Screen>
-    );
-  }
-
+  // 디버그 로그
   console.log('=== 렌더링 상태 ===');
   console.log('isLoading:', isLoading);
   console.log('error:', error);
-  console.log('authState:', authState);
+  console.log('isAuthenticated:', isAuthenticated);
   console.log('hasProfile:', hasProfile);
-  console.log('선택된 화면:', currentScreen?.props?.name);
 
   return (
     <NavigationContainer>
@@ -162,14 +137,66 @@ export default function App() {
       <Stack.Navigator 
         screenOptions={{
           ...HEADER_OPTIONS.MAIN,
-          cardStyle: { backgroundColor: COLORS.background.primary }
+          cardStyle: { backgroundColor: COLORS.background.primary },
+          animationEnabled: true,
+          gestureEnabled: false
         }}
       >
-        {currentScreen}
+        {error ? (
+          <Stack.Screen 
+            name={ROUTES.ERROR} 
+            options={{ 
+              headerShown: false,
+              animationEnabled: false
+            }}
+          >
+            {() => <ErrorScreen error={error} onRetry={handleRetry} />}
+          </Stack.Screen>
+        ) : isLoading ? (
+          <Stack.Screen 
+            name={ROUTES.SPLASH} 
+            options={{ 
+              headerShown: false,
+              animationEnabled: false
+            }}
+          >
+            {() => <SplashScreen />}
+          </Stack.Screen>
+        ) : !isAuthenticated ? (
+          <Stack.Screen 
+            name={ROUTES.AUTH.LOGIN} 
+            options={{ 
+              headerShown: false,
+              animationEnabled: false
+            }}
+          >
+            {() => <AuthNavigator />}
+          </Stack.Screen>
+        ) : !hasProfile ? (
+          <Stack.Screen 
+            name={ROUTES.AUTH.PROFILE_SETUP} 
+            options={{ 
+              headerShown: false,
+              animationEnabled: false
+            }}
+          >
+            {() => <ProfileSetupScreen />}
+          </Stack.Screen>
+        ) : (
+          <Stack.Screen 
+            name="Main" 
+            options={{ 
+              headerShown: false,
+              animationEnabled: false
+            }}
+          >
+            {() => <MainNavigator />}
+          </Stack.Screen>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
-} 
+}
 
 const styles = StyleSheet.create({
   errorContainer: {

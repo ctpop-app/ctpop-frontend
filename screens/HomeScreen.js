@@ -10,7 +10,7 @@ const dummyUsers = [
     age: 28,
     location: '서울',
     profilePhotoURL: null,
-    bio: '성소수자 커뮤니티에서 만나게 되어 반갑습니다.',
+    bio: '커뮤니티에서 만나게 되어 반갑습니다.',
   },
   {
     id: '2',

@@ -1,5 +1,69 @@
 # CTPOP Frontend
 
+## 소개
+CTPOP은 사용자 매칭과 채팅을 중심으로 한 소셜 데이팅 앱입니다. 전화번호 인증을 통한 안전한 사용자 인증과 프로필 기반의 매칭 시스템을 제공합니다.
+
+## 기술 스택
+- React Native
+- Expo
+- Firebase (Firestore, Storage)
+- React Navigation
+- Zustand (상태 관리)
+- AsyncStorage (로컬 스토리지)
+- Twilio (SMS 인증)
+
+## 개발 환경 설정
+1. 의존성 설치
+```bash
+npm install
+```
+
+(**utils/discovery.js에 자신의 ip 주소 추가**)
+
+2. 개발 서버 실행
+```bash
+npx expo start
+```
+
+## 주요 기능
+- 전화번호 기반 JWT 인증
+- 프로필 설정 및 관리
+- 사용자 매칭 및 추천
+- 실시간 채팅
+- 커뮤니티 게시판(토크)
+
+## 현재 개발 진척 상황
+✅ 완료된 기능:
+- 전화번호 인증(Twilio) 및 JWT 토큰 발급
+- 프로필 생성 여부 확인
+- 프로필 설정 화면 구현
+- 메인 화면 진입 로직
+
+🚧 진행 중인 기능:
+- 프로필 수정 기능
+
+## 기본 로직
+1. 앱 실행 시 인증 상태 확인
+   - JWT 토큰 존재 여부 확인
+   - 토큰이 있으면 사용자 정보 조회
+   - 토큰이 없으면 로그인 화면으로 이동
+
+2. 프로필 상태 확인
+   - 프로필이 있으면 메인 화면으로 이동
+   - 프로필이 없으면 프로필 설정 화면으로 이동
+
+3. 메인 화면 진입
+   - 홈: 매칭 및 추천
+   - 메시지: 채팅 목록
+   - 토크: 게시판 기능
+   - 설정: 프로필 수정 등
+
+## 주의사항
+- Firebase 설정이 필요합니다
+- 이미지 업로드를 위한 권한 설정이 필요합니다
+- 위치 정보 사용을 위한 권한 설정이 필요합니다
+- Twilio API 키 설정이 필요합니다
+
 ## 프로젝트 구조
 
 ### 네비게이션 구조
@@ -7,12 +71,19 @@
 App.js (최상위 네비게이션)
 ├── AuthNavigator (인증 관련 화면)
 │   ├── Login (로그인 화면)
-│   └── ProfileSetup (프로필 설정 화면)
+│   ├── ProfileSetup (프로필 설정 화면)
+│   └── OtpVerification (OTP 인증 화면)
 └── MainNavigator (메인 화면)
     └── MainStack
         ├── Home (홈 화면)
         ├── Messages (메시지 화면)
-        └── Settings (설정 화면)
+        ├── Settings (설정 화면)
+        ├── ProfileTest (프로필 테스트 화면)
+        ├── Board (게시판 화면)
+        ├── ProfileEdit (프로필 수정 화면)
+        ├── Chat (채팅 화면)
+        ├── ChatList (채팅 목록 화면)
+        └── Notifications (알림 화면)
 ```
 
 ### 상태 관리
@@ -31,13 +102,14 @@ App.js (최상위 네비게이션)
    - 홈 화면
    - 메시지 기능
    - 설정 관리
+   - 프로필 수정
 
 ### 기술 스택
 - React Native
 - React Navigation
 - Zustand
 - AsyncStorage
-- Expo
+- Expo GO
 
 ### 개발 환경 설정
 1. 의존성 설치
@@ -54,6 +126,7 @@ npm start
 - 프로필 설정은 필수이며, 프로필 생성 후에만 메인 화면 접근 가능
 - 네비게이션은 App.js의 조건부 렌더링에 의해 제어됨
 - 상태 변경은 반드시 Zustand store를 통해 수행
+- 프로필 수정은 MainNavigator의 ProfileEdit 화면에서 수행
 
 ## 인증 및 토큰 관리
 
@@ -104,6 +177,7 @@ npm start
    - 로그아웃 시: 프로필 상태 유지 (Firestore 문서는 그대로)
    - 회원탈퇴 시: 프로필 상태 초기화 (Firestore 문서 삭제)
    - 프로필 생성 시: Firestore에 사용자 문서 생성
+   - 프로필 수정 시: Firestore 문서 업데이트
 
 ### 토큰 저장소
 - AsyncStorage를 사용하여 토큰 저장
@@ -118,7 +192,7 @@ npm start
 - 로그아웃 시 서버에서 리프레시 토큰 무효화
 - 리프레시 토큰 만료 시 자동 로그아웃
 
-```
+## 프로젝트 구조
 ctpop-frontend/
 ├── api/                    # API 통신 관련 모듈
 │   ├── index.js           # API 엔드포인트 및 통신 로직
@@ -171,6 +245,7 @@ ctpop-frontend/
 ├── screens/             # 화면 컴포넌트
 │   ├── JwtPhoneLoginScreen.js    # 전화번호 인증 화면
 │   ├── ProfileSetupScreen.js     # 프로필 설정 화면
+│   ├── ProfileEditScreen.js      # 프로필 수정 화면
 │   ├── ProfileTestScreen.js      # 프로필 테스트 화면
 │   ├── SettingsScreen.js         # 설정 화면
 │   ├── SplashScreen.js           # 스플래시 화면
@@ -205,7 +280,7 @@ ctpop-frontend/
    - 앱의 진입점
    - 초기 설정 및 상태 관리
      - `useAuth` 훅을 통해 인증 상태 관리
-     - `useUserStore`를 통해 사용자 정보 관리
+     - `userStore`를 통해 사용자 정보 관리
      - `LogBox.ignoreLogs`로 특정 경고 메시지 무시 설정
    - 서버 설정 및 디스커버리
      - `initializeConfig`로 서버 설정 초기화
@@ -466,22 +541,6 @@ ctpop-frontend/
 - 프로필 데이터 관리
 - 폼 상태 관리
 
-## 기술 스택
-- React Native
-- Expo
-- Firebase (Firestore, Storage)
-- React Navigation
-
-## 개발 환경 설정
-1. 의존성 설치
-```bash
-npm install
-```
-
-2. 개발 서버 실행
-```bash
-npx expo start
-```
 
 ## 주의사항
 - Firebase 설정이 필요합니다

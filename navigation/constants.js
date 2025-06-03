@@ -17,7 +17,6 @@ export const ROUTES = {
   
   // 메인 관련
   MAIN: {
-    STACK: 'MainStack',
     HOME: 'Home',
     MESSAGES: 'Messages',
     SETTINGS: 'Settings',

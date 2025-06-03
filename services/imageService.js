@@ -1,5 +1,5 @@
 import { storage } from '../firebase';
-import { ref, uploadBytesWithMetadata, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImageManipulator from 'expo-image-manipulator';
 
 /**
@@ -51,7 +51,7 @@ export const uploadImage = async (uri, path = 'profile') => {
     console.log('메타데이터 준비 완료:', metadata);
 
     console.log('Storage 업로드 시작...');
-    await uploadBytesWithMetadata(storageRef, blob, metadata);
+    await uploadBytes(storageRef, blob, metadata);
     console.log('Storage 업로드 완료');
 
     // 다운로드 URL 반환

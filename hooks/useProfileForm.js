@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import { profile } from '../api';
 
-export const useProfileForm = (uuid) => {
+const fieldLabels = {
+  nickname: '닉네임',
+  age: '나이',
+  height: '키',
+  weight: '체중',
+  city: '시/도',
+  district: '시/군/구',
+  orientation: '성향',
+  bio: '자기소개'
+};
+
+export const useProfileForm = (uuid, initialFields = {}) => {
   const [formData, setFormData] = useState({
     nickname: '',
     age: '',
@@ -12,7 +23,8 @@ export const useProfileForm = (uuid) => {
     orientation: '',
     bio: '',
     mainPhotoURL: '',
-    photoURLs: []
+    photoURLs: [],
+    ...initialFields
   });
 
   const [errors, setErrors] = useState({});
@@ -78,7 +90,7 @@ export const useProfileForm = (uuid) => {
 
     try {
       // 필수 필드 검증
-      const requiredFields = ['nickname', 'age', 'height', 'weight', 'city', 'district'];
+      const requiredFields = ['nickname'];
       const newErrors = {};
 
       requiredFields.forEach(field => {
@@ -96,14 +108,18 @@ export const useProfileForm = (uuid) => {
       const profileData = {
         ...formData,
         ...photoData, // 사진 URL 데이터 추가
-        uuid: userUuid
+        mainPhotoURL: photoData.mainPhotoURL || null, // 빈 문자열 대신 null 사용
+        uuid: uuid
       };
+
+      console.log('프로필 데이터:', profileData);
 
       // 프로필 저장
       const response = await profile.createProfile(profileData);
+      console.log('프로필 저장 응답:', response);
       
-      if (!response.success) {
-        throw new Error(response.error);
+      if (!response || !response.success) {
+        throw new Error(response?.error || '프로필 저장에 실패했습니다.');
       }
 
       return response.data;

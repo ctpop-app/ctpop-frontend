@@ -27,10 +27,11 @@ export const profile = {
     }
   },
 
-  async createProfile(uuid, profileData) {
+  async createProfile(profileData) {
     try {
+      const { uuid, ...data } = profileData;
       const profile = new Profile({
-        ...profileData,
+        ...data,
         uuid,
         createdAt: getUTCTimestamp(),
         updatedAt: getUTCTimestamp()
@@ -42,28 +43,42 @@ export const profile = {
       }
 
       const docRef = await addDoc(collection(db, API_ENDPOINTS.PROFILES), profile.toFirestore());
-      return { id: docRef.id, ...profile };
+      return { 
+        success: true,
+        data: { id: docRef.id, ...profile } 
+      };
     } catch (error) {
       console.error('프로필 생성 실패:', error);
-      throw error;
+      return {
+        success: false,
+        error: error.message
+      };
     }
   },
 
-  async getProfile(profileId) {
+  async getProfile(uuid) {
     try {
-      const docRef = doc(db, API_ENDPOINTS.PROFILES, profileId);
-      const docSnap = await getDoc(docRef);
+      // uuid로 프로필 찾기
+      const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
+      const q = query(
+        profilesRef,
+        where('uuid', '==', uuid),
+        where('isActive', '==', true),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
 
-      if (!docSnap.exists()) {
+      if (querySnapshot.empty) {
         return {
           success: false,
           error: '프로필을 찾을 수 없습니다.'
         };
       }
 
+      const profileDoc = querySnapshot.docs[0];
       return {
         success: true,
-        data: Profile.fromFirestore(docSnap)
+        data: Profile.fromFirestore(profileDoc)
       };
     } catch (error) {
       return handleApiError(error);

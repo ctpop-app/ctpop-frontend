@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useNavigation } from '@react-navigation/native';
-import useUserStore from '../store/userStore';
+import userStore from '../store/userStore';
+import { useAuth } from '../hooks/useAuth';
 import { profileService } from '../services/profileService';
 import { userService } from '../services/userService';
 import { ROUTES } from '../navigation/constants';
@@ -14,7 +15,8 @@ const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
-  const { user, userProfile, logout, withdrawUser } = useUserStore();
+  const { user, userProfile, setUserProfile, withdrawUser } = userStore();
+  const { handleLogout } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +29,7 @@ const SettingsScreen = () => {
       
       const profile = await profileService.getProfile(user.phoneNumber);
       if (profile) {
-        useUserStore.getState().setUserProfile(profile);
+        setUserProfile(profile);
       }
     } catch (error) {
       console.error('프로필 로드 실패:', error);
@@ -42,13 +44,13 @@ const SettingsScreen = () => {
       Alert.alert('알림', '프로필 정보를 불러올 수 없습니다.');
       return;
     }
-    navigation.navigate('ProfileSetup', {
+    navigation.navigate(ROUTES.AUTH.PROFILE_SETUP, {
       isEdit: true,
       currentProfile: userProfile
     });
   };
 
-  const handleLogout = async () => {
+  const logout = async () => {
     Alert.alert(
       '로그아웃',
       '정말 로그아웃 하시겠습니까?',
@@ -62,7 +64,7 @@ const SettingsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              logout();
+              await handleLogout();
               navigation.reset({
                 index: 0,
                 routes: [{ name: ROUTES.AUTH.LOGIN }]
@@ -239,7 +241,7 @@ const SettingsScreen = () => {
         {/* 로그아웃 및 회원탈퇴 */}
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>계정</Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
           <Text style={styles.logoutText}>로그아웃</Text>
         </TouchableOpacity>
           <TouchableOpacity style={styles.withdrawButton} onPress={handleWithdraw}>

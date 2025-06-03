@@ -1,7 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '../utils/config';
-import { refreshAccessToken } from '../services/authService';
+import { refreshAccessToken, logout } from '../services/authService';
+import { AUTH_KEYS } from '../utils/constants';
 
 // 기본 Axios 인스턴스 생성
 const apiClient = axios.create({
@@ -59,7 +60,7 @@ apiClient.interceptors.request.use(
   async (config) => {
     // 인증이 필요한 요청에 토큰 추가
     if (config.authenticated !== false) {
-      const accessToken = await AsyncStorage.getItem('auth_access_token');
+      const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
       if (accessToken) {
         config.headers.Authorization = `Bearer ${accessToken}`;
       }
@@ -83,21 +84,26 @@ apiClient.interceptors.response.use(
       
       try {
         // 액세스 토큰 갱신 시도
-        const newAccessToken = await refreshAccessToken();
+        const result = await refreshAccessToken();
         
-        if (newAccessToken) {
+        if (result.success) {
           // 새 토큰으로 헤더 업데이트
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-          // 원래 요청 재시도
-          return apiClient(originalRequest);
-        } else {
-          // 토큰 갱신 실패 시 처리 (로그아웃 등)
-          // TODO: 로그아웃 처리 로직 추가
-          console.error('토큰 갱신 실패, 로그아웃 필요');
-          return Promise.reject(error);
+          const newAccessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
+          if (newAccessToken) {
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            // 원래 요청 재시도
+            return apiClient(originalRequest);
+          }
         }
+        
+        // 토큰 갱신 실패 시 로그아웃 처리
+        console.error('토큰 갱신 실패, 로그아웃 처리');
+        await logout();
+        return Promise.reject(error);
       } catch (refreshError) {
         console.error('토큰 갱신 중 오류:', refreshError);
+        // 토큰 갱신 중 오류 발생 시에도 로그아웃
+        await logout();
         return Promise.reject(refreshError);
       }
     }

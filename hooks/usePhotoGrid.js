@@ -4,9 +4,8 @@
  * Firebase Storage와 연동되어 이미지를 관리합니다.
  */
 
-import { useState } from 'react';
-import { profile } from '../api';
-import { uploadImage } from '../services/imageService';
+import { useState, useEffect, useCallback } from 'react';
+import { uploadMultipleImages } from '../services/imageService';
 
 /**
  * 프로필 사진 관리 훅
@@ -18,35 +17,35 @@ export const usePhotoGrid = (uuid) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const addPhoto = (photo) => {
-    console.log('사진 추가:', photo);
-    setPhotos(prev => {
-      const newPhotos = [...prev, photo];
-      console.log('업데이트된 사진 목록:', newPhotos);
-      return newPhotos;
-    });
-  };
+  // UUID 체크
+  useEffect(() => {
+    if (!uuid) {
+      console.error('UUID가 없습니다');
+      setError('사용자 정보를 불러올 수 없습니다.');
+    } else {
+      setError(null);
+    }
+  }, [uuid]);
 
-  const removePhoto = (index) => {
-    console.log('사진 제거:', index);
-    setPhotos(prev => {
-      const newPhotos = prev.filter((_, i) => i !== index);
-      console.log('업데이트된 사진 목록:', newPhotos);
-      return newPhotos;
-    });
-  };
+  const addPhoto = useCallback((photo) => {
+    if (!uuid) {
+      console.error('UUID가 없어서 사진을 추가할 수 없습니다');
+      return;
+    }
+    setPhotos(prev => [...prev, { ...photo, uuid }]);
+  }, [uuid]);
 
-  const uploadPhotos = async () => {
-    console.log('사진 업로드 시작:', { photos, uuid });
-    
-    if (photos.length === 0) {
-      console.log('업로드할 사진이 없음');
+  const removePhoto = useCallback((index) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const uploadPhotos = useCallback(async () => {
+    if (!uuid) {
+      console.error('UUID가 없어서 사진을 업로드할 수 없습니다');
       return [];
     }
 
-    if (!uuid) {
-      console.log('사용자 UUID 없음');
-      setError('사용자 정보가 없습니다. 다시 로그인해주세요.');
+    if (photos.length === 0) {
       return [];
     }
 
@@ -54,43 +53,19 @@ export const usePhotoGrid = (uuid) => {
     setError(null);
 
     try {
-      const photoUrls = [];
-      
-      // 각 사진을 순차적으로 업로드
-      for (const photo of photos) {
-        console.log('사진 업로드 중:', photo);
-        if (photo && photo.uri) {
-          console.log('uploadImage 호출:', { uri: photo.uri, path: `profiles/${uuid}` });
-          const url = await uploadImage(photo.uri, `profiles/${uuid}`);
-          console.log('사진 업로드 완료:', url);
-          photoUrls.push(url);
-        }
-      }
-
-      console.log('모든 사진 업로드 완료:', photoUrls);
-
-      // 프로필 업데이트
-      console.log('프로필 업데이트 시작');
-      const response = await profile.updateProfile(uuid, {
-        mainPhotoURL: photoUrls[0] || '',
-        photoURLs: photoUrls
-      });
-
-      if (!response.success) {
-        console.error('프로필 업데이트 실패:', response.error);
-        throw new Error(response.error);
-      }
-
-      console.log('프로필 업데이트 완료');
-      return photoUrls;
-    } catch (error) {
-      console.error('사진 업로드 중 오류:', error);
-      setError(error.message);
-      throw error;
+      console.log('사진 업로드 시작:', { photos, uuid });
+      const uris = photos.map(photo => photo.uri);
+      const result = await uploadMultipleImages(uris, `profiles/${uuid}`);
+      console.log('사진 업로드 결과:', result);
+      return result;
+    } catch (err) {
+      console.error('사진 업로드 오류:', err);
+      setError(err.message);
+      return [];
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [photos, uuid]);
 
   return {
     photos,

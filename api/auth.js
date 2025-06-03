@@ -65,11 +65,26 @@ export const verifyOtp = async (phoneNumber, code) => {
     );
     
     const data = response.data;
+    console.log('OTP 인증 응답:', data);
     
     if (data.accessToken) {
+      // 1. 토큰 저장
       await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, data.accessToken);
       await AsyncStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
       await AsyncStorage.setItem(AUTH_KEYS.PHONE_NUMBER, formattedPhone);
+      
+      // 2. JWT 토큰에서 UUID 추출
+      const decodedToken = jwtDecode(data.accessToken);
+      console.log('디코딩된 토큰:', decodedToken);
+      
+      // 3. 사용자 정보 저장
+      const user = {
+        phone: formattedPhone,
+        uuid: decodedToken.uuid,  // JWT의 uuid claim 사용
+        createdAt: new Date().toISOString()
+      };
+      console.log('저장할 사용자 정보:', user);
+      await storeUser(user);
     }
     
     return { success: true, data };
@@ -103,7 +118,18 @@ export const refreshToken = async () => {
     const data = response.data;
     
     if (data.accessToken) {
+      // 1. 토큰 저장
       await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, data.accessToken);
+      await AsyncStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
+      
+      // 2. UUID 업데이트
+      const decodedToken = jwtDecode(data.accessToken);
+      const user = await getStoredUser();
+      if (user) {
+        user.uuid = decodedToken.uuid;
+        await storeUser(user);
+      }
+      
       return { success: true, data };
     }
     
@@ -152,17 +178,13 @@ export const logout = async () => {
  */
 export const isAuthenticated = async () => {
   try {
-    // 1. 리프레시 토큰 확인
-    const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
-    if (!refreshToken) return false;
+    // 1. 액세스 토큰 확인
+    const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
+    if (!accessToken) return false;
 
-    // 2. 리프레시 토큰 만료 시간 확인
-    const decoded = jwtDecode(refreshToken);
-    const expirationTime = decoded.exp * 1000; // 초를 밀리초로 변환
-    const currentTime = Date.now();
-    
-    // 3. 리프레시 토큰이 만료되지 않았다면 인증된 것으로 간주
-    return expirationTime > currentTime;
+    // 2. 토큰 갱신 시도로 유효성 확인
+    const result = await refreshToken();
+    return result.success;
   } catch (error) {
     console.error('인증 확인 오류:', error);
     return false;

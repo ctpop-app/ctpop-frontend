@@ -67,5 +67,17 @@ export const profileService = {
       throw new Error(response.error);
     }
     return response.data;
+  },
+
+  /**
+   * 프로필 비활성화
+   * @param {string} phoneNumber - 전화번호
+   * @returns {Promise<void>}
+   */
+  async deactivateProfile(phoneNumber) {
+    const response = await profile.deactivateProfile(phoneNumber);
+    if (!response.success) {
+      throw new Error(response.error);
+    }
   }
 }; 

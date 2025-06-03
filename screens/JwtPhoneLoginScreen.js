@@ -64,7 +64,7 @@ export default function JwtPhoneLoginScreen() {
       }
     };
     checkInitialAuth();
-  }, [checkAuth, authState, navigation]);
+  }, []);
 
   // 인증 상태 변경 감지
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function JwtPhoneLoginScreen() {
         })
       );
     }
-  }, [authState, navigation]);
+  }, [authState.isAuthenticated, authState.hasProfile, navigation]);
 
   // 인증번호 전송
   const handleSendOtpPress = async () => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Text, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,14 +11,34 @@ import { OptionSelector } from '../components/profile-setup/form-inputs/OptionSe
 import { LocationSelector } from '../components/profile-setup/form-inputs/LocationSelector';
 import { Button } from '../components/Button';
 import { ProfileHeader } from '../components/profile-setup/common/ProfileHeader';
-import useUserStore from '../store/userStore';
+import userStore from '../store/userStore';
 import { ORIENTATION_OPTIONS, MAX_PHOTOS } from '../components/profile-setup/constants';
 
 const ProfileSetupScreen = () => {
   const navigation = useNavigation();
-  const { user, setHasProfile } = useUserStore();
+  const { user, setHasProfile, setUserProfile } = userStore();
   const [isSaving, setIsSaving] = useState(false);
   const [photoList, setPhotoList] = useState(Array(MAX_PHOTOS).fill(null));
+
+  // user 상태 확인
+  useEffect(() => {
+    console.log('ProfileSetupScreen - 현재 상태:', {
+      user: user,
+      hasProfile: userStore.getState().hasProfile,
+      userProfile: userStore.getState().userProfile
+    });
+    
+    if (!user || !user.uuid) {
+      console.error('사용자 정보가 없습니다:', user);
+      Alert.alert('오류', '사용자 정보를 불러올 수 없습니다. 다시 로그인해주세요.');
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: ROUTES.AUTH.LOGIN }]
+        })
+      );
+    }
+  }, [user, navigation]);
 
   const {
     formData,
@@ -26,7 +46,18 @@ const ProfileSetupScreen = () => {
     isLoading: isFormLoading,
     updateField,
     handleSubmit
-  } = useProfileForm(user?.uuid);
+  } = useProfileForm(user?.uuid, {
+    nickname: '',
+    age: '',
+    height: '',
+    weight: '',
+    city: '',
+    district: '',
+    orientation: '',
+    bio: '',
+    mainPhotoURL: '',
+    photoURLs: []
+  });
 
   const {
     photos,
@@ -97,6 +128,10 @@ const ProfileSetupScreen = () => {
       const photosToUpload = photoList.filter(photo => photo !== null);
       console.log('업로드할 사진:', photosToUpload);
       
+      if (photosToUpload.length === 0) {
+        throw new Error('대표 사진을 등록해주세요.');
+      }
+      
       // usePhotoGrid의 photos 배열 업데이트
       photosToUpload.forEach(photo => {
         if (!photos.find(p => p.uri === photo.uri)) {
@@ -115,8 +150,11 @@ const ProfileSetupScreen = () => {
       }
 
       // 2. 프로필 정보 저장 (사진 URL 포함)
+      console.log('프로필 저장 시작 - formData:', formData);
+      console.log('프로필 저장 시작 - photoUrls:', photoUrls);
+      
       const profileData = await handleSubmit({
-        mainPhotoURL: photoUrls[0] || '',
+        mainPhotoURL: photoUrls[0],  // 첫 번째 사진을 대표사진으로
         photoURLs: photoUrls
       });
       console.log('프로필 저장 결과:', profileData);
@@ -126,8 +164,20 @@ const ProfileSetupScreen = () => {
       }
 
       // 3. 프로필 생성 완료 상태로 변경
-      setHasProfile(true);
-      console.log('프로필 저장 완료');
+      const store = userStore.getState();
+      console.log('프로필 저장 전 상태:', {
+        hasProfile: store.hasProfile,
+        userProfile: store.userProfile
+      });
+      
+      store.setUserProfile(profileData);  // userProfile과 hasProfile을 함께 업데이트
+      
+      // 상태가 제대로 업데이트되었는지 확인
+      const updatedState = userStore.getState();
+      console.log('프로필 저장 완료, 현재 상태:', {
+        hasProfile: updatedState.hasProfile,
+        userProfile: updatedState.userProfile
+      });
 
       // 4. 홈 화면으로 이동
       navigation.dispatch(
@@ -135,14 +185,7 @@ const ProfileSetupScreen = () => {
           index: 0,
           routes: [
             {
-              name: ROUTES.MAIN.STACK,
-              state: {
-                routes: [
-                  {
-                    name: ROUTES.MAIN.HOME
-                  }
-                ]
-              }
+              name: ROUTES.MAIN.HOME
             }
           ]
         })

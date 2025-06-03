@@ -8,84 +8,103 @@ import { toKST, getUTCTimestamp } from '../utils/dateUtils';
 
 const useUserStore = create(
   persist(
-    (set) => ({
+    (set, get) => ({
+      // 상태
       user: null,
       userProfile: null,
+      isAuthenticated: false,
       hasProfile: false,
+
+      // 액션
       setUser: (user) => {
-        if (user) {
-          // 시간 관련 필드를 한국 시간으로 변환
-          const kstUser = {
-            ...user,
-            createdAt: toKST(user.createdAt),
-            lastLoginAt: toKST(user.lastLoginAt),
-          };
-          set({ user: kstUser });
-        } else {
-          set({ user: null });
-        }
+        console.log('setUser called with:', user);
+        set((state) => ({ 
+          ...state,
+          user, 
+          isAuthenticated: !!user 
+        }));
+        console.log('New state:', get());
       },
+      
       setUserProfile: (profile) => {
-        if (profile) {
-          // 프로필의 시간 관련 필드를 한국 시간으로 변환
-          const kstProfile = {
-            ...profile,
-            createdAt: toKST(profile.createdAt),
-            updatedAt: toKST(profile.updatedAt),
-          };
-          set({ userProfile: kstProfile });
-        } else {
-          set({ userProfile: null });
-        }
+        console.log('setUserProfile called with:', profile);
+        set((state) => ({ 
+          ...state,
+          userProfile: profile,
+          hasProfile: !!profile 
+        }));
+        console.log('New state:', get());
       },
-      setHasProfile: async (hasProfile) => {
-        set({ hasProfile });
-        // Firestore에 프로필 상태 저장
-        const user = useUserStore.getState().user;
-        if (user?.uuid) {
-          try {
-            const userRef = doc(db, 'users', user.uuid);
-            await setDoc(userRef, { 
-              updatedAt: getUTCTimestamp() // UTC 시간으로 저장
-            }, { merge: true });
-          } catch (error) {
-            console.error('프로필 상태 저장 실패:', error);
-          }
-        }
+      
+      setHasProfile: (hasProfile) => {
+        console.log('setHasProfile called with:', hasProfile);
+        set((state) => ({ 
+          ...state,
+          hasProfile 
+        }));
+        console.log('New state:', get());
       },
-      checkProfileStatus: async (uuid) => {
-        if (!uuid) return false;
+      
+      clearUser: () => {
+        console.log('clearUser called');
+        set((state) => ({ 
+          ...state,
+          user: null, 
+          userProfile: null, 
+          isAuthenticated: false, 
+          hasProfile: false 
+        }));
+        console.log('New state:', get());
+      },
+
+      // 회원탈퇴
+      withdrawUser: async () => {
+        console.log('withdrawUser called');
         try {
-          const userRef = doc(db, 'users', uuid);
-          const userDoc = await getDoc(userRef);
-          // 문서가 존재하면 프로필이 있는 것으로 간주
-          const hasProfile = userDoc.exists();
-          set({ hasProfile });
-          return hasProfile;
+          // 1. 상태 초기화
+          set((state) => ({ 
+            ...state,
+            user: null, 
+            userProfile: null, 
+            isAuthenticated: false, 
+            hasProfile: false 
+          }));
+          // 2. persist 스토리지 초기화
+          await AsyncStorage.removeItem('user-storage');
+          // 3. 인증 관련 데이터 삭제
+          await AsyncStorage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
+          await AsyncStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
+          await AsyncStorage.removeItem(AUTH_KEYS.PHONE_NUMBER);
+          await AsyncStorage.removeItem(AUTH_KEYS.USER);
+          console.log('User data cleared');
         } catch (error) {
-          console.error('프로필 상태 확인 실패:', error);
-          return false;
+          console.error('User data clear failed:', error);
         }
+        console.log('New state:', get());
       },
-      clearUser: () => set({ 
-        user: null, 
-        userProfile: null,
-        hasProfile: false  // 로그아웃 시에도 초기화
-      }),
 
-      // 회원탈퇴 시 호출되는 함수
-      withdrawUser: () => set({ 
-        user: null, 
-        userProfile: null,
-        hasProfile: false  // 회원탈퇴 시에만 false로 초기화
-      }),
-
+      // 초기화
+      initialize: async () => {
+        try {
+          const stored = await AsyncStorage.getItem('user-storage');
+          if (stored) {
+            const { state } = JSON.parse(stored);
+            set(state);
+          }
+        } catch (error) {
+          console.error('Storage 로드 실패:', error);
+        }
+      }
     }),
     {
       name: 'user-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      skipHydration: true
     }
   )
 );
+
+// store 초기화
+useUserStore.getState().initialize();
 
 export default useUserStore; 
