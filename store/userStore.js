@@ -1,4 +1,4 @@
-// userStore.js
+// store/userStore.js
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -52,7 +52,6 @@ const useUserStore = create(
           user: null, 
           userProfile: null, 
           isAuthenticated: false, 
-          hasProfile: false 
         }));
         console.log('New state:', get());
       },

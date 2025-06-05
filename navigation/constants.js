@@ -17,7 +17,8 @@ export const ROUTES = {
   
   // 메인 관련
   MAIN: {
-    HOME: 'Home',
+    MAIN_TABS: 'MainTabs',  // 메인 탭 네비게이션
+    HOME: 'Home',           // 홈 탭
     MESSAGES: 'Messages',
     SETTINGS: 'Settings',
     PROFILE_TEST: 'ProfileTest',

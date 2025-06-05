@@ -4,16 +4,16 @@
  * API 호출은 api/index.js의 userApi를 사용합니다.
  */
 
-import { userApi } from '../api';
+import { user as userApi } from '../api';
 
 export const userService = {
   /**
    * 사용자 생성
-   * @param {string} phoneNumber - 전화번호
+   * @param {string} uuid - 사용자 UUID
    * @returns {Promise<Object>}
    */
-  async createUser(phoneNumber) {
-    const response = await userApi.createUser(phoneNumber);
+  async createUser(uuid) {
+    const response = await userApi.createUser(uuid);
     if (!response.success) {
       throw new Error(response.error);
     }
@@ -21,12 +21,12 @@ export const userService = {
   },
 
   /**
-   * 사용자 조회
-   * @param {string} phoneNumber - 전화번호
+   * 사용자 정보 조회
+   * @param {string} uuid - 사용자 UUID
    * @returns {Promise<Object>}
    */
-  async getUser(phoneNumber) {
-    const response = await userApi.getUser(phoneNumber);
+  async getUser(uuid) {
+    const response = await userApi.getUser(uuid);
     if (!response.success) {
       throw new Error(response.error);
     }
@@ -35,11 +35,11 @@ export const userService = {
 
   /**
    * 사용자 비활성화
-   * @param {string} phoneNumber - 전화번호
+   * @param {string} uuid - 사용자 UUID
    * @returns {Promise<void>}
    */
-  async deactivateUser(phoneNumber) {
-    const response = await userApi.deactivateUser(phoneNumber);
+  async deactivateUser(uuid) {
+    const response = await userApi.deactivateUser(uuid);
     if (!response.success) {
       throw new Error(response.error);
     }

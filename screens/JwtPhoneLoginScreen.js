@@ -20,6 +20,7 @@ import { ROUTES } from '../navigation/constants';
 import { refreshAccessToken } from '../services/authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
+import * as authApi from '../api/auth';
 
 export default function JwtPhoneLoginScreen() {
   const navigation = useNavigation();
@@ -31,63 +32,36 @@ export default function JwtPhoneLoginScreen() {
     verificationCode,
     setVerificationCode,
     otpSent,
+    setOtpSent,
     handleSendOtp,
     handleVerifyOtp,
     handleResendOtp,
     checkAuth,
     authState,
-    handleTestConnection
+    handleTestConnection,
+    setUser,
+    storeTokens,
+    clearTokens,
   } = useAuth();
 
   // 앱 시작 시 인증 상태 확인
   useEffect(() => {
     const checkInitialAuth = async () => {
-      const isAuthenticated = await checkAuth();
-      if (isAuthenticated && authState.hasProfile) {
-        navigation.dispatch(
-          CommonActions.reset({
+      try {
+        const isAuthenticated = await checkAuth();
+        console.log('초기 인증 상태 확인:', isAuthenticated, authState);
+        if (isAuthenticated && authState.hasProfile) {
+          navigation.reset({
             index: 0,
-            routes: [
-              {
-                name: ROUTES.MAIN.STACK,
-                state: {
-                  routes: [
-                    {
-                      name: ROUTES.MAIN.HOME
-                    }
-                  ]
-                }
-              }
-            ]
-          })
-        );
+            routes: [{ name: ROUTES.MAIN.MAIN_TABS }]
+          });
+        }
+      } catch (error) {
+        console.error('초기 인증 확인 중 오류:', error);
       }
     };
     checkInitialAuth();
   }, []);
-
-  // 인증 상태 변경 감지
-  useEffect(() => {
-    if (authState.isAuthenticated && authState.hasProfile) {
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [
-            {
-              name: ROUTES.MAIN.STACK,
-              state: {
-                routes: [
-                  {
-                    name: ROUTES.MAIN.HOME
-                  }
-                ]
-              }
-            }
-          ]
-        })
-      );
-    }
-  }, [authState.isAuthenticated, authState.hasProfile, navigation]);
 
   // 인증번호 전송
   const handleSendOtpPress = async () => {
@@ -99,12 +73,35 @@ export default function JwtPhoneLoginScreen() {
 
   // 인증번호 확인
   const handleOtpVerification = async () => {
-    const success = await handleVerifyOtp();
-    if (success) {
-      if (authState.hasProfile) {
-        navigation.replace(ROUTES.MAIN.STACK);
-      } else {
-        navigation.replace(ROUTES.AUTH.PROFILE_SETUP, { phone: phoneNumber });
+    const result = await handleVerifyOtp();
+    if (result.success) {
+      // 토큰이 있으면 인증 성공으로 간주
+      if (result.data.accessToken) {
+        // 1. 토큰 저장
+        await storeTokens(result.data.accessToken, result.data.refreshToken);
+        
+        // 2. 사용자 정보 생성 (UUID만 사용)
+        const user = {
+          uuid: result.data.uuid,
+          createdAt: new Date().toISOString()
+        };
+        
+        // 3. 사용자 정보 저장
+        await authApi.storeUser(user);
+        
+        // 4. 서버에 인증 상태 확인
+        const isAuth = await authApi.isAuthenticated();
+        if (isAuth) {
+          setUser(user);
+          // 프로필 설정 화면으로 이동 (UUID 전달)
+          navigation.replace(ROUTES.AUTH.PROFILE_SETUP, { uuid: user.uuid });
+          return true;
+        } else {
+          // 인증 실패 시 토큰 삭제
+          await clearTokens();
+          Alert.alert('오류', '인증 상태 확인에 실패했습니다.');
+          return false;
+        }
       }
     }
   };

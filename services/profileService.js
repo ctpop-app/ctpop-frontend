@@ -10,11 +10,11 @@ import { Profile } from '../models/Profile';
 export const profileService = {
   /**
    * 프로필 존재 여부 확인
-   * @param {string} phoneNumber - 전화번호
+   * @param {string} uuid - 사용자 UUID
    * @returns {Promise<boolean>}
    */
-  async checkProfileExists(phoneNumber) {
-    const response = await profile.checkProfileExists(phoneNumber);
+  async checkProfileExists(uuid) {
+    const response = await profile.checkProfileExists(uuid);
     if (!response.success) {
       throw new Error(response.error);
     }
@@ -23,19 +23,19 @@ export const profileService = {
 
   /**
    * 프로필 생성
-   * @param {string} phoneNumber - 전화번호
+   * @param {string} uuid - 사용자 UUID
    * @param {Object} profileData - 프로필 데이터
    * @returns {Promise<Profile>}
    */
-  async createProfile(phoneNumber, profileData) {
+  async createProfile(uuid, profileData) {
     // 사용자 확인
-    const userResponse = await user.getUser(phoneNumber);
+    const userResponse = await user.getUser(uuid);
     if (!userResponse.success) {
       throw new Error('사용자를 찾을 수 없습니다.');
     }
 
     // 프로필 생성
-    const response = await profile.createProfile(phoneNumber, profileData);
+    const response = await profile.createProfile(uuid, profileData);
     if (!response.success) {
       throw new Error(response.error);
     }
@@ -44,11 +44,11 @@ export const profileService = {
 
   /**
    * 프로필 조회
-   * @param {string} profileId - 프로필 ID
+   * @param {string} uuid - 사용자 UUID
    * @returns {Promise<Profile>}
    */
-  async getProfile(profileId) {
-    const response = await profile.getProfile(profileId);
+  async getProfile(uuid) {
+    const response = await profile.getProfile(uuid);
     if (!response.success) {
       throw new Error(response.error);
     }
@@ -57,12 +57,12 @@ export const profileService = {
 
   /**
    * 프로필 업데이트
-   * @param {string} profileId - 프로필 ID
+   * @param {string} uuid - 사용자 UUID
    * @param {Object} updateData - 업데이트할 데이터
    * @returns {Promise<Profile>}
    */
-  async updateProfile(profileId, updateData) {
-    const response = await profile.updateProfile(profileId, updateData);
+  async updateProfile(uuid, updateData) {
+    const response = await profile.updateProfile(uuid, updateData);
     if (!response.success) {
       throw new Error(response.error);
     }
@@ -71,11 +71,11 @@ export const profileService = {
 
   /**
    * 프로필 비활성화
-   * @param {string} phoneNumber - 전화번호
+   * @param {string} uuid - 사용자 UUID
    * @returns {Promise<void>}
    */
-  async deactivateProfile(phoneNumber) {
-    const response = await profile.deactivateProfile(phoneNumber);
+  async deactivateProfile(uuid) {
+    const response = await profile.deactivateProfile(uuid);
     if (!response.success) {
       throw new Error(response.error);
     }

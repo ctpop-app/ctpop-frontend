@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { ROUTES } from '../navigation/constants';
+import userStore from '../store/userStore';
 import { profile } from '../api';
 
 const fieldLabels = {
@@ -12,8 +16,11 @@ const fieldLabels = {
   bio: '자기소개'
 };
 
-export const useProfileForm = (uuid, initialFields = {}) => {
-  const [formData, setFormData] = useState({
+export const useProfileForm = (userId, initialData = null) => {
+  const navigation = useNavigation();
+  const { user } = userStore();
+
+  const [formData, setFormData] = useState(initialData || {
     nickname: '',
     age: '',
     height: '',
@@ -23,14 +30,13 @@ export const useProfileForm = (uuid, initialFields = {}) => {
     orientation: '',
     bio: '',
     mainPhotoURL: '',
-    photoURLs: [],
-    ...initialFields
+    photoURLs: []
   });
 
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const updateField = (field, value) => {
+  const updateField = useCallback((field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -42,9 +48,9 @@ export const useProfileForm = (uuid, initialFields = {}) => {
         [field]: null
       }));
     }
-  };
+  }, []);
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const newErrors = {};
 
     // 필수 필드 검증
@@ -80,9 +86,9 @@ export const useProfileForm = (uuid, initialFields = {}) => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [formData]);
 
-  const handleSubmit = async (photoData = {}) => {
+  const handleSubmit = useCallback(async (data) => {
     if (isLoading) return;
 
     setIsLoading(true);
@@ -107,9 +113,9 @@ export const useProfileForm = (uuid, initialFields = {}) => {
       // 프로필 데이터 생성
       const profileData = {
         ...formData,
-        ...photoData, // 사진 URL 데이터 추가
-        mainPhotoURL: photoData.mainPhotoURL || null, // 빈 문자열 대신 null 사용
-        uuid: uuid
+        ...data, // 사진 URL 데이터 추가
+        mainPhotoURL: data.mainPhotoURL || null, // 빈 문자열 대신 null 사용
+        uuid: userId
       };
 
       console.log('프로필 데이터:', profileData);
@@ -130,7 +136,7 @@ export const useProfileForm = (uuid, initialFields = {}) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [formData, userId, isLoading]);
 
   return {
     formData,

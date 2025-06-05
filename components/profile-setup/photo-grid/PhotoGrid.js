@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, View, Dimensions } from 'react-native';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import Animated, { 
@@ -14,6 +14,50 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const PHOTO_SIZE = (SCREEN_WIDTH - 80) / 3;
 const MAX_PHOTOS = 6;
 
+const createPanGestureHandler = (index, positions, draggedIndex, dragging, moveItem) => 
+  useAnimatedGestureHandler({
+    onStart: (_, ctx) => {
+      if (index < 0 || index >= MAX_PHOTOS) return;
+      draggedIndex.value = index;
+      dragging.value = true;
+      ctx.startX = positions[index].x.value;
+      ctx.startY = positions[index].y.value;
+    },
+    onActive: (event, ctx) => {
+      if (draggedIndex.value < 0) return;
+      positions[draggedIndex.value].x.value = ctx.startX + event.translationX;
+      positions[draggedIndex.value].y.value = ctx.startY + event.translationY;
+    },
+    onEnd: (event) => {
+      if (draggedIndex.value < 0) return;
+
+      const GRID_TOP = 280;
+      const absX = event.absoluteX;
+      const absY = Math.max(0, event.absoluteY - GRID_TOP);
+
+      const itemWidth = PHOTO_SIZE + 10;
+      const itemHeight = PHOTO_SIZE + 10;
+      
+      const maxCol = 2;
+      const maxRow = Math.ceil(MAX_PHOTOS / 3) - 1;
+      
+      const col = Math.min(Math.max(0, Math.floor(absX / itemWidth)), maxCol);
+      const row = Math.min(Math.max(0, Math.floor(absY / itemHeight)), maxRow);
+      
+      const dropIndex = row * 3 + col;
+      
+      if (dropIndex >= 0 && dropIndex < MAX_PHOTOS && 
+          dropIndex !== draggedIndex.value) {
+        runOnJS(moveItem)(draggedIndex.value, dropIndex);
+      }
+      
+      positions[draggedIndex.value].x.value = withSpring(0);
+      positions[draggedIndex.value].y.value = withSpring(0);
+      dragging.value = false;
+      draggedIndex.value = -1;
+    }
+  });
+
 export const PhotoGrid = ({ 
   photos, 
   onPhotoPress, 
@@ -28,12 +72,12 @@ export const PhotoGrid = ({
   }));
 
   // 마지막으로 사용된 사진의 인덱스를 찾는 함수
-  const getLastUsedIndex = () => {
-    const lastIndex = photos.findIndex(photo => photo === null);
+  const getLastUsedIndex = useCallback(() => {
+    const lastIndex = photos.findIndex(photo => !photo?.photo?.uri);
     return lastIndex === -1 ? MAX_PHOTOS - 1 : lastIndex - 1;
-  };
+  }, [photos]);
 
-  const moveItem = (fromIdx, toIdx) => {
+  const moveItem = useCallback((fromIdx, toIdx) => {
     if (fromIdx < 0 || toIdx < 0 || fromIdx >= MAX_PHOTOS || toIdx >= MAX_PHOTOS) {
       console.log('Invalid move attempted:', { fromIdx, toIdx });
       return;
@@ -46,53 +90,9 @@ export const PhotoGrid = ({
     }
 
     onPhotoMove(fromIdx, toIdx);
-  };
+  }, [getLastUsedIndex, onPhotoMove]);
 
-  const createPanGestureHandler = (index) => 
-    useAnimatedGestureHandler({
-      onStart: (_, ctx) => {
-        if (index < 0 || index >= MAX_PHOTOS) return;
-        draggedIndex.value = index;
-        dragging.value = true;
-        ctx.startX = positions[index].x.value;
-        ctx.startY = positions[index].y.value;
-      },
-      onActive: (event, ctx) => {
-        if (draggedIndex.value < 0) return;
-        positions[draggedIndex.value].x.value = ctx.startX + event.translationX;
-        positions[draggedIndex.value].y.value = ctx.startY + event.translationY;
-      },
-      onEnd: (event) => {
-        if (draggedIndex.value < 0) return;
-
-        const GRID_TOP = 280;
-        const absX = event.absoluteX;
-        const absY = Math.max(0, event.absoluteY - GRID_TOP);
-
-        const itemWidth = PHOTO_SIZE + 10;
-        const itemHeight = PHOTO_SIZE + 10;
-        
-        const maxCol = 2;
-        const maxRow = Math.ceil(MAX_PHOTOS / 3) - 1;
-        
-        const col = Math.min(Math.max(0, Math.floor(absX / itemWidth)), maxCol);
-        const row = Math.min(Math.max(0, Math.floor(absY / itemHeight)), maxRow);
-        
-        const dropIndex = row * 3 + col;
-        
-        if (dropIndex >= 0 && dropIndex < MAX_PHOTOS && 
-            dropIndex !== draggedIndex.value) {
-          runOnJS(moveItem)(draggedIndex.value, dropIndex);
-        }
-        
-        positions[draggedIndex.value].x.value = withSpring(0);
-        positions[draggedIndex.value].y.value = withSpring(0);
-        dragging.value = false;
-        draggedIndex.value = -1;
-      }
-    });
-
-  const getAnimatedStyle = (index) => useAnimatedStyle(() => {
+  const getAnimatedStyle = useCallback((index) => useAnimatedStyle(() => {
     if (draggedIndex.value === index) {
       return {
         transform: [
@@ -111,29 +111,36 @@ export const PhotoGrid = ({
       ],
       zIndex: 1
     };
-  });
+  }), [draggedIndex, dragging, positions]);
 
-  const data = photos.map((p, i) => {
+  const photoList = photos.map((p, i) => {
     const lastUsedIndex = getLastUsedIndex();
-    const isAddable = i === lastUsedIndex + 1;
+    const isAddable = i <= lastUsedIndex + 1;
     
     return { 
-      key: `${i}`, 
-      uri: p?.uri || null, 
-      empty: p === null, 
+      key: p?.photo?.uri || `empty-${i}`, 
+      uri: p?.photo?.uri || null, 
+      empty: p?.photo === null, 
       idx: i,
-      isAddable
+      isAddable,
+      photo: p?.photo
     };
   });
 
+  console.log('PhotoGrid photoList:', photoList.map(p => ({
+    uri: p.photo?.uri,
+    isAddable: p.isAddable,
+    empty: p.empty
+  })));
+
   return (
     <View style={styles.photoGrid}>
-      {data.map((item, index) => (
+      {photoList.map((item, index) => (
         <PanGestureHandler
           key={`pan-${item.key}`}
-          enabled={!item.empty}
-          onGestureEvent={createPanGestureHandler(index)}
-          onHandlerStateChange={createPanGestureHandler(index)}
+          enabled={!!item.photo?.uri}
+          onGestureEvent={createPanGestureHandler(index, positions, draggedIndex, dragging, moveItem)}
+          onHandlerStateChange={createPanGestureHandler(index, positions, draggedIndex, dragging, moveItem)}
           activeOffsetX={[-20, 20]}
           activeOffsetY={[-20, 20]}
         >
@@ -141,8 +148,9 @@ export const PhotoGrid = ({
             <PhotoItem
               item={item}
               index={index}
-              onPress={item.isAddable ? onPhotoPress : undefined}
+              onPress={onPhotoPress}
               onRemove={onPhotoRemove}
+              disabled={!item.isAddable}
             />
           </Animated.View>
         </PanGestureHandler>

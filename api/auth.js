@@ -1,8 +1,8 @@
 import apiClient from './client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { toE164Format } from '../services/authService';
 import { AUTH_KEYS } from '../utils/constants';
 import { jwtDecode } from 'jwt-decode';
+import { toE164Format } from '../services/authService';
 
 /**
  * 서버 연결을 테스트합니다.
@@ -71,7 +71,6 @@ export const verifyOtp = async (phoneNumber, code) => {
       // 1. 토큰 저장
       await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, data.accessToken);
       await AsyncStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
-      await AsyncStorage.setItem(AUTH_KEYS.PHONE_NUMBER, formattedPhone);
       
       // 2. JWT 토큰에서 UUID 추출
       const decodedToken = jwtDecode(data.accessToken);
@@ -79,7 +78,6 @@ export const verifyOtp = async (phoneNumber, code) => {
       
       // 3. 사용자 정보 저장
       const user = {
-        phone: formattedPhone,
         uuid: decodedToken.uuid,  // JWT의 uuid claim 사용
         createdAt: new Date().toISOString()
       };
@@ -103,19 +101,26 @@ export const verifyOtp = async (phoneNumber, code) => {
  */
 export const refreshToken = async () => {
   try {
+    console.log('refreshToken 시작');
     const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
-    const phoneNumber = await AsyncStorage.getItem(AUTH_KEYS.PHONE_NUMBER);
+    const user = await getStoredUser();
     
-    if (!refreshToken || !phoneNumber) {
+    console.log('refreshToken 확인:', refreshToken ? '있음' : '없음');
+    console.log('user 확인:', user ? '있음' : '없음');
+    
+    if (!refreshToken || !user?.uuid) {
+      console.log('토큰 또는 사용자 정보가 없습니다.');
       return { success: false, message: '토큰 정보가 없습니다.' };
     }
     
+    console.log('서버에 토큰 갱신 요청');
     const response = await apiClient.post('/auth/refresh', 
-      { refreshToken, phone: phoneNumber },
+      { refreshToken, uuid: user.uuid },
       { authenticated: false }
     );
     
     const data = response.data;
+    console.log('토큰 갱신 응답:', data);
     
     if (data.accessToken) {
       // 1. 토큰 저장
@@ -124,15 +129,16 @@ export const refreshToken = async () => {
       
       // 2. UUID 업데이트
       const decodedToken = jwtDecode(data.accessToken);
-      const user = await getStoredUser();
       if (user) {
         user.uuid = decodedToken.uuid;
         await storeUser(user);
       }
       
+      console.log('토큰 갱신 완료');
       return { success: true, data };
     }
     
+    console.log('토큰 갱신 실패');
     return { success: false, message: '토큰 갱신에 실패했습니다.' };
   } catch (error) {
     console.error('토큰 갱신 오류:', error);
@@ -149,15 +155,14 @@ export const refreshToken = async () => {
  */
 export const logout = async () => {
   try {
-    const phoneNumber = await AsyncStorage.getItem(AUTH_KEYS.PHONE_NUMBER);
+    const user = await getStoredUser();
     
-    if (phoneNumber) {
-      await apiClient.post('/auth/logout', { phone: phoneNumber });
+    if (user?.uuid) {
+      await apiClient.post('/auth/logout', { uuid: user.uuid });
     }
     
     await AsyncStorage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
     await AsyncStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
-    await AsyncStorage.removeItem(AUTH_KEYS.PHONE_NUMBER);
     await AsyncStorage.removeItem(AUTH_KEYS.USER);
     
     return { success: true };
@@ -166,7 +171,6 @@ export const logout = async () => {
     // 로그아웃 실패해도 로컬 데이터는 삭제
     await AsyncStorage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
     await AsyncStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
-    await AsyncStorage.removeItem(AUTH_KEYS.PHONE_NUMBER);
     await AsyncStorage.removeItem(AUTH_KEYS.USER);
     return { success: true };
   }
@@ -178,13 +182,29 @@ export const logout = async () => {
  */
 export const isAuthenticated = async () => {
   try {
-    // 1. 액세스 토큰 확인
-    const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
-    if (!accessToken) return false;
+    // 1. 리프레시 토큰 확인
+    const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
+    if (!refreshToken) {
+      console.log('리프레시 토큰이 없습니다.');
+      return false;
+    }
 
-    // 2. 토큰 갱신 시도로 유효성 확인
-    const result = await refreshToken();
-    return result.success;
+    // 2. 리프레시 토큰 디코딩하여 만료 여부 확인
+    try {
+      const decodedToken = jwtDecode(refreshToken);
+      const currentTime = Date.now() / 1000;
+      
+      if (decodedToken.exp < currentTime) {
+        console.log('리프레시 토큰이 만료되었습니다.');
+        return false;
+      }
+      
+      console.log('리프레시 토큰이 유효합니다.');
+      return true;
+    } catch (decodeError) {
+      console.error('리프레시 토큰 디코딩 오류:', decodeError);
+      return false;
+    }
   } catch (error) {
     console.error('인증 확인 오류:', error);
     return false;

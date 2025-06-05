@@ -12,17 +12,14 @@ export const PhotoItem = ({
   item, 
   index, 
   onPress, 
-  onRemove
+  onRemove,
+  disabled
 }) => {
   const { uri, empty, isAddable } = item;
   const isMainPhoto = index === 0;
 
   const handlePress = () => {
-    if (empty) {
-      if (isAddable) {
-        onPress(index);
-      }
-    } else {
+    if (!disabled) {
       onPress(index);
     }
   };
@@ -30,21 +27,29 @@ export const PhotoItem = ({
   if (empty) {
     return (
       <TouchableOpacity
-        style={[styles.container, styles.emptyContainer]}
-        onPress={isAddable ? handlePress : undefined}
-        disabled={!isAddable}
+        style={[
+          styles.container, 
+          styles.emptyContainer,
+          disabled && styles.disabledContainer
+        ]}
+        onPress={handlePress}
+        disabled={disabled}
       >
         <Ionicons 
           name="add-circle-outline" 
           size={32} 
-          color={isAddable ? "#666" : "#ccc"} 
+          color={disabled ? "#ccc" : "#666"}
         />
       </TouchableOpacity>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity 
+      style={styles.container}
+      onPress={handlePress}
+      disabled={disabled}
+    >
       <Image
         source={{ uri }}
         style={styles.image}
@@ -63,7 +68,7 @@ export const PhotoItem = ({
           <Ionicons name="close" size={16} color="#fff" />
         </TouchableOpacity>
       )}
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -89,6 +94,10 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderStyle: 'dashed',
     borderRadius: 12,
+  },
+  disabledContainer: {
+    opacity: 0.5,
+    backgroundColor: '#f5f5f5',
   },
   image: {
     width: '100%',

@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import { profileService } from '../services/profileService';
 import { userService } from '../services/userService';
 import { ROUTES } from '../navigation/constants';
+import { CommonActions } from '@react-navigation/native';
 
 // 기본 프로필 이미지 URL
 const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150';
@@ -25,9 +26,9 @@ const SettingsScreen = () => {
 
   const loadUserProfile = async () => {
     try {
-      if (!user?.phoneNumber) return;
+      if (!user?.uuid) return;
       
-      const profile = await profileService.getProfile(user.phoneNumber);
+      const profile = await profileService.getProfile(user.uuid);
       if (profile) {
         setUserProfile(profile);
       }
@@ -39,14 +40,23 @@ const SettingsScreen = () => {
     }
   };
 
-  const handleProfileEdit = () => {
+  const handleEditProfile = () => {
+    const userProfile = userStore.getState().userProfile;
     if (!userProfile) {
-      Alert.alert('알림', '프로필 정보를 불러올 수 없습니다.');
+      Alert.alert('오류', '프로필 정보를 불러올 수 없습니다.');
       return;
     }
-    navigation.navigate(ROUTES.AUTH.PROFILE_SETUP, {
-      isEdit: true,
-      currentProfile: userProfile
+
+    // Date 객체를 문자열로 변환
+    const serializedProfile = {
+      ...userProfile,
+      createdAt: userProfile.createdAt?.toISOString(),
+      updatedAt: userProfile.updatedAt?.toISOString()
+    };
+
+    navigation.navigate(ROUTES.PROFILE.EDIT, { 
+      currentProfile: serializedProfile,
+      isEdit: true 
     });
   };
 
@@ -65,10 +75,16 @@ const SettingsScreen = () => {
           onPress: async () => {
             try {
               await handleLogout();
-              navigation.reset({
-                index: 0,
-                routes: [{ name: ROUTES.AUTH.LOGIN }]
-              });
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [
+                    {
+                      name: ROUTES.AUTH.STACK
+                    }
+                  ]
+                })
+              );
             } catch (error) {
               console.error('로그아웃 실패:', error);
               Alert.alert('오류', '로그아웃 중 문제가 발생했습니다.');
@@ -80,9 +96,11 @@ const SettingsScreen = () => {
   };
 
   const handleWithdraw = async () => {
+    if (!user?.uuid) return;
+
     Alert.alert(
       '회원 탈퇴',
-      '정말 탈퇴하시겠습니까? 탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.',
+      '정말로 탈퇴하시겠습니까?',
       [
         {
           text: '취소',
@@ -93,45 +111,35 @@ const SettingsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (!user?.phoneNumber) {
-                // 사용자 정보가 없는 경우 로그인 화면으로 이동
-                withdrawUser();
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: ROUTES.AUTH.LOGIN }]
-                });
-                return;
-              }
-
-              // 프로필 존재 여부 확인
-              const profileCheck = await profileService.checkProfileExists(user.phoneNumber);
-              if (!profileCheck.success) {
-                // 프로필 확인 실패 시 로그인 화면으로 이동
-                withdrawUser();
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: ROUTES.AUTH.LOGIN }]
-                });
-                return;
-              }
-
-              // 프로필이 있는 경우에만 비활성화
-              if (profileCheck.exists) {
-                await profileService.deactivateProfile(user.phoneNumber);
-              }
-
+              // 프로필 비활성화
+              await profileService.deactivateProfile(user.uuid);
+              
               // 사용자 비활성화
-              await userService.deactivateUser(user.phoneNumber);
-
-              // 로컬 상태 초기화 및 로그인 화면으로 이동
-              withdrawUser();
-              navigation.reset({
-                index: 0,
-                routes: [{ name: ROUTES.AUTH.LOGIN }]
-              });
+              await userService.deactivateUser(user.uuid);
+              
+              // 로컬 상태 초기화
+              await handleLogout();
+              
+              // 로그인 화면으로 이동
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [
+                    {
+                      name: ROUTES.AUTH.STACK,
+                      state: {
+                        routes: [
+                          {
+                            name: ROUTES.AUTH.LOGIN
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                })
+              );
             } catch (error) {
-              console.error('회원 탈퇴 실패:', error);
-              Alert.alert('오류', '회원 탈퇴 중 문제가 발생했습니다.');
+              Alert.alert('오류', '회원 탈퇴 중 오류가 발생했습니다.');
             }
           }
         }
@@ -189,7 +197,7 @@ const SettingsScreen = () => {
             <Text style={styles.profileName}>{userProfile?.nickname || '사용자'}</Text>
             <Text style={styles.profileEmail}>{userProfile?.location || '위치 미설정'}</Text>
           </View>
-          <TouchableOpacity style={styles.editButton} onPress={handleProfileEdit}>
+          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
             <Ionicons name="pencil" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
@@ -235,7 +243,7 @@ const SettingsScreen = () => {
         {/* 개발자 옵션 */}
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>개발자 옵션</Text>
-          {renderLinkItem('people-outline', '프로필 테스트', () => navigation.navigate('ProfileTest'))}
+          {renderLinkItem('people-outline', '프로필 테스트', () => navigation.navigate(ROUTES.MAIN.PROFILE_TEST))}
         </View>
 
         {/* 로그아웃 및 회원탈퇴 */}

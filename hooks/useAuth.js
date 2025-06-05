@@ -6,6 +6,8 @@ import { isValidPhoneNumber, isValidOtpCode, storeTokens, clearTokens } from '..
 import useUserStore from '../store/userStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
+import { jwtDecode } from 'jwt-decode';
+import * as userService from '../services/userService';
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -123,20 +125,33 @@ export const useAuth = () => {
       if (result.success) {
         // 토큰이 있으면 인증 성공으로 간주
         if (result.data.accessToken) {
-          // 1. 토큰 저장
-          await storeTokens(result.data.accessToken, result.data.refreshToken);
+          console.log('인증 성공 - 토큰 저장 시작');
+          console.log('액세스 토큰:', result.data.accessToken ? '있음' : '없음');
+          console.log('리프레시 토큰:', result.data.refreshToken ? '있음' : '없음');
           
-          // 2. 사용자 정보 생성
+          // 1. 토큰 저장
+          const storeResult = await storeTokens(result.data.accessToken, result.data.refreshToken);
+          console.log('토큰 저장 결과:', storeResult ? '성공' : '실패');
+          
+          // 저장된 토큰 확인
+          const storedAccessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
+          const storedRefreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
+          console.log('저장된 액세스 토큰:', storedAccessToken ? '있음' : '없음');
+          console.log('저장된 리프레시 토큰:', storedRefreshToken ? '있음' : '없음');
+          
+          // 2. JWT 토큰에서 UUID 추출
+          const decodedToken = jwtDecode(result.data.accessToken);
+          
+          // 3. 사용자 정보 생성 (UUID만 사용)
           const user = {
-            phone: phoneNumber,
-            uuid: result.data.uuid,
+            uuid: decodedToken.uuid,
             createdAt: new Date().toISOString()
           };
           
-          // 3. 사용자 정보 저장
+          // 4. 사용자 정보 저장
           await authApi.storeUser(user);
           
-          // 4. 서버에 인증 상태 확인
+          // 5. 서버에 인증 상태 확인
           const isAuth = await authApi.isAuthenticated();
           if (isAuth) {
             setUser(user);
@@ -198,61 +213,87 @@ export const useAuth = () => {
 
   // 인증 상태 확인
   const checkAuth = useCallback(async () => {
+    console.log('checkAuth 시작');
     setIsLoading(true);
     setError(null);
     
     try {
       // 1. 토큰 확인
       const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
-      if (!accessToken) {
-        console.log('액세스 토큰이 없습니다.');
+      const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
+      console.log('액세스 토큰 확인:', accessToken ? '있음' : '없음');
+      console.log('리프레시 토큰 확인:', refreshToken ? '있음' : '없음');
+
+      if (!accessToken || !refreshToken) {
+        console.log('토큰이 없습니다.');
         return false;
       }
 
-      // 2. 서버에 인증 상태 확인
-      const isAuth = await authApi.isAuthenticated();
-      if (!isAuth) {
-        console.log('서버 인증 실패');
-        await clearTokens();
-        clearUser();
+      // 2. 리프레시 토큰 만료 확인
+      try {
+        const decodedRefreshToken = jwtDecode(refreshToken);
+        const currentTime = Date.now() / 1000;
+        
+        if (decodedRefreshToken.exp < currentTime) {
+          console.log('리프레시 토큰이 만료되었습니다.');
+          await clearTokens();  // 토큰 만료 시에만 토큰 삭제
+          return false;
+        }
+        console.log('리프레시 토큰 유효함');
+      } catch (decodeError) {
+        console.error('리프레시 토큰 디코딩 오류:', decodeError);
         return false;
       }
 
-      // 3. 사용자 정보 확인
+      // 3. 액세스 토큰 만료 확인
+      try {
+        const decodedAccessToken = jwtDecode(accessToken);
+        const currentTime = Date.now() / 1000;
+        
+        // 액세스 토큰이 만료되었을 때만 갱신 시도
+        if (decodedAccessToken.exp < currentTime) {
+          console.log('액세스 토큰이 만료되어 갱신을 시도합니다.');
+          const tokenRefreshResult = await authApi.refreshToken(refreshToken);
+          
+          if (!tokenRefreshResult.success) {
+            console.log('토큰 리프레시 실패');
+            return false;
+          }
+          
+          // 새로운 토큰 저장
+          if (tokenRefreshResult.data.accessToken) {
+            await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, tokenRefreshResult.data.accessToken);
+            // 리프레시 토큰은 새로운 것이 있을 때만 업데이트
+            if (tokenRefreshResult.data.refreshToken) {
+              await AsyncStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, tokenRefreshResult.data.refreshToken);
+            }
+            console.log('토큰 리프레시 성공');
+          }
+        } else {
+          console.log('액세스 토큰이 유효합니다.');
+        }
+      } catch (error) {
+        console.log('액세스 토큰 확인 중 오류:', error);
+        return false;
+      }
+
+      // 4. 사용자 정보 확인
       const user = await AsyncStorage.getItem(AUTH_KEYS.USER);
+      console.log('사용자 정보 확인:', user ? '있음' : '없음');
       if (user) {
         const parsedUser = JSON.parse(user);
         setUser(parsedUser);
-
-        // 4. 프로필 정보 확인
-        try {
-          console.log('프로필 확인 시작 - UUID:', parsedUser.uuid);
-          const profileResult = await profile.getProfile(parsedUser.uuid);
-          console.log('프로필 확인 결과:', profileResult);
-          
-          if (profileResult.success) {
-            setUserProfile(profileResult.data);
-            console.log('프로필 정보 로드 완료:', profileResult.data);
-          } else {
-            console.log('프로필이 없습니다:', profileResult.error);
-            setUserProfile(null);
-          }
-        } catch (error) {
-          console.log('프로필 정보 확인 실패:', error);
-          setUserProfile(null);
-        }
+        return true;
       }
-
-      return true;
+      
+      return false;
     } catch (error) {
-      console.error('인증 상태 확인 오류:', error);
-      await clearTokens();
-      clearUser();
+      console.error('인증 확인 중 오류:', error);
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [setUser, setUserProfile, clearUser]);
+  }, [setUser, clearTokens]);
 
   return {
     isLoading,
@@ -262,12 +303,16 @@ export const useAuth = () => {
     verificationCode,
     setVerificationCode,
     otpSent,
+    setOtpSent,
     handleSendOtp,
     handleVerifyOtp,
     handleResendOtp,
     handleLogout,
     checkAuth,
     authState,
-    handleTestConnection
+    handleTestConnection,
+    setUser,
+    storeTokens,
+    clearTokens
   };
 }; 
