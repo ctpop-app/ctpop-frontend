@@ -10,16 +10,13 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import PhoneInput from '../components/auth/PhoneInput';
 import OtpInput from '../components/auth/OtpInput';
 import AuthButton from '../components/auth/AuthButton';
 import ServerTestButton from '../components/auth/ServerTestButton';
 import { useAuth } from '../hooks/useAuth';
-import { ROUTES } from '../navigation/constants';
-import { refreshAccessToken } from '../services/authService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AUTH_KEYS } from '../utils/constants';
+import { ROUTES, navigationUtils } from '../navigation/constants';
 
 export default function JwtPhoneLoginScreen() {
   const navigation = useNavigation();
@@ -31,81 +28,53 @@ export default function JwtPhoneLoginScreen() {
     verificationCode,
     setVerificationCode,
     otpSent,
+    setOtpSent,
     handleSendOtp,
     handleVerifyOtp,
     handleResendOtp,
     checkAuth,
-    authState,
-    handleTestConnection
+    isAuthenticated,
+    hasProfile,
+    handleTestConnection,
   } = useAuth();
 
   // 앱 시작 시 인증 상태 확인
   useEffect(() => {
     const checkInitialAuth = async () => {
-      const isAuthenticated = await checkAuth();
-      if (isAuthenticated && authState.hasProfile) {
-        navigation.dispatch(
-          CommonActions.reset({
+      try {
+        const isAuth = await checkAuth();
+        if (isAuth && hasProfile) {
+          navigation.reset({
             index: 0,
-            routes: [
-              {
-                name: ROUTES.MAIN.STACK,
-                state: {
-                  routes: [
-                    {
-                      name: ROUTES.MAIN.HOME
-                    }
-                  ]
-                }
-              }
-            ]
-          })
-        );
+            routes: [{ name: ROUTES.MAIN.MAIN_TABS }]
+          });
+        }
+      } catch (error) {
+        console.error('초기 인증 확인 중 오류:', error);
       }
     };
     checkInitialAuth();
-  }, []);
-
-  // 인증 상태 변경 감지
-  useEffect(() => {
-    if (authState.isAuthenticated && authState.hasProfile) {
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [
-            {
-              name: ROUTES.MAIN.STACK,
-              state: {
-                routes: [
-                  {
-                    name: ROUTES.MAIN.HOME
-                  }
-                ]
-              }
-            }
-          ]
-        })
-      );
-    }
-  }, [authState.isAuthenticated, authState.hasProfile, navigation]);
+  }, [checkAuth, hasProfile, navigation]);
 
   // 인증번호 전송
   const handleSendOtpPress = async () => {
     const success = await handleSendOtp();
     if (success) {
       setOtpSent(true);
+      Alert.alert('성공', '인증번호가 전송되었습니다.');
+    } else if (error) {
+      Alert.alert('오류', error);
     }
   };
 
   // 인증번호 확인
   const handleOtpVerification = async () => {
-    const success = await handleVerifyOtp();
-    if (success) {
-      if (authState.hasProfile) {
-        navigation.replace(ROUTES.MAIN.STACK);
-      } else {
-        navigation.replace(ROUTES.AUTH.PROFILE_SETUP, { phone: phoneNumber });
-      }
+    const result = await handleVerifyOtp();
+    if (result.success) {
+      Alert.alert('성공', '인증되었습니다.');
+      // 네비게이션 제거 - 상태 변경만으로 App.js가 자동으로 화면 전환
+    } else if (error) {
+      Alert.alert('오류', error);
     }
   };
 
@@ -203,16 +172,21 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   resendButton: {
+    marginTop: 15,
     padding: 10,
-    alignItems: 'center',
   },
   resendButtonText: {
-    color: '#FF6B6B',
+    color: '#666',
+    textAlign: 'center',
+    fontSize: 14,
   },
 }); 

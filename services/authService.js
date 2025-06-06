@@ -98,13 +98,10 @@ export const isAuthenticated = async () => {
     if (!accessToken) return false;
 
     // 2. 토큰 만료 확인
-    if (isTokenExpired(accessToken)) {
-      // 만료된 경우 리프레시 토큰으로 갱신 시도
-      const result = await refreshAccessToken();
-      return result.success;
-    }
+    const decoded = jwtDecode(accessToken);
+    const expiryTime = decoded.exp * 1000; // 초를 밀리초로 변환
+    return Date.now() < expiryTime;
 
-    return true;
   } catch (error) {
     console.error('인증 확인 오류:', error);
     return false;

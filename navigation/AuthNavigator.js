@@ -8,21 +8,26 @@ import ProfileSetupScreen from '../screens/ProfileSetupScreen';
 
 const Stack = createStackNavigator();
 
-const AuthNavigator = ({ initialRouteName = ROUTES.AUTH.LOGIN }) => {
+const AuthNavigator = () => {
   return (
     <Stack.Navigator 
-      initialRouteName={initialRouteName}
       screenOptions={HEADER_OPTIONS.AUTH}
     >
       <Stack.Screen 
-        name={ROUTES.AUTH.LOGIN} 
+        name="PhoneLogin"
         component={JwtPhoneLoginScreen}
-        options={{ title: '로그인' }}
+        options={{ 
+          title: '로그인',
+          headerShown: false 
+        }}
       />
       <Stack.Screen 
-        name={ROUTES.AUTH.PROFILE_SETUP} 
+        name={ROUTES.AUTH.PROFILE_SETUP}
         component={ProfileSetupScreen}
-        options={{ title: '프로필 설정' }}
+        options={{ 
+          title: '프로필 설정',
+          headerShown: false 
+        }}
       />
     </Stack.Navigator>
   );

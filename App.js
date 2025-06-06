@@ -1,7 +1,7 @@
 // App.js
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar, View, Text, StyleSheet, LogBox, TouchableOpacity } from 'react-native';
 import 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -62,36 +62,37 @@ const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, cle
       updateApiUrl(apiUrl);
     }
     
-    // 3. 리프레시 토큰 만료 확인
-    const isExpired = await isRefreshTokenExpired();
-    if (isExpired) {
-      console.log('리프레시 토큰이 만료되었습니다.');
-      await clearTokens();
-      await clearUser();
-      return;
-    }
-    
-    // 4. 인증 상태 확인
+    // 3. 인증 상태 확인 (토큰 갱신 포함)
     await checkAuth();
-
-    // 5. 토큰 갱신 시도
-    const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
-    if (accessToken) {
-      const result = await refreshAccessToken();
-      if (!result.success) {
-        console.log('토큰 갱신 실패:', result.message);
-        await clearTokens();
-        await clearUser();
-      } else {
-        console.log('토큰 갱신 성공');
-      }
-    }
 
   } catch (err) {
     console.error('앱 초기화 실패:', err);
     setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
   } finally {
     setIsLoading(false);
+  }
+};
+
+const checkInitialAuth = async () => {
+  try {
+    const result = await authApi.validateAndRefreshToken();
+    
+    if (result.success) {
+      // 토큰이 유효하고 갱신된 경우
+      const user = await authApi.getStoredUser();
+      if (user) {
+        setUser(user);
+      }
+    } else if (result.shouldLogout) {
+      // 토큰이 유효하지 않거나 만료된 경우
+      await authApi.logout();
+      clearUser();
+    }
+  } catch (error) {
+    console.error('초기 인증 확인 실패:', error);
+    // 에러 발생 시 로그아웃 처리
+    await authApi.logout();
+    clearUser();
   }
 };
 
@@ -109,16 +110,25 @@ export default function App() {
 
   // 앱 초기화
   useEffect(() => {
-    initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser);
+    const init = async () => {
+      try {
+        await initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser);
+      } catch (err) {
+        console.error('앱 초기화 실패:', err);
+        setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
+        setIsLoading(false);
+      }
+    };
+    
+    init();
   }, []);
 
   // 재시도 핸들러
-  const handleRetry = () => {
-    console.log('재시도 요청');
+  const handleRetry = useCallback(() => {
     setError(null);
     setIsLoading(true);
     initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser);
-  };
+  }, [checkAuth, clearTokens, clearUser]);
 
   // 디버그 로그
   console.log('=== 렌더링 상태 ===');
@@ -164,7 +174,7 @@ export default function App() {
           </Stack.Screen>
         ) : !isAuthenticated ? (
           <Stack.Screen 
-            name={ROUTES.AUTH.LOGIN} 
+            name="Auth"
             options={{ 
               headerShown: false,
               animationEnabled: false

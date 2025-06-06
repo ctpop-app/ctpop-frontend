@@ -1,6 +1,7 @@
 import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 
 /**
  * 이미지를 Firebase Storage에 업로드합니다.
@@ -113,5 +114,30 @@ export const getFilenameFromUrl = (url) => {
   } catch (error) {
     console.error('Error getting filename from URL:', error);
     return null;
+  }
+};
+
+export const imageService = {
+  pickImage: async () => {
+    try {
+      // 권한 요청
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error('갤러리 접근 권한이 필요합니다.');
+      }
+
+      // 이미지 선택
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      return result;
+    } catch (error) {
+      console.error('이미지 선택 실패:', error);
+      throw error;
+    }
   }
 }; 

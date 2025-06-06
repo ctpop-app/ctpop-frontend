@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Text, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
 import { ROUTES } from '../navigation/constants';
 import { useProfileForm } from '../hooks/useProfileForm';
-import { usePhotoGrid } from '../hooks/usePhotoGrid';
+import { useProfilePhotos } from '../hooks/useProfilePhotos';
 import { PhotoGrid } from '../components/profile-setup/photo-grid/PhotoGrid';
 import { FormInput } from '../components/profile-setup/form-inputs/FormInput';
 import { OptionSelector } from '../components/profile-setup/form-inputs/OptionSelector';
@@ -12,24 +11,15 @@ import { LocationSelector } from '../components/profile-setup/form-inputs/Locati
 import { Button } from '../components/Button';
 import { ProfileHeader } from '../components/profile-setup/common/ProfileHeader';
 import userStore from '../store/userStore';
-import { ORIENTATION_OPTIONS, MAX_PHOTOS } from '../components/profile-setup/constants';
+import { ORIENTATION_OPTIONS } from '../components/profile-setup/constants';
 
 const ProfileSetupScreen = () => {
   const navigation = useNavigation();
-  const { user, setHasProfile, setUserProfile } = userStore();
+  const { user, setUserProfile } = userStore();
   const [isSaving, setIsSaving] = useState(false);
-  const [photoList, setPhotoList] = useState(Array(MAX_PHOTOS).fill(null));
 
-  // user 상태 확인
   useEffect(() => {
-    console.log('ProfileSetupScreen - 현재 상태:', {
-      user: user,
-      hasProfile: userStore.getState().hasProfile,
-      userProfile: userStore.getState().userProfile
-    });
-    
     if (!user || !user.uuid) {
-      console.error('사용자 정보가 없습니다:', user);
       Alert.alert('오류', '사용자 정보를 불러올 수 없습니다. 다시 로그인해주세요.');
       navigation.dispatch(
         CommonActions.reset({
@@ -46,60 +36,25 @@ const ProfileSetupScreen = () => {
     isLoading: isFormLoading,
     updateField,
     handleSubmit
-  } = useProfileForm(user?.uuid, {
-    nickname: '',
-    age: '',
-    height: '',
-    weight: '',
-    city: '',
-    district: '',
-    orientation: '',
-    bio: '',
-    mainPhotoURL: '',
-    photoURLs: []
-  });
+  } = useProfileForm(user?.uuid);
 
   const {
     photos,
+    photoList,
     isLoading: isPhotoLoading,
     error: photoError,
-    addPhoto,
+    handlePhotoPress,
     removePhoto,
+    handlePhotoMove,
     uploadPhotos
-  } = usePhotoGrid(user?.uuid);
+  } = useProfilePhotos(user?.uuid);
 
-  const handlePhotoPress = async (index) => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('권한 필요', '사진 접근 권한이 필요합니다.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled) {
-        const photo = {
-          uri: result.assets[0].uri,
-          type: 'image/jpeg/png',
-          name: `photo_${Date.now()}.jpg`
-        };
-        
-        // photoList 업데이트
-        const newPhotoList = [...photoList];
-        newPhotoList[index] = photo;
-        setPhotoList(newPhotoList);
-        
-        // usePhotoGrid의 addPhoto 호출
-        addPhoto(photo);
-      }
-    } catch (error) {
-      Alert.alert('오류', '사진 선택 중 오류가 발생했습니다.');
+  const onPhotoPress = async (index) => {
+    const photo = await handlePhotoPress(index);
+    if (photo) {
+      const newPhotoList = [...photoList];
+      newPhotoList[index] = photo;
+      setPhotoList(newPhotoList);
     }
   };
 
@@ -110,86 +65,29 @@ const ProfileSetupScreen = () => {
     setPhotoList(newPhotoList);
   };
 
-  const handlePhotoMove = (fromIndex, toIndex) => {
-    const newPhotoList = [...photoList];
-    const [movedPhoto] = newPhotoList.splice(fromIndex, 1);
-    newPhotoList.splice(toIndex, 0, movedPhoto);
-    setPhotoList(newPhotoList);
-  };
-
   const handleSave = async () => {
     if (isSaving) return;
 
     try {
       setIsSaving(true);
-      console.log('프로필 저장 시작:', { user, formData, photoList });
-
+      
       // 1. 사진 업로드
-      const photosToUpload = photoList.filter(photo => photo !== null);
-      console.log('업로드할 사진:', photosToUpload);
+      const uploadedURLs = await uploadPhotos();
       
-      if (photosToUpload.length === 0) {
-        throw new Error('대표 사진을 등록해주세요.');
-      }
-      
-      // usePhotoGrid의 photos 배열 업데이트
-      photosToUpload.forEach(photo => {
-        if (!photos.find(p => p.uri === photo.uri)) {
-          addPhoto(photo);
-        }
-      });
-      
-      let photoUrls = [];
-      if (photosToUpload.length > 0) {
-        photoUrls = await uploadPhotos();
-        console.log('사진 업로드 결과:', photoUrls);
-        
-        if (!photoUrls || photoUrls.length === 0) {
-          throw new Error('사진 업로드에 실패했습니다.');
-        }
-      }
-
-      // 2. 프로필 정보 저장 (사진 URL 포함)
-      console.log('프로필 저장 시작 - formData:', formData);
-      console.log('프로필 저장 시작 - photoUrls:', photoUrls);
-      
+      // 2. 프로필 데이터 저장
       const profileData = await handleSubmit({
-        mainPhotoURL: photoUrls[0],  // 첫 번째 사진을 대표사진으로
-        photoURLs: photoUrls
+        mainPhotoURL: uploadedURLs[0] || null,
+        photoURLs: uploadedURLs
       });
-      console.log('프로필 저장 결과:', profileData);
       
-      if (!profileData) {
-        throw new Error('프로필 저장에 실패했습니다.');
-      }
-
       // 3. 프로필 생성 완료 상태로 변경
-      const store = userStore.getState();
-      console.log('프로필 저장 전 상태:', {
-        hasProfile: store.hasProfile,
-        userProfile: store.userProfile
-      });
-      
-      store.setUserProfile(profileData);  // userProfile과 hasProfile을 함께 업데이트
-      
-      // 상태가 제대로 업데이트되었는지 확인
-      const updatedState = userStore.getState();
-      console.log('프로필 저장 완료, 현재 상태:', {
-        hasProfile: updatedState.hasProfile,
-        userProfile: updatedState.userProfile
-      });
+      setUserProfile(profileData);
 
       // 4. 홈 화면으로 이동
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [
-            {
-              name: ROUTES.MAIN.HOME
-            }
-          ]
-        })
-      );
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }]
+      });
     } catch (error) {
       console.error('프로필 저장 중 오류:', error);
       Alert.alert('오류', error.message);
@@ -228,7 +126,7 @@ const ProfileSetupScreen = () => {
                 </Text>
                 <PhotoGrid
                   photos={photoList}
-                  onPhotoPress={handlePhotoPress}
+                  onPhotoPress={onPhotoPress}
                   onPhotoRemove={handlePhotoRemove}
                   onPhotoMove={handlePhotoMove}
                   isLoading={isPhotoLoading}

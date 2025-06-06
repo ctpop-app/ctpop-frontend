@@ -1,11 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import * as authApi from '../api/auth';
-import { profile } from '../api/profile';  // profile 객체를 직접 import
-import { isValidPhoneNumber, isValidOtpCode, storeTokens, clearTokens } from '../services/authService';
+import { isValidPhoneNumber, isValidOtpCode } from '../services/authService';
 import useUserStore from '../store/userStore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AUTH_KEYS } from '../utils/constants';
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -16,38 +13,25 @@ export const useAuth = () => {
 
   // Zustand store 사용
   const userStore = useUserStore();
-  const user = userStore.user;
-  const isAuthenticated = userStore.isAuthenticated;
-  const hasProfile = userStore.hasProfile;
-  const setUser = userStore.setUser;
-  const setUserProfile = userStore.setUserProfile;
-  const setHasProfile = userStore.setHasProfile;
-  const clearUser = userStore.clearUser;
-
-  // 인증 상태 객체
-  const authState = {
-    user,
-    isAuthenticated,
-    hasProfile
-  };
+  const { user, isAuthenticated, hasProfile, setUser, setUserProfile, setHasProfile, clearUser } = userStore;
 
   // 서버 연결 테스트
   const handleTestConnection = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
     try {
       const result = await authApi.testConnection();
       if (result.success) {
-        Alert.alert('성공', result.message);
+        Alert.alert('성공', '서버 연결이 성공적으로 이루어졌습니다.');
       } else {
-        Alert.alert('오류', result.message);
+        Alert.alert('실패', result.message || '서버 연결에 실패했습니다.');
+        setError(result.message || result.error);
       }
       return result.success;
     } catch (error) {
-      const message = error.message || '서버 연결에 실패했습니다.';
-      Alert.alert('오류', message);
-      setError(message);
+      const errorMessage = error.message || '서버 연결 중 오류가 발생했습니다.';
+      Alert.alert('오류', errorMessage);
+      setError(errorMessage);
       return false;
     } finally {
       setIsLoading(false);
@@ -57,36 +41,28 @@ export const useAuth = () => {
   // OTP 전송
   const handleSendOtp = useCallback(async () => {
     if (!phoneNumber) {
-      Alert.alert('오류', '전화번호를 입력해주세요.');
+      setError('전화번호를 입력해주세요.');
+      return false;
+    }
+
+    if (!isValidPhoneNumber(phoneNumber)) {
+      setError('유효하지 않은 전화번호 형식입니다.');
       return false;
     }
 
     setIsLoading(true);
     setError(null);
-    
     try {
-      if (!isValidPhoneNumber(phoneNumber)) {
-        const message = '유효하지 않은 전화번호 형식입니다.';
-        Alert.alert('오류', message);
-        setError(message);
-        return false;
-      }
-
       const result = await authApi.sendOtp(phoneNumber);
-      
       if (result.success) {
         setOtpSent(true);
-        Alert.alert('성공', '인증번호가 전송되었습니다.');
         return true;
       } else {
-        Alert.alert('오류', result.message || 'OTP 전송에 실패했습니다.');
-        setError(result.message);
+        setError(result.message || '인증번호 전송에 실패했습니다.');
         return false;
       }
     } catch (error) {
-      const message = error.message || 'OTP 전송 중 오류가 발생했습니다.';
-      Alert.alert('오류', message);
-      setError(message);
+      setError(error.message || '인증번호 전송 중 오류가 발생했습니다.');
       return false;
     } finally {
       setIsLoading(false);
@@ -95,101 +71,126 @@ export const useAuth = () => {
 
   // OTP 확인
   const handleVerifyOtp = useCallback(async () => {
-    if (!phoneNumber || !verificationCode) {
-      Alert.alert('오류', '전화번호와 인증번호를 모두 입력해주세요.');
-      return false;
+    if (!verificationCode) {
+      setError('인증번호를 입력해주세요.');
+      return { success: false };
+    }
+
+    if (!isValidOtpCode(verificationCode)) {
+      setError('유효하지 않은 인증번호 형식입니다.');
+      return { success: false };
     }
 
     setIsLoading(true);
     setError(null);
-    
     try {
-      if (!isValidPhoneNumber(phoneNumber)) {
-        const message = '유효하지 않은 전화번호 형식입니다.';
-        Alert.alert('오류', message);
-        setError(message);
-        return false;
-      }
-
-      if (!isValidOtpCode(verificationCode)) {
-        const message = '유효하지 않은 인증번호 형식입니다.';
-        Alert.alert('오류', message);
-        setError(message);
-        return false;
-      }
-
+      console.log('OTP 검증 시작');
       const result = await authApi.verifyOtp(phoneNumber, verificationCode);
+      console.log('OTP 검증 결과:', result);
       
       if (result.success) {
-        // 토큰이 있으면 인증 성공으로 간주
-        if (result.data.accessToken) {
-          // 1. 토큰 저장
-          await storeTokens(result.data.accessToken, result.data.refreshToken);
+        console.log('사용자 정보 가져오기 시작');
+        const user = await authApi.getStoredUser();
+        console.log('저장된 사용자 정보:', user);
+        
+        if (user) {
+          console.log('사용자 정보 설정 시작');
+          // 사용자 정보 설정
+          setUser(user);
+          console.log('사용자 정보 설정 완료');
           
-          // 2. 사용자 정보 생성
-          const user = {
-            phone: phoneNumber,
-            uuid: result.data.uuid,
-            createdAt: new Date().toISOString()
-          };
+          // 프로필 존재 여부 확인
+          const hasProfile = !!user.hasProfile;
+          console.log('프로필 존재 여부:', hasProfile);
+          setHasProfile(hasProfile);
           
-          // 3. 사용자 정보 저장
-          await authApi.storeUser(user);
-          
-          // 4. 서버에 인증 상태 확인
-          const isAuth = await authApi.isAuthenticated();
-          if (isAuth) {
-            setUser(user);
-            Alert.alert('성공', '인증되었습니다.');
-            return true;
-          } else {
-            // 인증 실패 시 토큰 삭제
-            await clearTokens();
-            Alert.alert('오류', '인증 상태 확인에 실패했습니다.');
-            return false;
-          }
+          // 상태 확인
+          console.log('현재 상태:', {
+            isAuthenticated,
+            hasProfile,
+            user
+          });
+        } else {
+          console.error('사용자 정보가 없습니다.');
         }
       } else {
-        Alert.alert('오류', result.message || 'OTP 확인에 실패했습니다.');
         setError(result.message);
-        return false;
       }
+      return result;
     } catch (error) {
-      const message = error.message || 'OTP 확인 중 오류가 발생했습니다.';
-      Alert.alert('오류', message);
-      setError(message);
-      return false;
+      console.error('OTP 검증 에러:', error);
+      setError(error.message);
+      return { success: false };
     } finally {
       setIsLoading(false);
     }
-  }, [phoneNumber, verificationCode, setUser]);
+  }, [phoneNumber, verificationCode, setUser, setHasProfile, isAuthenticated, hasProfile]);
 
-  // 인증번호 재전송
-  const handleResendOtp = useCallback(() => {
-    setOtpSent(false);
-    setVerificationCode('');
+  // 리프레시 토큰으로 인증
+  const authenticateWithRefreshToken = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await authApi.authenticateWithRefreshToken();
+      if (result.success) {
+        // 사용자 정보 업데이트
+        const user = {
+          uuid: result.data.uuid,
+          createdAt: new Date().toISOString()
+        };
+        setUser(user);
+      } else {
+        setError(result.message);
+      }
+      return result;
+    } catch (error) {
+      setError(error.message);
+      return { success: false };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setUser]);
+
+  // 액세스 토큰 발급
+  const getAccessToken = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await authApi.getAccessToken();
+      if (!result.success) {
+        setError(result.message);
+      }
+      return result;
+    } catch (error) {
+      setError(error.message);
+      return { success: false };
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   // 로그아웃
   const handleLogout = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
     try {
+      console.log('handleLogout 시작');
       const result = await authApi.logout();
+      console.log('authApi.logout 결과:', result);
       if (result.success) {
-        await clearTokens();
+        console.log('clearUser 호출 전');
         clearUser();
-        return true;
+        console.log('clearUser 호출 후');
+        setPhoneNumber('');
+        setVerificationCode('');
+        setOtpSent(false);
       } else {
-        Alert.alert('오류', result.message || '로그아웃에 실패했습니다.');
         setError(result.message);
-        return false;
       }
+      return result.success;
     } catch (error) {
-      const message = error.message || '로그아웃 중 오류가 발생했습니다.';
-      Alert.alert('오류', message);
-      setError(message);
+      console.error('handleLogout 에러:', error);
+      setError(error.message);
       return false;
     } finally {
       setIsLoading(false);
@@ -200,59 +201,40 @@ export const useAuth = () => {
   const checkAuth = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
     try {
-      // 1. 토큰 확인
-      const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
-      if (!accessToken) {
-        console.log('액세스 토큰이 없습니다.');
-        return false;
-      }
-
-      // 2. 서버에 인증 상태 확인
       const isAuth = await authApi.isAuthenticated();
-      if (!isAuth) {
-        console.log('서버 인증 실패');
-        await clearTokens();
-        clearUser();
-        return false;
-      }
-
-      // 3. 사용자 정보 확인
-      const user = await AsyncStorage.getItem(AUTH_KEYS.USER);
-      if (user) {
-        const parsedUser = JSON.parse(user);
-        setUser(parsedUser);
-
-        // 4. 프로필 정보 확인
-        try {
-          console.log('프로필 확인 시작 - UUID:', parsedUser.uuid);
-          const profileResult = await profile.getProfile(parsedUser.uuid);
-          console.log('프로필 확인 결과:', profileResult);
-          
-          if (profileResult.success) {
-            setUserProfile(profileResult.data);
-            console.log('프로필 정보 로드 완료:', profileResult.data);
-          } else {
-            console.log('프로필이 없습니다:', profileResult.error);
-            setUserProfile(null);
-          }
-        } catch (error) {
-          console.log('프로필 정보 확인 실패:', error);
-          setUserProfile(null);
-        }
-      }
-
-      return true;
+      return isAuth;
     } catch (error) {
-      console.error('인증 상태 확인 오류:', error);
-      await clearTokens();
-      clearUser();
+      setError(error.message);
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [setUser, setUserProfile, clearUser]);
+  }, []);
+
+  // OTP 재전송
+  const handleResendOtp = useCallback(() => {
+    setVerificationCode('');
+    setOtpSent(false);
+  }, []);
+
+  // 토큰 검증 및 갱신
+  const validateAndRefreshToken = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await authApi.validateAndRefreshToken();
+      if (!result.success && result.shouldLogout) {
+        await handleLogout();
+      }
+      return result;
+    } catch (error) {
+      setError(error.message);
+      return { success: false };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [handleLogout]);
 
   return {
     isLoading,
@@ -262,12 +244,18 @@ export const useAuth = () => {
     verificationCode,
     setVerificationCode,
     otpSent,
+    setOtpSent,
+    user,
+    isAuthenticated,
+    hasProfile,
+    handleTestConnection,
     handleSendOtp,
     handleVerifyOtp,
-    handleResendOtp,
+    authenticateWithRefreshToken,
+    getAccessToken,
     handleLogout,
     checkAuth,
-    authState,
-    handleTestConnection
+    handleResendOtp,
+    validateAndRefreshToken
   };
 }; 

@@ -12,11 +12,11 @@ const Stack = createStackNavigator();
 const MainNavigator = () => {
   return (
     <Stack.Navigator 
-      initialRouteName={ROUTES.MAIN.HOME}
+      initialRouteName={ROUTES.MAIN.MAIN_TABS}
       screenOptions={HEADER_OPTIONS.MAIN}
     >
       <Stack.Screen 
-        name={ROUTES.MAIN.HOME} 
+        name={ROUTES.MAIN.MAIN_TABS} 
         component={MainTabs}
         options={{ title: '홈' }}
       />

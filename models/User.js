@@ -3,8 +3,8 @@
  */
 export class User {
   constructor(props = {}) {
-    this.id = props.id || null;              // Firestore 문서 ID (자동 생성)
-    this.uuid = props.uuid || null;          // 고유 식별자 (User와 Profile 연결용)
+    this.id = props.id || null;              // Firestore 문서 ID (UUID)
+    this.uuid = props.uuid || null;          // 시스템 UUID (데이터 연관 관계용)
     this.firstAuthAt = props.firstAuthAt || null; // 최초 인증 시간
     this.lastAuthAt = props.lastAuthAt || null;   // 마지막 인증 시간
     this.isActive = props.isActive !== undefined ? props.isActive : true;
