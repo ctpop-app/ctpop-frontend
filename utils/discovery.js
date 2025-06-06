@@ -12,7 +12,7 @@ const DEFAULT_IPS = [
   'localhost',     // 로컬 개발용
   '127.0.0.1',      // 로컬호스트 대체
   '192.168.0.7',
-  '172.30.1.98',
+  '172.30.1.1',
   '192.168.219.154'
 ];
 
@@ -75,7 +75,7 @@ export const discoverServer = async () => {
     const isValid = await testServerConnection(savedIp);
     if (isValid) {
       console.log(`저장된 서버가 응답합니다: ${savedIp}`);
-      return `http://${savedIp}:${SERVER_PORT}/api`;
+      return `http://${savedIp}:${SERVER_PORT}`;
     }
     console.log(`저장된 서버가 응답하지 않습니다. 다른 서버 검색 중...`);
   }
@@ -91,7 +91,7 @@ export const discoverServer = async () => {
       console.log(`서버 발견: ${ip}`);
       // 발견된 IP 저장
       await AsyncStorage.setItem(SERVER_IP_KEY, ip);
-      return `http://${ip}:${SERVER_PORT}/api`;
+      return `http://${ip}:${SERVER_PORT}`;
     }
   }
   
@@ -106,15 +106,24 @@ export const discoverServer = async () => {
  */
 const testServerConnection = async (ip) => {
   try {
+    const testUrl = `http://${ip}:${SERVER_PORT}/test/echo?message=test`;
+    console.log(`서버 연결 테스트 중: ${testUrl}`);
+    
     // Echo API 테스트
-    const response = await axios.get(`http://${ip}:${SERVER_PORT}/api/auth/echo?message=test`, {
+    const response = await axios.get(testUrl, {
       timeout: 2000 // 2초 타임아웃
     });
     
-    // 서버가 올바르게 응답하는지 확인
-    return response.status === 200 && response.data.echo === 'test';
+    console.log('서버 응답:', response.data);
+    // 서버가 올바르게 응답하는지 확인 (문자열 응답 처리)
+    return response.status === 200 && response.data === 'test';
   } catch (error) {
     // 오류 발생 시 연결 실패로 처리
+    console.error(`서버 연결 테스트 실패 (${ip}):`, error.message);
+    if (error.response) {
+      console.error('응답 데이터:', error.response.data);
+      console.error('응답 상태:', error.response.status);
+    }
     return false;
   }
 };

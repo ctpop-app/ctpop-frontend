@@ -7,23 +7,23 @@ const SERVER_IP_KEY = 'server_ip_address';
 const SERVER_PORT = '8080';
 
 // 기본 설정값 (서버를 찾지 못했을 때 폴백으로 사용)
-const DEFAULT_IP = 'localhost';
+const DEFAULT_IP = '172.30.1.1';
 const DEFAULT_PORT = SERVER_PORT;
 
 // 개발 환경
 const DEV = {
   // 기본 API URL (디스커버리 서비스로 업데이트될 예정)
-  API_URL: `http://${DEFAULT_IP}:${DEFAULT_PORT}/api`,
+  API_URL: `http://${DEFAULT_IP}:${DEFAULT_PORT}`,
 };
 
 // 테스트 환경
 const TEST = {
-  API_URL: 'https://test-api.ctpop.com/api',
+  API_URL: 'https://test-api.ctpop.com',
 };
 
 // 배포 환경
 const PROD = {
-  API_URL: 'https://api.ctpop.com/api',
+  API_URL: 'https://api.ctpop.com',
 };
 
 // 현재 사용할 환경 설정 (DEV, TEST, PROD 중 선택)
@@ -57,7 +57,7 @@ export const initializeConfig = async () => {
   try {
     const savedIp = await getSavedServerIp();
     if (savedIp && savedIp !== DEFAULT_IP) {
-      updateApiUrl(`http://${savedIp}:${SERVER_PORT}/api`);
+      updateApiUrl(`http://${savedIp}:${SERVER_PORT}`);
     }
   } catch (error) {
     console.error('설정 초기화 실패:', error);

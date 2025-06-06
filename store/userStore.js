@@ -51,7 +51,8 @@ const useUserStore = create(
           ...state,
           user: null, 
           userProfile: null, 
-          isAuthenticated: false, 
+          isAuthenticated: false,
+          hasProfile: false
         }));
         console.log('New state:', get());
       },

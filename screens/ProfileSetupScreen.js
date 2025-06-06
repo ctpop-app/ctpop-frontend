@@ -86,7 +86,7 @@ const ProfileSetupScreen = () => {
       // 4. 홈 화면으로 이동
       navigation.reset({
         index: 0,
-        routes: [{ name: ROUTES.MAIN.MAIN_TABS }]
+        routes: [{ name: 'Main' }]
       });
     } catch (error) {
       console.error('프로필 저장 중 오류:', error);

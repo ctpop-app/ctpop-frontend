@@ -1,7 +1,6 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '../utils/config';
-import { refreshAccessToken, logout } from '../services/authService';
 import { AUTH_KEYS } from '../utils/constants';
 
 // 기본 Axios 인스턴스 생성
@@ -28,10 +27,13 @@ export const updateBaseUrl = (newBaseUrl) => {
 // 네트워크 연결 확인 함수
 export const testNetworkConnection = async () => {
   try {
-    const response = await apiClient.get('/auth/echo?message=test', { timeout: 5000 });
+    const response = await apiClient.get('/test/echo?message=test', { 
+      authenticated: false,
+      timeout: 5000 
+    });
     return {
       connected: true,
-      data: response.data
+      data: response.data === 'test'  // 문자열 응답 확인
     };
   } catch (error) {
     console.error('네트워크 연결 테스트 실패:', error.message);
@@ -82,30 +84,9 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       
-      try {
-        // 액세스 토큰 갱신 시도
-        const result = await refreshAccessToken();
-        
-        if (result.success) {
-          // 새 토큰으로 헤더 업데이트
-          const newAccessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
-          if (newAccessToken) {
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-            // 원래 요청 재시도
-            return apiClient(originalRequest);
-          }
-        }
-        
-        // 토큰 갱신 실패 시 로그아웃 처리
-        console.error('토큰 갱신 실패, 로그아웃 처리');
-        await logout();
-        return Promise.reject(error);
-      } catch (refreshError) {
-        console.error('토큰 갱신 중 오류:', refreshError);
-        // 토큰 갱신 중 오류 발생 시에도 로그아웃
-        await logout();
-        return Promise.reject(refreshError);
-      }
+      // 401 에러 발생 시 이벤트 발생
+      const event = new CustomEvent('unauthorized');
+      window.dispatchEvent(event);
     }
     
     return Promise.reject(error);
@@ -114,7 +95,10 @@ apiClient.interceptors.response.use(
 
 // API 응답 공통 핸들러
 export const handleApiResponse = (response) => {
-  return response.data;
+  return {
+    success: true,
+    ...response.data
+  };
 };
 
 // API 에러 공통 핸들러
