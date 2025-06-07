@@ -12,7 +12,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { PhotoGrid } from '../components/profile-setup/photo-grid/PhotoGrid';
 import { useProfileForm } from '../hooks/useProfileForm';
-import { useProfilePhotos } from '../hooks/useProfilePhotos';
+import { usePhotoGrid } from '../hooks/usePhotoGrid';
 import { FormInput } from '../components/profile-setup/form-inputs/FormInput';
 import { OptionSelector } from '../components/profile-setup/form-inputs/OptionSelector';
 import { LocationSelector } from '../components/profile-setup/form-inputs/LocationSelector';
@@ -29,7 +29,15 @@ const ProfileEditScreen = () => {
   const { setUserProfile } = userStore();
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [photoList, setPhotoList] = useState(Array(MAX_PHOTOS).fill(null));
+
+  // usePhotoGrid에서 photoList와 사진 관련 메서드만 사용
+  const {
+    photoList,
+    handlePhotoPress,
+    removePhoto,
+    handlePhotoMove,
+    uploadPhotos
+  } = usePhotoGrid(currentProfile?.id, currentProfile?.photoURLs || []);
 
   useEffect(() => {
     if (!currentProfile) {
@@ -37,15 +45,6 @@ const ProfileEditScreen = () => {
       navigation.goBack();
       return;
     }
-
-    // 기존 사진 목록 설정
-    const photos = currentProfile.photoURLs || [];
-    const newPhotoList = Array(MAX_PHOTOS).fill(null).map((_, index) => ({
-      photo: photos[index] ? { uri: photos[index] } : null,
-      isAddable: index < photos.length + 1 // 기존 사진 개수 + 1까지 활성화
-    }));
-    setPhotoList(newPhotoList);
-
     setIsLoading(false);
   }, [currentProfile, navigation]);
 
@@ -68,72 +67,86 @@ const ProfileEditScreen = () => {
     photoURLs: currentProfile?.photoURLs || []
   });
 
-  const {
-    photos,
-    isLoading: isPhotoLoading,
-    error: photoError,
-    handlePhotoPress,
-    removePhoto,
-    handlePhotoMove,
-    uploadPhotos
-  } = useProfilePhotos(currentProfile?.id, currentProfile?.photoURLs || []);
-
   console.log('Current Profile PhotoURLs:', currentProfile?.photoURLs);
   console.log('PhotoList:', photoList);
 
-  const onPhotoPress = async (index) => {
-    const photo = await handlePhotoPress(index);
-    if (photo) {
-      const newPhotoList = [...photoList];
-      newPhotoList[index] = photo;
-      setPhotoList(newPhotoList);
-    }
-  };
-
-  const handlePhotoRemove = (index) => {
-    removePhoto(index);
-    const newPhotoList = [...photoList];
-    newPhotoList[index] = null;
-    setPhotoList(newPhotoList);
-  };
-
   const handleSave = async () => {
     if (isSaving) return;
-
     try {
       setIsSaving(true);
+      // 1. 사진 업로드 준비 - 중복 제거 및 유효한 사진만 필터링
+      const uniquePhotos = photoList.filter((item, index, self) => 
+        item?.photo?.uri && 
+        index === self.findIndex((t) => t?.photo?.uri === item?.photo?.uri)
+      );
       
-      // 1. 사진 업로드
-      const photosToUpload = photoList.filter(photo => photo !== null);
-      
+      const photosToUpload = uniquePhotos.filter(item => item?.photo?.uri);
       if (photosToUpload.length === 0) {
         throw new Error('대표 사진을 등록해주세요.');
       }
-
-      const uploadedURLs = await uploadPhotos();
-      
-      if (!uploadedURLs || uploadedURLs.length === 0) {
+      // 2. file://로 된 새 사진만 따로 모으고, 기존 https:// 사진은 그대로 저장
+      const localPhotos = [];
+      const existingPhotoURLs = [];
+      photosToUpload.forEach(item => {
+        if (!item?.photo?.uri) return;
+        const uri = item.photo.uri;
+        if (uri.startsWith('file://')) {
+          localPhotos.push({ uri });
+        } else if (uri.startsWith('https://')) {
+          existingPhotoURLs.push(uri);
+        }
+      });
+      // 3. 새로 추가된 사진만 Storage에 업로드
+      let newPhotoURLs = [];
+      if (localPhotos.length > 0) {
+        newPhotoURLs = await uploadPhotos(); // 여러 장 한 번에 업로드
+      }
+      // 4. photoList 순서대로 최종 https:// URL 배열 만들기
+      let newPhotoIndex = 0;
+      const finalPhotoURLs = photosToUpload.map(item => {
+        const uri = item?.photo?.uri;
+        if (uri?.startsWith('file://')) {
+          return newPhotoURLs[newPhotoIndex++];
+        } else if (uri?.startsWith('https://')) {
+          return uri;
+        }
+        return null;
+      }).filter(Boolean);
+      if (finalPhotoURLs.length === 0) {
         throw new Error('사진 업로드에 실패했습니다.');
       }
 
-      // 2. 프로필 데이터 저장
+      // 5. Firestore에 프로필 정보 저장 (대표사진, 전체 사진 배열)
       const profileData = await profile.updateProfile(currentProfile.id, {
-        ...formData,
-        mainPhotoURL: uploadedURLs[0],
-        photoURLs: uploadedURLs
+        id: currentProfile.id,
+        nickname: formData.nickname,
+        age: formData.age,
+        height: formData.height,
+        weight: formData.weight,
+        city: formData.city,
+        district: formData.district,
+        orientation: formData.orientation,
+        bio: formData.bio,
+        mainPhotoURL: finalPhotoURLs[0],
+        photoURLs: finalPhotoURLs,
+        createdAt: currentProfile.createdAt,
+        updatedAt: new Date()
       });
-      
-      if (!profileData || !profileData.success) {
-        throw new Error(profileData?.error || '프로필 저장에 실패했습니다.');
+
+      // Profile 객체가 반환되면 성공으로 처리
+      if (!profileData || !profileData.id) {
+        throw new Error('프로필 저장에 실패했습니다.');
       }
-
-      // 3. 프로필 업데이트
-      setUserProfile(profileData.data);
-
-      // 4. 이전 화면으로 이동
+      setUserProfile(profileData);
+      // 6. 이전 화면으로 이동
       navigation.goBack();
     } catch (error) {
       console.error('프로필 저장 중 오류:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response
+      });
       Alert.alert('오류', error.message);
     } finally {
       setIsSaving(false);
@@ -180,11 +193,11 @@ const ProfileEditScreen = () => {
                 </Text>
                 <PhotoGrid
                   photos={photoList}
-                  onPhotoPress={onPhotoPress}
-                  onPhotoRemove={handlePhotoRemove}
+                  onPhotoPress={handlePhotoPress}
+                  onPhotoRemove={removePhoto}
                   onPhotoMove={handlePhotoMove}
-                  isLoading={isPhotoLoading}
-                  error={photoError}
+                  isLoading={false}
+                  error={null}
                 />
               </View>
 
@@ -262,7 +275,7 @@ const ProfileEditScreen = () => {
               <Button
                 title="저장하기"
                 onPress={handleSave}
-                disabled={isSaving || isFormLoading || isPhotoLoading}
+                disabled={isSaving}
                 loading={isSaving}
                 style={styles.saveButton}
               />

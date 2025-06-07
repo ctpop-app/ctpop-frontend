@@ -11,182 +11,138 @@ import { Alert } from 'react-native';
 import { MAX_PHOTOS } from '../components/profile-setup/constants';
 
 /**
- * 프로필 사진 관리 훅
- * @param {string} uuid - 사용자의 UUID
+ * 프로필 사진 관리 훅 (6개 그리드, 순서 이동, 업로드, file/https 구분 등 모두 포함)
+ * @param {string} userId - 사용자의 UUID
+ * @param {string[]} initialPhotos - 초기 사진 URL 배열
  * @returns {Object} 사진 관리 관련 함수와 상태
  */
-export const usePhotoGrid = (uuid) => {
-  const [photos, setPhotos] = useState([]);
+export const usePhotoGrid = (userId, initialPhotos = []) => {
+  // 6개의 슬롯을 초기화
+  const [photoList, setPhotoList] = useState(
+    Array(MAX_PHOTOS).fill(null).map((_, index) => ({
+      photo: initialPhotos[index] ? { uri: initialPhotos[index] } : null,
+      isAddable: index < initialPhotos.length + 1
+    }))
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [photoList, setPhotoList] = useState(Array(MAX_PHOTOS).fill(null));
 
   // UUID 체크
   useEffect(() => {
-    if (!uuid) {
+    if (!userId) {
       console.error('UUID가 없습니다');
       setError('사용자 정보를 불러올 수 없습니다.');
     } else {
       setError(null);
     }
-  }, [uuid]);
+  }, [userId]);
 
-  const handlePhotoPress = async (index) => {
+  // 사진 추가(갤러리에서 선택)
+  const handlePhotoPress = useCallback(async (index) => {
+    if (!photoList[index].isAddable) return null;
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('권한 필요', '사진 접근 권한이 필요합니다.');
-        return null;
-      }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
-
       if (!result.canceled) {
-        const photo = {
-          uri: result.assets[0].uri,
-          type: 'image/jpeg/png',
-          name: `photo_${Date.now()}.jpg`
+        const newPhoto = {
+          photo: {
+            uri: result.assets[0].uri,
+            type: 'image/jpeg',
+            name: 'photo.jpg'
+          },
+          isAddable: true
         };
-        
-        // photoList 업데이트
-        const newPhotoList = [...photoList];
-        newPhotoList[index] = photo;
-        setPhotoList(newPhotoList);
-        
-        // photos 배열에도 추가
-        addPhoto(photo);
-        return photo;
+        setPhotoList(prev => {
+          const newList = [...prev];
+          newList[index] = newPhoto;
+          if (index + 1 < MAX_PHOTOS) {
+            newList[index + 1] = { ...newList[index + 1], isAddable: true };
+          }
+          return newList;
+        });
+        return newPhoto.photo;
       }
-      return null;
     } catch (error) {
-      Alert.alert('오류', '사진 선택 중 오류가 발생했습니다.');
-      return null;
+      Alert.alert('오류', '사진을 선택하는 중 오류가 발생했습니다.');
+      setError(error);
     }
-  };
+    return null;
+  }, [photoList]);
 
-  const addPhoto = useCallback((photo) => {
-    if (!uuid) {
-      console.error('UUID가 없어서 사진을 추가할 수 없습니다');
-      return;
-    }
-    setPhotos(prev => [...prev, { ...photo, uuid }]);
-  }, [uuid]);
-
+  // 사진 삭제
   const removePhoto = useCallback((index) => {
-    // photoList 업데이트
-    const newPhotoList = [...photoList];
-    newPhotoList[index] = null;
-    setPhotoList(newPhotoList);
-    
-    // photos 배열에서도 제거
-    setPhotos(prev => prev.filter((_, i) => i !== index));
-  }, [photoList]);
+    setPhotoList(prev => {
+      const newList = [...prev];
+      newList[index] = { ...newList[index], photo: null };
+      for (let i = index + 1; i < MAX_PHOTOS; i++) {
+        newList[i] = { ...newList[i], isAddable: false };
+      }
+      if (index > 0) {
+        newList[index - 1] = { ...newList[index - 1], isAddable: true };
+      }
+      return newList;
+    });
+  }, []);
 
-  const uploadPhotos = useCallback(async () => {
-    if (!uuid) {
-      console.error('UUID가 없어서 사진을 업로드할 수 없습니다');
-      return [];
-    }
-
-    if (photos.length === 0) {
-      return [];
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      console.log('사진 업로드 시작:', { photos, uuid });
-      const uris = photos.map(photo => photo.uri);
-      const result = await uploadMultipleImages(uris, `profiles/${uuid}`);
-      console.log('사진 업로드 결과:', result);
-      return result;
-    } catch (err) {
-      console.error('사진 업로드 오류:', err);
-      setError(err.message);
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
-  }, [photos, uuid]);
-
+  // 사진 순서 이동
   const handlePhotoMove = useCallback((fromIndex, toIndex) => {
-    const newPhotoList = [...photoList];
-    const [movedPhoto] = newPhotoList.splice(fromIndex, 1);
-    newPhotoList.splice(toIndex, 0, movedPhoto);
-    setPhotoList(newPhotoList);
+    if (!photoList[fromIndex]?.photo || !photoList[toIndex]?.photo) return;
+    setPhotoList(prev => {
+      const newList = [...prev];
+      const [movedPhoto] = newList.splice(fromIndex, 1);
+      newList.splice(toIndex, 0, movedPhoto);
+      return newList;
+    });
   }, [photoList]);
 
-  const handleSave = useCallback(async (formData, handleSubmit) => {
-    if (isLoading) return;
-
+  // 사진 업로드 (file://만 업로드, https://는 그대로)
+  const uploadPhotos = useCallback(async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      console.log('프로필 저장 시작:', { formData, photoList });
-
-      // 1. 사진 업로드
-      const photosToUpload = photoList.filter(photo => photo !== null);
-      console.log('업로드할 사진:', photosToUpload);
-      
-      if (photosToUpload.length === 0) {
-        throw new Error('대표 사진을 등록해주세요.');
+      // file://만 업로드, https://는 그대로
+      const localPhotos = photoList.filter(item => item?.photo?.uri?.startsWith('file://')).map(item => item.photo.uri);
+      const existingPhotoURLs = photoList.filter(item => item?.photo?.uri?.startsWith('https://')).map(item => item.photo.uri);
+      let newPhotoURLs = [];
+      if (localPhotos.length > 0) {
+        newPhotoURLs = await uploadMultipleImages(localPhotos, `profiles/${userId}`);
       }
-      
-      // photos 배열 업데이트
-      photosToUpload.forEach(photo => {
-        if (!photos.find(p => p.uri === photo.uri)) {
-          addPhoto(photo);
+      // photoList 순서대로 최종 https:// URL 배열 만들기
+      let newPhotoIndex = 0;
+      const finalPhotoURLs = photoList.map(item => {
+        const uri = item?.photo?.uri;
+        if (uri?.startsWith('file://')) {
+          return newPhotoURLs[newPhotoIndex++];
+        } else if (uri?.startsWith('https://')) {
+          return uri;
         }
-      });
-      
-      let photoUrls = [];
-      if (photosToUpload.length > 0) {
-        photoUrls = await uploadPhotos();
-        console.log('사진 업로드 결과:', photoUrls);
-        
-        if (!photoUrls || photoUrls.length === 0) {
-          throw new Error('사진 업로드에 실패했습니다.');
-        }
-      }
-
-      // 2. 프로필 정보 저장 (사진 URL 포함)
-      console.log('프로필 저장 시작 - formData:', formData);
-      console.log('프로필 저장 시작 - photoUrls:', photoUrls);
-      
-      const profileData = await handleSubmit({
-        mainPhotoURL: photoUrls[0],  // 첫 번째 사진을 대표사진으로
-        photoURLs: photoUrls
-      });
-      console.log('프로필 저장 결과:', profileData);
-      
-      if (!profileData) {
-        throw new Error('프로필 저장에 실패했습니다.');
-      }
-
-      return profileData;
+        return null;
+      }).filter(Boolean);
+      // 업로드 후 photoList를 https://...로만 재구성
+      setPhotoList(finalPhotoURLs.map(url => ({
+        photo: { uri: url },
+        isAddable: true
+      })));
+      return finalPhotoURLs;
     } catch (error) {
-      console.error('프로필 저장 중 오류:', error);
+      Alert.alert('오류', '사진 업로드 중 오류가 발생했습니다.');
+      setError(error);
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [photoList, photos, addPhoto, uploadPhotos, isLoading]);
+  }, [photoList, userId]);
 
   return {
-    photos,
     photoList,
     isLoading,
     error,
     handlePhotoPress,
-    addPhoto,
     removePhoto,
-    uploadPhotos,
     handlePhotoMove,
-    handleSave
+    uploadPhotos
   };
 }; 

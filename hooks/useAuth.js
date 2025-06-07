@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import * as authApi from '../api/auth';
 import { isValidPhoneNumber, isValidOtpCode } from '../services/authService';
 import useUserStore from '../store/userStore';
+import { profileService } from '../services/profileService';
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -99,8 +100,9 @@ export const useAuth = () => {
           setUser(user);
           console.log('사용자 정보 설정 완료');
           
-          // 프로필 존재 여부 확인
-          const hasProfile = !!user.hasProfile;
+          // Firestore에서 프로필 존재 여부 확인
+          console.log('프로필 존재 여부 확인 시작');
+          const hasProfile = await profileService.checkProfileExists(user.uuid);
           console.log('프로필 존재 여부:', hasProfile);
           setHasProfile(hasProfile);
           
