@@ -39,8 +39,11 @@ export const sendOtp = async (phoneNumber) => {
     const response = await apiClient.post('/api/otp/send', { phone: phoneNumber });
     const data = response.data;
     
-    // OTP 전송 시 받은 액세스 토큰은 1회용이므로 저장하지 않음
-    console.log('OTP 전송 성공 - 1회용 액세스 토큰:', data.accessToken);
+    // OTP 전송 시 받은 액세스 토큰 저장
+    if (data.accessToken) {
+      console.log('OTP 전송 성공 - 액세스 토큰 저장');
+      await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, data.accessToken);
+    }
     
     return handleApiResponse(response);
   } catch (error) {

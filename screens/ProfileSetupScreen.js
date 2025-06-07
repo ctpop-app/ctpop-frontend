@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, Alert, Text, SafeAreaView, KeyboardAvoidi
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { ROUTES } from '../navigation/constants';
 import { useProfileForm } from '../hooks/useProfileForm';
-import { useProfilePhotos } from '../hooks/useProfilePhotos';
+import { usePhotoGrid } from '../hooks/usePhotoGrid';
 import { PhotoGrid } from '../components/profile-setup/photo-grid/PhotoGrid';
 import { FormInput } from '../components/profile-setup/form-inputs/FormInput';
 import { OptionSelector } from '../components/profile-setup/form-inputs/OptionSelector';
@@ -47,7 +47,7 @@ const ProfileSetupScreen = () => {
     removePhoto,
     handlePhotoMove,
     uploadPhotos
-  } = useProfilePhotos(user?.uuid);
+  } = usePhotoGrid(user?.uuid);
 
   const onPhotoPress = async (index) => {
     const photo = await handlePhotoPress(index);
