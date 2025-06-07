@@ -1,6 +1,5 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 
 // 서버 IP 저장용 키
 const SERVER_IP_KEY = 'server_ip_address';
@@ -16,7 +15,8 @@ const DEFAULT_IPS = [
   '192.168.219.154',
   '192.168.100.16',
   '192.168.1.151',
-  '192.168.1.153'
+  '192.168.1.153',
+  '192.168.219.101'
 ];
 
 // IP 목록 저장용 키
