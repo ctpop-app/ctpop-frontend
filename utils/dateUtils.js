@@ -75,11 +75,3 @@ export const getRelativeTime = (date) => {
   
   return formatDate(date);
 };
-
-/**
- * 현재 시간을 UTC 타임스탬프로 반환
- * @returns {string} "YYYY-MM-DD HH:mm" 형식의 문자열
- */
-export const getUTCTimestamp = () => {
-  return formatDate(new Date());
-}; 

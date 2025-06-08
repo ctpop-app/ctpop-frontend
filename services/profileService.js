@@ -6,7 +6,7 @@
 
 import { profile } from '../api';
 import { Profile } from '../models/Profile';
-import { getUTCTimestamp } from '../utils/dateUtils';
+import { formatDate, getCurrentKST } from '../utils/dateUtils';
 
 export const profileService = {
   /**
@@ -43,8 +43,8 @@ export const profileService = {
       const profileInstance = new Profile({
         ...profileData,
         uuid,
-        createdAt: getUTCTimestamp(),
-        updatedAt: getUTCTimestamp()
+        createdAt: formatDate(getCurrentKST()),
+        updatedAt: formatDate(getCurrentKST())
       });
 
       const errors = profileInstance.validate();
@@ -99,7 +99,8 @@ export const profileService = {
       const updatedProfile = new Profile({
         ...existingProfile,
         ...updateData,
-        updatedAt: getUTCTimestamp()
+        uuid,
+        updatedAt: formatDate(getCurrentKST())
       });
 
       const errors = updatedProfile.validate();
@@ -108,7 +109,7 @@ export const profileService = {
       }
 
       // 3. 프로필 업데이트
-      return await profile.updateProfile(uuid, updatedProfile);
+      return await profile.updateProfile(updatedProfile);
     } catch (error) {
       console.error('프로필 업데이트 실패:', error);
       throw error;
@@ -162,7 +163,7 @@ export const profileService = {
         ...existingProfile,
         photoURLs: photoUrls,
         mainPhotoURL: photoUrls[0],
-        updatedAt: getUTCTimestamp()
+        updatedAt: formatDate(getCurrentKST())
       });
 
       const errors = updatedProfile.validate();

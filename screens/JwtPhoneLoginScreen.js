@@ -60,7 +60,6 @@ export default function JwtPhoneLoginScreen() {
   const handleSendOtpPress = async () => {
     const success = await handleSendOtp();
     if (success) {
-      setOtpSent(true);
       Alert.alert('성공', '인증번호가 전송되었습니다.');
     } else if (error) {
       Alert.alert('오류', error);

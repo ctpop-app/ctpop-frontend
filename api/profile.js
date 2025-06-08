@@ -4,7 +4,7 @@ import { db, storage } from '../firebase';
 import { Profile } from '../models/Profile';
 import { API_ENDPOINTS } from './constants';
 import { handleApiError } from './utils/errorHandler';
-import { getUTCTimestamp } from '../utils/dateUtils';
+import { formatDate, getCurrentKST } from '../utils/dateUtils';
 
 export const profile = {
   async checkProfileExists(uuid) {
@@ -118,7 +118,7 @@ export const profile = {
         const updateData = {
           photoURLs: photoUrls,
           mainPhotoURL: photoUrls[0],
-          updatedAt: getUTCTimestamp()
+          updatedAt: getCurrentKST()
         };
         await updateDoc(profileRef, updateData);
       }

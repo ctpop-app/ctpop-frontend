@@ -38,7 +38,7 @@ const ProfileEditScreen = () => {
     handlePhotoMove,
     uploadPhotos,
     isLoading: isPhotoLoading
-  } = usePhotoGrid(currentProfile?.uuid, currentProfile?.photoURLs || []);
+  } = usePhotoGrid(currentProfile?.uuid || '', currentProfile?.photoURLs || []);
 
   const {
     formData,
@@ -46,7 +46,7 @@ const ProfileEditScreen = () => {
     isLoading: isFormLoading,
     updateField,
     handleSubmit
-  } = useProfileForm(currentProfile?.uuid, {
+  } = useProfileForm(currentProfile?.uuid || '', {
     nickname: currentProfile?.nickname || '',
     age: currentProfile?.age || '',
     height: currentProfile?.height || '',

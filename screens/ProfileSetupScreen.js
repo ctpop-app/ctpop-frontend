@@ -40,17 +40,41 @@ const ProfileSetupScreen = () => {
   } = useProfileForm(user?.uuid || '');
 
   useEffect(() => {
-    if (!user?.uuid) {
-      setError('사용자 정보를 불러올 수 없습니다. 다시 로그인해주세요.');
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: ROUTES.AUTH.LOGIN }]
-        })
-      );
-    } else {
-      setIsLoading(false);
-    }
+    const checkProfile = async () => {
+      if (!user?.uuid) {
+        setError('사용자 정보를 불러올 수 없습니다. 다시 로그인해주세요.');
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: ROUTES.AUTH.LOGIN }]
+          })
+        );
+        return;
+      }
+
+      try {
+        // 프로필 존재 여부 확인
+        const hasProfile = await profileService.checkProfileExists(user.uuid);
+        if (hasProfile) {
+          // 이미 프로필이 있으면 메인 화면으로 이동
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: ROUTES.MAIN.HOME }]
+            })
+          );
+          return;
+        }
+        
+        setIsLoading(false);
+      } catch (error) {
+        console.error('프로필 확인 실패:', error);
+        setError('프로필 확인 중 오류가 발생했습니다.');
+        setIsLoading(false);
+      }
+    };
+
+    checkProfile();
   }, [user, navigation]);
 
   const handleSave = async () => {
@@ -85,11 +109,9 @@ const ProfileSetupScreen = () => {
       });
 
       if (profileData) {
+        // 프로필 저장 성공 시 상태 업데이트
+        setUserProfile(profileData);
         Alert.alert('성공', '프로필이 저장되었습니다.');
-        navigation.reset({
-          index: 0,
-          routes: [{ name: ROUTES.MAIN }]
-        });
       }
     } catch (error) {
       console.error('프로필 생성 실패:', error);

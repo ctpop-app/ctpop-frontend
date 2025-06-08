@@ -28,12 +28,6 @@ import { AUTH_KEYS } from './utils/constants';
 
 const Stack = createStackNavigator();
 
-// 경고 메시지 무시 설정
-LogBox.ignoreLogs([
-  'Sending `onAnimatedValueUpdate` with no listeners registered',
-  'Non-serializable values were found in the navigation state',
-]);
-
 // 에러 화면 컴포넌트
 const ErrorScreen = ({ error, onRetry }) => (
   <View style={styles.errorContainer}>
@@ -51,23 +45,38 @@ const ErrorScreen = ({ error, onRetry }) => (
 // 앱 초기화 함수
 const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, clearUser) => {
   try {
+    console.log('앱 초기화 시작');
     setIsLoading(true);
     
     // 1. 서버 설정 초기화
+    console.log('서버 설정 초기화 시작');
     await initializeConfig();
+    console.log('서버 설정 초기화 완료');
     
     // 2. 서버 디스커버리
+    console.log('서버 디스커버리 시작');
     const apiUrl = await discoverServer();
-    if (apiUrl) {
-      updateApiUrl(apiUrl);
+    if (!apiUrl) {
+      throw new Error('서버를 찾을 수 없습니다.');
     }
+    updateApiUrl(apiUrl);
+    console.log('서버 디스커버리 완료:', apiUrl);
     
-    // 3. 인증 상태 확인 (토큰 갱신 포함)
-    await checkAuth();
+    // 3. 인증 상태 확인
+    console.log('인증 상태 확인 시작');
+    const isAuth = await checkAuth();
+    if (!isAuth) {
+      console.log('인증 실패, 사용자 정보 및 토큰 삭제');
+      await clearUser();
+      await clearTokens();
+    }
+    console.log('인증 상태 확인 완료:', isAuth);
 
   } catch (err) {
     console.error('앱 초기화 실패:', err);
     setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
+    await clearUser();
+    await clearTokens();
   } finally {
     setIsLoading(false);
   }
@@ -173,33 +182,15 @@ export default function App() {
             {() => <SplashScreen />}
           </Stack.Screen>
         ) : !isAuthenticated ? (
-          <Stack.Screen 
-            name="Auth"
-            options={{ 
-              headerShown: false,
-              animationEnabled: false
-            }}
-          >
+          <Stack.Screen name={ROUTES.ROOT.AUTH}>
             {() => <AuthNavigator />}
           </Stack.Screen>
         ) : !hasProfile ? (
-          <Stack.Screen 
-            name={ROUTES.AUTH.PROFILE_SETUP} 
-            options={{ 
-              headerShown: false,
-              animationEnabled: false
-            }}
-          >
+          <Stack.Screen name={ROUTES.AUTH.PROFILE_SETUP}>
             {() => <ProfileSetupScreen />}
           </Stack.Screen>
         ) : (
-          <Stack.Screen 
-            name="Main" 
-            options={{ 
-              headerShown: false,
-              animationEnabled: false
-            }}
-          >
+          <Stack.Screen name={ROUTES.ROOT.MAIN}>
             {() => <MainNavigator />}
           </Stack.Screen>
         )}

@@ -1,70 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { signOut } from 'firebase/auth';
-import { auth } from '../firebase';
 import { useNavigation } from '@react-navigation/native';
 import userStore from '../store/userStore';
 import { useAuth } from '../hooks/useAuth';
-import { profileService } from '../services/profileService';
-import { userService } from '../services/userService';
 import { ROUTES } from '../navigation/constants';
 import { CommonActions } from '@react-navigation/native';
-import { formatDate } from '../utils/dateUtils';
-
-// 기본 프로필 이미지 URL
-const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
-  const { user, userProfile, setUserProfile, withdrawUser } = userStore();
-  const { handleLogout } = useAuth();
+  const { user, userProfile, setUserProfile } = userStore();
+  const { handleLogout, loadUserProfile, handleEditProfile, handleWithdraw } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadUserProfile();
   }, []);
 
-  const loadUserProfile = async () => {
-    try {
-      if (!user?.uuid) return;
-      
-      const profile = await profileService.getProfile(user.uuid);
-      if (profile) {
-        setUserProfile(profile);
-      }
-    } catch (error) {
-      console.error('프로필 로드 실패:', error);
-      Alert.alert('오류', '프로필 정보를 불러오는데 실패했습니다.');
-    } finally {
-      setIsLoading(false);
+  const onEditProfile = () => {
+    const serializedProfile = handleEditProfile();
+    if (serializedProfile) {
+      navigation.navigate(ROUTES.PROFILE.EDIT, { 
+        currentProfile: serializedProfile,
+        isEdit: true 
+      });
     }
-  };
-
-  const handleEditProfile = () => {
-    const userProfile = userStore.getState().userProfile;
-    if (!userProfile) {
-      Alert.alert('오류', '프로필 정보를 불러올 수 없습니다.');
-      return;
-    }
-
-    if (!userProfile.uuid) {
-      console.error('Invalid userProfile: missing uuid field', userProfile);
-      Alert.alert('오류', '프로필 정보가 올바르지 않습니다.');
-      return;
-    }
-
-    // Date 객체를 문자열로 변환
-    const serializedProfile = {
-      ...userProfile,
-      createdAt: formatDate(userProfile.createdAt),
-      updatedAt: formatDate(userProfile.updatedAt)
-    };
-
-    navigation.navigate(ROUTES.PROFILE.EDIT, { 
-      currentProfile: serializedProfile,
-      isEdit: true 
-    });
   };
 
   const logout = async () => {
@@ -97,7 +57,7 @@ const SettingsScreen = () => {
     );
   };
 
-  const handleWithdraw = async () => {
+  const onWithdraw = async () => {
     if (!user?.uuid) return;
 
     Alert.alert(
@@ -113,26 +73,20 @@ const SettingsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // 프로필 비활성화
-              await profileService.deactivateProfile(user.uuid);
-              
-              // 사용자 비활성화
-              await userService.deactivateUser(user.uuid);
-              
-              // 로컬 상태 초기화
-              await handleLogout();
-              
-              // 로그인 화면으로 이동
-              navigation.dispatch(
-                CommonActions.reset({
-                  index: 0,
-                  routes: [
-                    {
-                      name: ROUTES.AUTH.LOGIN
-                    }
-                  ]
-                })
-              );
+              const success = await handleWithdraw();
+              if (success) {
+                // 로그인 화면으로 이동
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [
+                      {
+                        name: ROUTES.AUTH.LOGIN
+                      }
+                    ]
+                  })
+                );
+              }
             } catch (error) {
               Alert.alert('오류', '회원 탈퇴 중 오류가 발생했습니다.');
             }
@@ -192,7 +146,7 @@ const SettingsScreen = () => {
             <Text style={styles.profileName}>{userProfile?.nickname || '사용자'}</Text>
             <Text style={styles.profileEmail}>{userProfile?.location || '위치 미설정'}</Text>
           </View>
-          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
+          <TouchableOpacity style={styles.editButton} onPress={onEditProfile}>
             <Ionicons name="pencil" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
@@ -247,7 +201,7 @@ const SettingsScreen = () => {
         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
           <Text style={styles.logoutText}>로그아웃</Text>
         </TouchableOpacity>
-          <TouchableOpacity style={styles.withdrawButton} onPress={handleWithdraw}>
+          <TouchableOpacity style={styles.withdrawButton} onPress={onWithdraw}>
             <Text style={styles.withdrawalText}>회원탈퇴</Text>
           </TouchableOpacity>
         </View>

@@ -1,7 +1,7 @@
 /**
  * 사용자 프로필 데이터 모델
  */
-import { toKST, getUTCTimestamp, formatDate } from '../utils/dateUtils';
+import { toKST, formatDate, getCurrentKST } from '../utils/dateUtils';
 
 export class Profile {
   /**
@@ -78,9 +78,9 @@ export class Profile {
       mainPhotoURL: this.mainPhotoURL,
       photoURLs: this.photoURLs || [],
       isActive: this.isActive,
-      createdAt: formatDate(this.createdAt) || getUTCTimestamp(),
-      updatedAt: getUTCTimestamp(),
-      lastActive: formatDate(this.lastActive) || getUTCTimestamp()
+      createdAt: formatDate(this.createdAt) || formatDate(getCurrentKST()),
+      updatedAt: formatDate(getCurrentKST()),
+      lastActive: formatDate(this.lastActive) || formatDate(getCurrentKST())
     };
   }
 
