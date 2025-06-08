@@ -4,8 +4,9 @@
  * API 호출은 api/profile.js의 profile 모듈과 api/user.js의 user 모듈을 사용합니다.
  */
 
-import { profile, user } from '../api';
+import { profile } from '../api';
 import { Profile } from '../models/Profile';
+import { getUTCTimestamp } from '../utils/dateUtils';
 
 export const profileService = {
   /**
@@ -14,11 +15,16 @@ export const profileService = {
    * @returns {Promise<boolean>}
    */
   async checkProfileExists(uuid) {
-    const response = await profile.checkProfileExists(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
+    if (!uuid) {
+      throw new Error('사용자 ID가 필요합니다.');
     }
-    return response.data;
+
+    try {
+      return await profile.checkProfileExists(uuid);
+    } catch (error) {
+      console.error('프로필 존재 여부 확인 실패:', error);
+      throw error;
+    }
   },
 
   /**
@@ -28,18 +34,29 @@ export const profileService = {
    * @returns {Promise<Profile>}
    */
   async createProfile(uuid, profileData) {
-    // 사용자 확인
-    const userResponse = await user.getUser(uuid);
-    if (!userResponse.success) {
-      throw new Error('사용자를 찾을 수 없습니다.');
+    if (!uuid) {
+      throw new Error('사용자 ID가 필요합니다.');
     }
 
-    // 프로필 생성
-    const response = await profile.createProfile(uuid, profileData);
-    if (!response.success) {
-      throw new Error(response.error);
+    try {
+      // 프로필 데이터 검증
+      const profileInstance = new Profile({
+        ...profileData,
+        uuid,
+        createdAt: getUTCTimestamp(),
+        updatedAt: getUTCTimestamp()
+      });
+
+      const errors = profileInstance.validate();
+      if (errors) {
+        throw new Error(Object.values(errors).join('\n'));
+      }
+
+      return await profile.createProfile(profileInstance);
+    } catch (error) {
+      console.error('프로필 생성 실패:', error);
+      throw error;
     }
-    return response.data;
   },
 
   /**
@@ -48,11 +65,16 @@ export const profileService = {
    * @returns {Promise<Profile>}
    */
   async getProfile(uuid) {
-    const response = await profile.getProfile(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
+    if (!uuid) {
+      throw new Error('사용자 ID가 필요합니다.');
     }
-    return response.data;
+
+    try {
+      return await profile.getProfile(uuid);
+    } catch (error) {
+      console.error('프로필 조회 실패:', error);
+      throw error;
+    }
   },
 
   /**
@@ -62,11 +84,35 @@ export const profileService = {
    * @returns {Promise<Profile>}
    */
   async updateProfile(uuid, updateData) {
-    const response = await profile.updateProfile(uuid, updateData);
-    if (!response.success) {
-      throw new Error(response.error);
+    if (!uuid) {
+      throw new Error('사용자 ID가 필요합니다.');
     }
-    return response.data;
+
+    try {
+      // 1. 기존 프로필 조회
+      const existingProfile = await this.getProfile(uuid);
+      if (!existingProfile) {
+        throw new Error('프로필을 찾을 수 없습니다.');
+      }
+
+      // 2. 업데이트 데이터 검증
+      const updatedProfile = new Profile({
+        ...existingProfile,
+        ...updateData,
+        updatedAt: getUTCTimestamp()
+      });
+
+      const errors = updatedProfile.validate();
+      if (errors) {
+        throw new Error(Object.values(errors).join('\n'));
+      }
+
+      // 3. 프로필 업데이트
+      return await profile.updateProfile(uuid, updatedProfile);
+    } catch (error) {
+      console.error('프로필 업데이트 실패:', error);
+      throw error;
+    }
   },
 
   /**
@@ -75,9 +121,58 @@ export const profileService = {
    * @returns {Promise<void>}
    */
   async deactivateProfile(uuid) {
-    const response = await profile.deactivateProfile(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
+    if (!uuid) {
+      throw new Error('사용자 ID가 필요합니다.');
     }
+
+    // 1. 프로필 존재 확인
+    const exists = await this.checkProfileExists(uuid);
+    if (!exists) {
+      throw new Error('프로필을 찾을 수 없습니다.');
+    }
+
+    // 2. 프로필 비활성화
+    await profile.deactivateProfile(uuid);
+  },
+
+  /**
+   * 프로필 사진 업로드
+   * @param {string} uuid - 사용자 UUID
+   * @param {Array<Object>} photos - 업로드할 사진 배열
+   * @returns {Promise<Profile>}
+   */
+  async uploadPhotos(uuid, photos) {
+    if (!uuid) {
+      throw new Error('사용자 ID가 필요합니다.');
+    }
+
+    // 1. 프로필 존재 확인
+    const exists = await this.checkProfileExists(uuid);
+    if (!exists) {
+      throw new Error('프로필을 찾을 수 없습니다.');
+    }
+
+    // 2. 사진 업로드
+    const photoUrls = await profile.uploadPhotos(uuid, photos);
+
+    // 3. 프로필 업데이트
+    if (photoUrls.length > 0) {
+      const existingProfile = await this.getProfile(uuid);
+      const updatedProfile = new Profile({
+        ...existingProfile,
+        photoURLs: photoUrls,
+        mainPhotoURL: photoUrls[0],
+        updatedAt: getUTCTimestamp()
+      });
+
+      const errors = updatedProfile.validate();
+      if (errors) {
+        throw new Error(Object.values(errors).join('\n'));
+      }
+
+      return await this.updateProfile(uuid, updatedProfile);
+    }
+
+    return photoUrls;
   }
 }; 

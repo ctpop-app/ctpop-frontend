@@ -10,6 +10,7 @@ import { profileService } from '../services/profileService';
 import { userService } from '../services/userService';
 import { ROUTES } from '../navigation/constants';
 import { CommonActions } from '@react-navigation/native';
+import { formatDate } from '../utils/dateUtils';
 
 // 기본 프로필 이미지 URL
 const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150';
@@ -47,11 +48,17 @@ const SettingsScreen = () => {
       return;
     }
 
+    if (!userProfile.uuid) {
+      console.error('Invalid userProfile: missing uuid field', userProfile);
+      Alert.alert('오류', '프로필 정보가 올바르지 않습니다.');
+      return;
+    }
+
     // Date 객체를 문자열로 변환
     const serializedProfile = {
       ...userProfile,
-      createdAt: userProfile.createdAt?.toISOString(),
-      updatedAt: userProfile.updatedAt?.toISOString()
+      createdAt: formatDate(userProfile.createdAt),
+      updatedAt: formatDate(userProfile.updatedAt)
     };
 
     navigation.navigate(ROUTES.PROFILE.EDIT, { 

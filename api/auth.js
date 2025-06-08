@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
 import { jwtDecode } from 'jwt-decode';
 import { toE164Format } from '../services/authService';
+import { formatDate } from '../utils/dateUtils';
 
 /**
  * 서버 연결을 테스트합니다.
@@ -90,7 +91,7 @@ export const verifyOtp = async (phoneNumber, code) => {
         console.log('사용자 정보 저장 시작');
         const user = {
           uuid: data.uuid,
-          createdAt: new Date().toISOString(),
+          createdAt: formatDate(new Date()),
           hasProfile: false
         };
         await AsyncStorage.setItem(AUTH_KEYS.USER, JSON.stringify(user));

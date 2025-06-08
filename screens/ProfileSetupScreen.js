@@ -12,89 +12,101 @@ import { Button } from '../components/Button';
 import { ProfileHeader } from '../components/profile-setup/common/ProfileHeader';
 import userStore from '../store/userStore';
 import { ORIENTATION_OPTIONS } from '../components/profile-setup/constants';
+import { profileService } from '../services/profileService';
 
 const ProfileSetupScreen = () => {
   const navigation = useNavigation();
   const { user, setUserProfile } = userStore();
-  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!user || !user.uuid) {
-      Alert.alert('오류', '사용자 정보를 불러올 수 없습니다. 다시 로그인해주세요.');
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: ROUTES.AUTH.LOGIN }]
-        })
-      );
-    }
-  }, [user, navigation]);
+  const {
+    photoList,
+    handlePhotoPress,
+    removePhoto,
+    handlePhotoMove,
+    uploadPhotos,
+    isLoading: isPhotoLoading,
+    isValid: isPhotoValid
+  } = usePhotoGrid(user?.uuid || '');
 
   const {
     formData,
     errors,
     isLoading: isFormLoading,
     updateField,
+    isValid: isFormValid,
     handleSubmit
-  } = useProfileForm(user?.uuid);
+  } = useProfileForm(user?.uuid || '');
 
-  const {
-    photos,
-    photoList,
-    isLoading: isPhotoLoading,
-    error: photoError,
-    handlePhotoPress,
-    removePhoto,
-    handlePhotoMove,
-    uploadPhotos
-  } = usePhotoGrid(user?.uuid);
-
-  const onPhotoPress = async (index) => {
-    const photo = await handlePhotoPress(index);
-    if (photo) {
-      const newPhotoList = [...photoList];
-      newPhotoList[index] = photo;
-      setPhotoList(newPhotoList);
+  useEffect(() => {
+    if (!user?.uuid) {
+      setError('사용자 정보를 불러올 수 없습니다. 다시 로그인해주세요.');
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: ROUTES.AUTH.LOGIN }]
+        })
+      );
+    } else {
+      setIsLoading(false);
     }
-  };
-
-  const handlePhotoRemove = (index) => {
-    removePhoto(index);
-    const newPhotoList = [...photoList];
-    newPhotoList[index] = null;
-    setPhotoList(newPhotoList);
-  };
+  }, [user, navigation]);
 
   const handleSave = async () => {
-    if (isSaving) return;
+    if (!user?.uuid) {
+      Alert.alert('오류', '사용자 정보를 불러올 수 없습니다.');
+      return;
+    }
+
+    if (!isPhotoValid || !isFormValid) {
+      Alert.alert('오류', '사용자 정보를 불러올 수 없습니다.');
+      return;
+    }
+
+    // 닉네임이 없으면 에러 표시
+    if (!formData.nickname) {
+      Alert.alert('오류', '닉네임을 입력해주세요.');
+      return;
+    }
 
     try {
-      setIsSaving(true);
-      
-      // 1. 사진 업로드
-      const uploadedURLs = await uploadPhotos();
-      
-      // 2. 프로필 데이터 저장
-      const profileData = await handleSubmit({
-        mainPhotoURL: uploadedURLs[0] || null,
-        photoURLs: uploadedURLs
-      });
-      
-      // 3. 프로필 생성 완료 상태로 변경
-      setUserProfile(profileData);
+      // 사진 업로드
+      const photoUrls = await uploadPhotos();
+      if (!photoUrls) {
+        Alert.alert('오류', '사진 업로드에 실패했습니다.');
+        return;
+      }
 
-      // 4. 홈 화면으로 이동
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Main' }]
+      // 프로필 저장
+      const profileData = await handleSubmit({
+        mainPhotoURL: photoUrls[0],
+        photoURLs: photoUrls
       });
+
+      if (profileData) {
+        Alert.alert('성공', '프로필이 저장되었습니다.');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: ROUTES.MAIN }]
+        });
+      }
     } catch (error) {
-      console.error('프로필 저장 중 오류:', error);
-      Alert.alert('오류', error.message);
-    } finally {
-      setIsSaving(false);
+      console.error('프로필 생성 실패:', error);
+      setError(error.message);
+      Alert.alert('오류', error.message || '프로필 저장에 실패했습니다.');
     }
   };
+
+  if (isLoading || !user?.uuid || !isPhotoValid) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <Text>로딩 중...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -126,11 +138,11 @@ const ProfileSetupScreen = () => {
                 </Text>
                 <PhotoGrid
                   photos={photoList}
-                  onPhotoPress={onPhotoPress}
-                  onPhotoRemove={handlePhotoRemove}
+                  onPhotoPress={handlePhotoPress}
+                  onPhotoRemove={removePhoto}
                   onPhotoMove={handlePhotoMove}
                   isLoading={isPhotoLoading}
-                  error={photoError}
+                  error={error}
                 />
               </View>
 
@@ -208,8 +220,8 @@ const ProfileSetupScreen = () => {
               <Button
                 title="저장하기"
                 onPress={handleSave}
-                disabled={isSaving || isFormLoading || isPhotoLoading}
-                loading={isSaving}
+                disabled={isPhotoLoading || isFormLoading}
+                loading={isPhotoLoading || isFormLoading}
                 style={styles.saveButton}
               />
             </View>
@@ -293,6 +305,11 @@ const styles = StyleSheet.create({
   saveButton: {
     marginTop: 24,
     marginBottom: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -17,11 +17,7 @@ export const profile = {
         limit(1)
       );
       const querySnapshot = await getDocs(q);
-
-      return {
-        success: true,
-        data: !querySnapshot.empty
-      };
+      return !querySnapshot.empty;
     } catch (error) {
       return handleApiError(error);
     }
@@ -29,36 +25,16 @@ export const profile = {
 
   async createProfile(profileData) {
     try {
-      const { uuid, ...data } = profileData;
-      const profile = new Profile({
-        ...data,
-        uuid,
-        createdAt: getUTCTimestamp(),
-        updatedAt: getUTCTimestamp()
-      });
-
-      const errors = profile.validate();
-      if (errors) {
-        throw new Error(Object.values(errors).join('\n'));
-      }
-
-      const docRef = await addDoc(collection(db, API_ENDPOINTS.PROFILES), profile.toFirestore());
-      return { 
-        success: true,
-        data: { id: docRef.id, ...profile } 
-      };
+      const docRef = await addDoc(collection(db, API_ENDPOINTS.PROFILES), profileData.toFirestore());
+      return { id: docRef.id, ...profileData };
     } catch (error) {
       console.error('프로필 생성 실패:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   },
 
   async getProfile(uuid) {
     try {
-      // uuid로 프로필 찾기
       const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
       const q = query(
         profilesRef,
@@ -69,44 +45,36 @@ export const profile = {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        return {
-          success: false,
-          error: '프로필을 찾을 수 없습니다.'
-        };
+        return null;
       }
 
       const profileDoc = querySnapshot.docs[0];
-      return {
-        success: true,
-        data: Profile.fromFirestore(profileDoc)
-      };
+      return Profile.fromFirestore(profileDoc);
     } catch (error) {
       return handleApiError(error);
     }
   },
 
-  async updateProfile(profileId, updateData) {
+  async updateProfile(profileData) {
     try {
-      const profileRef = doc(db, API_ENDPOINTS.PROFILES, profileId);
-      const profileDoc = await getDoc(profileRef);
+      const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
+      const q = query(
+        profilesRef,
+        where('uuid', '==', profileData.uuid),
+        where('isActive', '==', true),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
 
-      if (!profileDoc.exists()) {
+      if (querySnapshot.empty) {
         throw new Error('프로필을 찾을 수 없습니다.');
       }
 
-      const updatedProfile = new Profile({
-        ...profileDoc.data(),
-        ...updateData,
-        updatedAt: getUTCTimestamp()
-      });
+      const profileDoc = querySnapshot.docs[0];
+      const profileRef = doc(db, API_ENDPOINTS.PROFILES, profileDoc.id);
 
-      const errors = updatedProfile.validate();
-      if (errors) {
-        throw new Error(Object.values(errors).join('\n'));
-      }
-
-      await updateDoc(profileRef, updatedProfile.toFirestore());
-      return updatedProfile;
+      await updateDoc(profileRef, profileData.toFirestore());
+      return profileData;
     } catch (error) {
       console.error('프로필 업데이트 실패:', error);
       throw error;
@@ -115,7 +83,7 @@ export const profile = {
 
   async uploadPhotos(uuid, photos) {
     try {
-      // 1. 프로필 찾기
+      // 1. 프로필 존재 확인
       const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
       const q = query(
         profilesRef,
@@ -132,7 +100,7 @@ export const profile = {
       const profileDoc = querySnapshot.docs[0];
       const profileRef = doc(db, API_ENDPOINTS.PROFILES, profileDoc.id);
 
-      // 2. 사진 업로드 및 URL 수집
+      // 2. 사진 업로드
       const photoUrls = [];
       for (const photo of photos) {
         if (photo && photo.uri) {
@@ -149,12 +117,10 @@ export const profile = {
       if (photoUrls.length > 0) {
         const updateData = {
           photoURLs: photoUrls,
-          mainPhotoURL: photoUrls[0], // 첫 번째 사진을 대표 사진으로 설정
+          mainPhotoURL: photoUrls[0],
           updatedAt: getUTCTimestamp()
         };
-
         await updateDoc(profileRef, updateData);
-        console.log('사진 업로드 완료:', photoUrls);
       }
 
       return photoUrls;

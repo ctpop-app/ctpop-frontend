@@ -1,7 +1,7 @@
 /**
  * 사용자 프로필 데이터 모델
  */
-import { toKST, getUTCTimestamp } from '../utils/dateUtils';
+import { toKST, getUTCTimestamp, formatDate } from '../utils/dateUtils';
 
 export class Profile {
   /**
@@ -78,9 +78,9 @@ export class Profile {
       mainPhotoURL: this.mainPhotoURL,
       photoURLs: this.photoURLs || [],
       isActive: this.isActive,
-      createdAt: this.createdAt ? this.createdAt.toISOString() : getUTCTimestamp(),
+      createdAt: formatDate(this.createdAt) || getUTCTimestamp(),
       updatedAt: getUTCTimestamp(),
-      lastActive: this.lastActive ? this.lastActive.toISOString() : getUTCTimestamp()
+      lastActive: formatDate(this.lastActive) || getUTCTimestamp()
     };
   }
 
@@ -107,8 +107,8 @@ export class Profile {
     }
 
     // 사진 URL 개수 검사
-    if (this.photoURLs && this.photoURLs.length > 5) {
-      errors.photoURLs = '추가 사진은 최대 5장까지 가능합니다.';
+    if (this.photoURLs && this.photoURLs.length > 6) {
+      errors.photoURLs = '추가 사진은 최대 6장까지 가능합니다.';
     }
 
     return Object.keys(errors).length === 0 ? null : errors;

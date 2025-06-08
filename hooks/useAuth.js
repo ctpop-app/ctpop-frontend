@@ -4,6 +4,7 @@ import * as authApi from '../api/auth';
 import { isValidPhoneNumber, isValidOtpCode } from '../services/authService';
 import useUserStore from '../store/userStore';
 import { profileService } from '../services/profileService';
+import { formatDate } from '../utils/dateUtils';
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -138,7 +139,7 @@ export const useAuth = () => {
         // 사용자 정보 업데이트
         const user = {
           uuid: result.data.uuid,
-          createdAt: new Date().toISOString()
+          createdAt: formatDate(new Date())
         };
         setUser(user);
       } else {

@@ -28,6 +28,10 @@ const useUserStore = create(
       
       setUserProfile: (profile) => {
         console.log('setUserProfile called with:', profile);
+        if (!profile?.uuid) {
+          console.error('Invalid profile: missing uuid field', profile);
+          return;
+        }
         set((state) => ({ 
           ...state,
           userProfile: profile,

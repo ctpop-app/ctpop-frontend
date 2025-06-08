@@ -9,8 +9,8 @@
  */
 export const toKST = (date) => {
   if (!date) return null;
-  const utcDate = new Date(date);
-  return new Date(utcDate.getTime() + (9 * 60 * 60 * 1000));
+  const d = new Date(date);
+  return new Date(d.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
 };
 
 /**
@@ -22,17 +22,14 @@ export const getCurrentKST = () => {
 };
 
 /**
- * 날짜를 'YYYY-MM-DD' 형식의 문자열로 변환
- * @param {Date} date - 변환할 날짜
- * @returns {string} 'YYYY-MM-DD' 형식의 문자열
+ * 날짜를 읽기 쉬운 형식으로 변환
+ * @param {Date|string} date 변환할 날짜
+ * @returns {string} "YYYY-MM-DD HH:mm" 형식의 문자열
  */
 export const formatDate = (date) => {
-  if (!date) return '';
+  if (!date) return null;
   const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
 /**
@@ -60,36 +57,29 @@ export const formatDateTime = (date) => {
 };
 
 /**
- * 상대적 시간 표시 (예: '3분 전', '1시간 전', '어제' 등)
- * @param {Date} date - 변환할 날짜/시간
+ * 상대적 시간 표시 (예: "3분 전", "1시간 전")
+ * @param {Date|string} date 변환할 날짜
  * @returns {string} 상대적 시간 문자열
  */
-export const formatRelativeTime = (date) => {
+export const getRelativeTime = (date) => {
   if (!date) return '';
-  const now = getCurrentKST();
-  const diff = now - new Date(date);
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 7) {
-    return formatDate(date);
-  } else if (days > 0) {
-    return `${days}일 전`;
-  } else if (hours > 0) {
-    return `${hours}시간 전`;
-  } else if (minutes > 0) {
-    return `${minutes}분 전`;
-  } else {
-    return '방금 전';
-  }
+  
+  const now = new Date();
+  const target = new Date(date);
+  const diffInSeconds = Math.floor((now - target) / 1000);
+  
+  if (diffInSeconds < 60) return '방금 전';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}분 전`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}시간 전`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}일 전`;
+  
+  return formatDate(date);
 };
 
 /**
- * Firestore에 저장할 UTC 시간 문자열 생성
- * @returns {string} ISO 형식의 UTC 시간 문자열
+ * 현재 시간을 UTC 타임스탬프로 반환
+ * @returns {string} "YYYY-MM-DD HH:mm" 형식의 문자열
  */
 export const getUTCTimestamp = () => {
-  return new Date().toISOString();
+  return formatDate(new Date());
 }; 

@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ROUTES } from '../navigation/constants';
 import userStore from '../store/userStore';
-import { profile } from '../api';
+import { profileService } from '../services/profileService';
 
 const fieldLabels = {
   nickname: '닉네임',
@@ -20,6 +20,7 @@ export const useProfileForm = (userId, initialData = null) => {
   const navigation = useNavigation();
   const { user } = userStore();
 
+  // 상태 관리 훅들 - 항상 호출됨
   const [formData, setFormData] = useState(initialData || {
     nickname: '',
     age: '',
@@ -32,11 +33,27 @@ export const useProfileForm = (userId, initialData = null) => {
     mainPhotoURL: '',
     photoURLs: []
   });
-
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isValid, setIsValid] = useState(false);
+
+  // userId 유효성 검사 - 항상 호출됨
+  useEffect(() => {
+    if (!userId) {
+      setErrors(prev => ({ ...prev, userId: '사용자 정보를 불러올 수 없습니다.' }));
+      setIsValid(false);
+    } else {
+      setErrors(prev => {
+        const { userId, ...rest } = prev;
+        return rest;
+      });
+      setIsValid(true);
+    }
+  }, [userId]);
 
   const updateField = useCallback((field, value) => {
+    if (!isValid) return;
+
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -48,9 +65,14 @@ export const useProfileForm = (userId, initialData = null) => {
         [field]: null
       }));
     }
-  }, []);
+  }, [errors, isValid]);
 
   const validateForm = useCallback(() => {
+    if (!isValid) {
+      setErrors(prev => ({ ...prev, submit: '사용자 정보를 불러올 수 없습니다.' }));
+      return false;
+    }
+
     const newErrors = {};
 
     // 필수 필드 검증
@@ -86,10 +108,15 @@ export const useProfileForm = (userId, initialData = null) => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData]);
+  }, [formData, isValid]);
 
   const handleSubmit = useCallback(async (data) => {
-    if (isLoading) return;
+    if (!isValid) {
+      setErrors(prev => ({ ...prev, submit: '사용자 정보를 불러올 수 없습니다.' }));
+      return null;
+    }
+
+    if (isLoading) return null;
 
     setIsLoading(true);
     setErrors({});
@@ -105,6 +132,11 @@ export const useProfileForm = (userId, initialData = null) => {
         }
       });
 
+      // 사진 검증
+      if (!data.photoURLs || data.photoURLs.length === 0) {
+        newErrors.photos = '최소 1장의 사진이 필요합니다.';
+      }
+
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
         return null;
@@ -114,34 +146,38 @@ export const useProfileForm = (userId, initialData = null) => {
       const profileData = {
         ...formData,
         ...data, // 사진 URL 데이터 추가
-        mainPhotoURL: data.mainPhotoURL || null, // 빈 문자열 대신 null 사용
-        uuid: userId
+        mainPhotoURL: data.mainPhotoURL || null // 빈 문자열 대신 null 사용
       };
 
-      console.log('프로필 데이터:', profileData);
-
-      // 프로필 저장
-      const response = await profile.createProfile(profileData);
-      console.log('프로필 저장 응답:', response);
+      // 프로필 저장 (생성 또는 업데이트)
+      let response;
+      if (initialData) {
+        // 프로필 수정
+        response = await profileService.updateProfile(userId, profileData);
+      } else {
+        // 프로필 생성
+        response = await profileService.createProfile(userId, profileData);
+      }
       
-      if (!response || !response.success) {
-        throw new Error(response?.error || '프로필 저장에 실패했습니다.');
+      if (!response) {
+        throw new Error('프로필 저장에 실패했습니다.');
       }
 
-      return response.data;
+      return response;
     } catch (error) {
       console.error('프로필 저장 실패:', error);
-      setErrors({ submit: error.message });
+      setErrors(prev => ({ ...prev, submit: error.message }));
       return null;
     } finally {
       setIsLoading(false);
     }
-  }, [formData, userId, isLoading]);
+  }, [formData, userId, isLoading, isValid, initialData]);
 
   return {
     formData,
     errors,
     isLoading,
+    isValid,
     updateField,
     handleSubmit,
     validateForm

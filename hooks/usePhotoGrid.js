@@ -5,10 +5,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { uploadMultipleImages } from '../services/imageService';
-import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import { MAX_PHOTOS } from '../components/profile-setup/constants';
+import { imageService } from '../services/imageService';
 
 /**
  * 프로필 사진 관리 훅 (6개 그리드, 순서 이동, 업로드, file/https 구분 등 모두 포함)
@@ -17,7 +16,7 @@ import { MAX_PHOTOS } from '../components/profile-setup/constants';
  * @returns {Object} 사진 관리 관련 함수와 상태
  */
 export const usePhotoGrid = (userId, initialPhotos = []) => {
-  // 6개의 슬롯을 초기화
+  // 상태 관리 훅들 - 항상 호출됨
   const [photoList, setPhotoList] = useState(
     Array(MAX_PHOTOS).fill(null).map((_, index) => ({
       photo: initialPhotos[index] ? { uri: initialPhotos[index] } : null,
@@ -26,27 +25,33 @@ export const usePhotoGrid = (userId, initialPhotos = []) => {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isValid, setIsValid] = useState(false);
 
-  // UUID 체크
+  // userId 유효성 검사 - 항상 호출됨
   useEffect(() => {
     if (!userId) {
-      console.error('UUID가 없습니다');
       setError('사용자 정보를 불러올 수 없습니다.');
+      setIsValid(false);
     } else {
       setError(null);
+      setIsValid(true);
     }
   }, [userId]);
 
-  // 사진 추가(갤러리에서 선택)
+  // 사진 추가(갤러리에서 선택) - 조건부 로직을 내부로 이동
   const handlePhotoPress = useCallback(async (index) => {
-    if (!photoList[index].isAddable) return null;
+    if (!isValid) {
+      Alert.alert('오류', '사용자 정보를 불러올 수 없습니다.');
+      return { photo: null };
+    }
+
+    if (!photoList[index].isAddable) {
+      return { photo: null };
+    }
+
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+      const result = await imageService.pickImage();
+
       if (!result.canceled) {
         const newPhoto = {
           photo: {
@@ -64,17 +69,20 @@ export const usePhotoGrid = (userId, initialPhotos = []) => {
           }
           return newList;
         });
-        return newPhoto.photo;
+        return newPhoto;
       }
+      return { photo: null };
     } catch (error) {
       Alert.alert('오류', '사진을 선택하는 중 오류가 발생했습니다.');
       setError(error);
+      return { photo: null };
     }
-    return null;
-  }, [photoList]);
+  }, [photoList, isValid]);
 
-  // 사진 삭제
+  // 사진 삭제 - 조건부 로직을 내부로 이동
   const removePhoto = useCallback((index) => {
+    if (!isValid) return;
+
     setPhotoList(prev => {
       const newList = [...prev];
       newList[index] = { ...newList[index], photo: null };
@@ -86,60 +94,61 @@ export const usePhotoGrid = (userId, initialPhotos = []) => {
       }
       return newList;
     });
-  }, []);
+  }, [isValid]);
 
-  // 사진 순서 이동
+  // 사진 순서 이동 - 조건부 로직을 내부로 이동
   const handlePhotoMove = useCallback((fromIndex, toIndex) => {
+    if (!isValid) return;
     if (!photoList[fromIndex]?.photo || !photoList[toIndex]?.photo) return;
+
     setPhotoList(prev => {
       const newList = [...prev];
       const [movedPhoto] = newList.splice(fromIndex, 1);
       newList.splice(toIndex, 0, movedPhoto);
       return newList;
     });
-  }, [photoList]);
+  }, [photoList, isValid]);
 
-  // 사진 업로드 (file://만 업로드, https://는 그대로)
+  // 사진 업로드 - 조건부 로직을 내부로 이동
   const uploadPhotos = useCallback(async () => {
+    if (!isValid) {
+      throw new Error('사용자 정보를 불러올 수 없습니다.');
+    }
+
     setIsLoading(true);
+    setError(null);
+    
     try {
-      // file://만 업로드, https://는 그대로
-      const localPhotos = photoList.filter(item => item?.photo?.uri?.startsWith('file://')).map(item => item.photo.uri);
-      const existingPhotoURLs = photoList.filter(item => item?.photo?.uri?.startsWith('https://')).map(item => item.photo.uri);
-      let newPhotoURLs = [];
-      if (localPhotos.length > 0) {
-        newPhotoURLs = await uploadMultipleImages(localPhotos, `profiles/${userId}`);
+      const photosToUpload = photoList
+        .filter(item => item?.photo?.uri)
+        .map(item => item.photo);
+
+      if (photosToUpload.length === 0) {
+        throw new Error('업로드할 사진이 없습니다.');
       }
-      // photoList 순서대로 최종 https:// URL 배열 만들기
-      let newPhotoIndex = 0;
-      const finalPhotoURLs = photoList.map(item => {
-        const uri = item?.photo?.uri;
-        if (uri?.startsWith('file://')) {
-          return newPhotoURLs[newPhotoIndex++];
-        } else if (uri?.startsWith('https://')) {
-          return uri;
-        }
-        return null;
-      }).filter(Boolean);
-      // 업로드 후 photoList를 https://...로만 재구성
-      setPhotoList(finalPhotoURLs.map(url => ({
+
+      const photoURLs = await imageService.uploadProfilePhotos(photosToUpload, userId);
+      
+      // 업로드 후 photoList 업데이트
+      setPhotoList(photoURLs.map(url => ({
         photo: { uri: url },
         isAddable: true
       })));
-      return finalPhotoURLs;
+
+      return photoURLs;
     } catch (error) {
-      Alert.alert('오류', '사진 업로드 중 오류가 발생했습니다.');
-      setError(error);
+      setError(error.message);
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [photoList, userId]);
+  }, [photoList, userId, isValid]);
 
   return {
     photoList,
     isLoading,
     error,
+    isValid,
     handlePhotoPress,
     removePhoto,
     handlePhotoMove,
