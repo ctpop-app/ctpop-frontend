@@ -68,6 +68,9 @@ export const profileService = {
    * @returns {Promise<Profile>}
    */
   async update(uuid, data) {
+    console.log('profileService.update 시작 - uuid:', uuid);
+    console.log('profileService.update - 받은 데이터:', data);
+
     const existing = await this.getProfile(uuid);
     if (!existing) {
       throw new Error('프로필을 찾을 수 없습니다.');
@@ -78,13 +81,20 @@ export const profileService = {
       ...data,
       updatedAt: getCurrentKST()
     });
+    console.log('Profile 객체 생성 완료:', profile);
 
     const errors = profile.validate();
-    if (errors.length > 0) {
-      throw new Error(errors.join(', '));
+    console.log('Profile 유효성 검사 결과:', errors);
+    
+    if (errors) {
+      console.error('Profile 유효성 검사 실패:', errors);
+      throw new Error(Object.values(errors).join(', '));
     }
 
-    return await profileApi.update(existing.id, profile.toFirestore());
+    const firestoreData = profile.toFirestore();
+    console.log('Firestore 데이터:', firestoreData);
+
+    return await profileApi.update(existing.id, firestoreData);
   },
 
   /**
