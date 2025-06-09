@@ -2,7 +2,7 @@ import apiClient, { handleApiResponse, handleApiError } from './client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
 import { jwtDecode } from 'jwt-decode';
-import { toE164Format } from '../services/authService';
+import { toE164Format } from '../utils/phoneUtils';
 import { formatDate } from '../utils/dateUtils';
 
 /**
@@ -40,12 +40,7 @@ export const sendOtp = async (phoneNumber) => {
     console.log('auth.js - sendOtp 시작');
     const response = await apiClient.post('/api/otp/send', { phone: phoneNumber });
     console.log('auth.js - sendOtp 원본 응답:', response.data);
-    
-    // response.data를 그대로 전달
-    return {
-      success: true,
-      data: response.data
-    };
+    return handleApiResponse(response);
   } catch (error) {
     console.error('auth.js - sendOtp 에러:', error);
     return handleApiError(error);
@@ -241,5 +236,23 @@ export const storeTokens = async (accessToken, refreshToken) => {
     }
   } catch (error) {
     console.error('토큰 저장 실패:', error);
+  }
+};
+
+/**
+ * 슈퍼패스 토큰 발급 (개발용)
+ * @returns {Promise<Object>} - 응답 데이터
+ */
+export const getSuperPassToken = async () => {
+  try {
+    const response = await apiClient.post('/test/superpass', {}, {
+      headers: {
+        'Authorization': `Bearer ${userStore.getState().user?.uuid}`
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('슈퍼패스 토큰 발급 실패:', error);
+    throw error;
   }
 }; 

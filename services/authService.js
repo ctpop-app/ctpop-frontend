@@ -3,6 +3,7 @@ import * as authApi from '../api/auth';
 import { AUTH_KEYS } from '../utils/constants';
 import { jwtDecode } from 'jwt-decode';
 import { formatDate } from '../utils/dateUtils';
+import { toE164Format, isValidPhoneNumber } from '../utils/phoneUtils';
 
 // Auth token keys in AsyncStorage
 const ACCESS_TOKEN_KEY = 'auth_access_token';
@@ -13,36 +14,6 @@ const AUTH_USER_KEY = '@auth_user';
 // 토큰 만료 시간 (밀리초)
 const ACCESS_TOKEN_EXPIRY = 30 * 60 * 1000;  // 30분
 const REFRESH_TOKEN_EXPIRY = 30 * 24 * 60 * 60 * 1000;  // 30일
-
-/**
- * 전화번호를 E.164 형식으로 변환합니다.
- * @param {string} phoneNumber - 변환할 전화번호
- * @returns {string} E.164 형식의 전화번호
- */
-export const toE164Format = (phoneNumber) => {
-  // 숫자만 추출
-  const numbers = phoneNumber.replace(/\D/g, '');
-  
-  // 한국 전화번호 형식 검사 (010으로 시작하는 11자리)
-  if (numbers.length === 11 && numbers.startsWith('010')) {
-    return numbers;  // +82를 붙이지 않고 숫자만 반환
-  }
-  
-  return numbers;
-};
-
-/**
- * 전화번호 형식이 유효한지 검사합니다.
- * @param {string} phoneNumber - 검사할 전화번호
- * @returns {boolean} 유효성 여부
- */
-export const isValidPhoneNumber = (phoneNumber) => {
-  // 숫자만 추출
-  const numbers = phoneNumber.replace(/\D/g, '');
-  
-  // 한국 전화번호 형식 검사 (010으로 시작하는 11자리)
-  return numbers.length === 11 && numbers.startsWith('010');
-};
 
 /**
  * OTP 코드 형식이 유효한지 검사합니다.
@@ -85,14 +56,14 @@ export const sendOtp = async (phoneNumber) => {
     if (!response.success) {
       return {
         success: false,
-        message: response.data?.error || response.message || '인증번호 전송에 실패했습니다.'
+        message: response.message || '인증번호 전송에 실패했습니다.'
       };
     }
-    
-    if (response.data?.accessToken) {
-      console.log('authService.js - 액세스 토큰 발견:', response.data.accessToken);
+
+    // 액세스 토큰 저장
+    if (response.accessToken) {
       try {
-        await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, response.data.accessToken);
+        await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, response.accessToken);
         console.log('authService.js - AsyncStorage에 토큰 저장 완료');
       } catch (error) {
         console.error('authService.js - 토큰 저장 실패:', error);
@@ -101,20 +72,17 @@ export const sendOtp = async (phoneNumber) => {
           message: '인증 토큰 저장에 실패했습니다.'
         };
       }
-    } else {
-      console.log('authService.js - 액세스 토큰 없음:', response.data);
-      return {
-        success: false,
-        message: response.data?.error || '인증 토큰을 받지 못했습니다.'
-      };
     }
     
-    return response;
+    return {
+      success: true,
+      message: '인증번호가 전송되었습니다.'
+    };
   } catch (error) {
     console.error('authService.js - sendOtp 에러:', error);
     return {
       success: false,
-      message: error.response?.data?.error || error.message || '인증번호 전송 중 오류가 발생했습니다.'
+      message: error.message || '인증번호 전송 중 오류가 발생했습니다.'
     };
   }
 };

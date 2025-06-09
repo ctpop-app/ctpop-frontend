@@ -2,20 +2,26 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import userStore from '../store/userStore';
+import useUserStore from '../store/userStore';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTES } from '../navigation/constants';
 import { CommonActions } from '@react-navigation/native';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
-  const { user, userProfile, setUserProfile } = userStore();
+  const { user, userProfile, setUserProfile } = useUserStore();
   const { handleLogout, loadUserProfile, handleEditProfile, handleWithdraw } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadUserProfile();
-  }, []);
+    if (user?.uuid) {
+      loadUserProfile().then(() => {
+        setIsLoading(false);
+      });
+    } else {
+      setIsLoading(false);
+    }
+  }, [user?.uuid, loadUserProfile]);
 
   const onEditProfile = () => {
     const serializedProfile = handleEditProfile();

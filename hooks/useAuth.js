@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import * as authApi from '../api/auth';
-import { isValidPhoneNumber, isValidOtpCode } from '../services/authService';
+import { isValidOtpCode } from '../services/authService';
+import { isValidPhoneNumber } from '../utils/phoneUtils';
 import useUserStore from '../store/userStore';
 import { profileService } from '../services/profileService';
 import { userService } from '../services/userService';
@@ -19,7 +20,7 @@ export const useAuth = () => {
 
   // Zustand store 사용
   const userStore = useUserStore();
-  const { user, isAuthenticated, hasProfile, setUser, setUserProfile, setHasProfile, clearUser } = userStore;
+  const { user, isAuthenticated, hasProfile, setUser, setUserProfile, setHasProfile, clearUser, userProfile } = userStore;
 
   // 서버 연결 테스트
   const handleTestConnection = useCallback(async () => {
@@ -195,8 +196,7 @@ export const useAuth = () => {
       console.log('토큰 검증 결과:', result);
       
       if (!result.success) {
-        console.log('토큰 검증 실패 - 로그아웃 필요');
-        return false;
+        return isAuthenticated;
       }
 
       // 3. 사용자 정보 확인
@@ -215,6 +215,9 @@ export const useAuth = () => {
       console.log('프로필 존재 여부:', hasProfile);
       setHasProfile(hasProfile);
 
+      // 5. 사용자 정보 설정
+      setUser(user);
+
       console.log('인증 상태 확인 완료 - 성공');
       return true;
     } catch (error) {
@@ -224,7 +227,7 @@ export const useAuth = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [setHasProfile, isAuthenticated]);
+  }, [setHasProfile, isAuthenticated, setUser]);
 
   // OTP 재전송
   const handleResendOtp = useCallback(() => {
@@ -255,26 +258,25 @@ export const useAuth = () => {
 
   // 프로필 수정
   const handleEditProfile = useCallback(() => {
-    const currentProfile = userStore.getState().userProfile;
-    if (!currentProfile) {
+    if (!userProfile) {
       Alert.alert('오류', '프로필 정보를 불러올 수 없습니다.');
       return null;
     }
 
-    if (!currentProfile.uuid) {
-      console.error('Invalid userProfile: missing uuid field', currentProfile);
+    if (!userProfile.uuid) {
+      console.error('Invalid userProfile: missing uuid field', userProfile);
       Alert.alert('오류', '프로필 정보가 올바르지 않습니다.');
       return null;
     }
 
     // Date 객체를 문자열로 변환
     return {
-      ...currentProfile,
-      createdAt: formatDate(currentProfile.createdAt),
-      updatedAt: formatDate(currentProfile.updatedAt),
-      lastActive: formatDate(currentProfile.lastActive)
+      ...userProfile,
+      createdAt: formatDate(userProfile.createdAt),
+      updatedAt: formatDate(userProfile.updatedAt),
+      lastActive: formatDate(userProfile.lastActive)
     };
-  }, []);
+  }, [userProfile]);
 
   // 회원 탈퇴
   const handleWithdraw = useCallback(async () => {
@@ -324,6 +326,7 @@ export const useAuth = () => {
     handleResendOtp,
     loadUserProfile,
     handleEditProfile,
-    handleWithdraw
+    handleWithdraw,
+    clearUser
   };
 }; 
