@@ -106,8 +106,12 @@ export class Profile {
       errors.weight = '체중은 30kg 이상 200kg 이하여야 합니다.';
     }
 
-    // 사진 URL 개수 검사
-    if (this.photoURLs && this.photoURLs.length > 6) {
+    // 사진 URL 개수 검사 (null 체크 추가)
+    if (!Array.isArray(this.photoURLs)) {
+      errors.photoURLs = '사진 URL이 올바르지 않습니다.';
+    } else if (this.photoURLs.length === 0) {
+      errors.photoURLs = '최소 1장의 사진이 필요합니다.';
+    } else if (this.photoURLs.length > 6) {
       errors.photoURLs = '추가 사진은 최대 6장까지 가능합니다.';
     }
 

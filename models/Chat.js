@@ -19,8 +19,8 @@ class Chat {
 
     return new Chat({
       participants,
-      unreadCount: participants.reduce((acc, userId) => {
-        acc[userId] = 0;
+      unreadCount: participants.reduce((acc, uuid) => {
+        acc[uuid] = 0;
         return acc;
       }, {})
     });
@@ -38,31 +38,31 @@ class Chat {
   }
 
   // 읽지 않은 메시지 수 업데이트
-  updateUnreadCount(userId, count) {
-    if (!this.participants.includes(userId)) {
+  updateUnreadCount(uuid, count) {
+    if (!this.participants.includes(uuid)) {
       throw new Error('채팅방 참여자가 아닙니다.');
     }
-    this.unreadCount[userId] = count;
+    this.unreadCount[uuid] = count;
   }
 
   // 채팅방 참여자 추가
-  addParticipant(userId) {
-    if (this.participants.includes(userId)) {
+  addParticipant(uuid) {
+    if (this.participants.includes(uuid)) {
       throw new Error('이미 참여 중인 사용자입니다.');
     }
-    this.participants.push(userId);
-    this.unreadCount[userId] = 0;
+    this.participants.push(uuid);
+    this.unreadCount[uuid] = 0;
     this.updatedAt = Timestamp.now();
   }
 
   // 채팅방 참여자 제거
-  removeParticipant(userId) {
-    const index = this.participants.indexOf(userId);
+  removeParticipant(uuid) {
+    const index = this.participants.indexOf(uuid);
     if (index === -1) {
       throw new Error('참여 중이 아닌 사용자입니다.');
     }
     this.participants.splice(index, 1);
-    delete this.unreadCount[userId];
+    delete this.unreadCount[uuid];
     this.updatedAt = Timestamp.now();
   }
 

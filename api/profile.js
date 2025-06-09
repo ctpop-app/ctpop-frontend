@@ -1,21 +1,14 @@
 import { collection, query, where, limit, getDocs, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { Profile } from '../models/Profile';
 import { API_ENDPOINTS } from './constants';
 import { handleApiError } from './utils/errorHandler';
-import { formatDate, getCurrentKST } from '../utils/dateUtils';
 
-export const profile = {
-  async checkProfileExists(uuid) {
+export const profileApi = {
+  async exists(uuid) {
     try {
       const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
-      const q = query(
-        profilesRef,
-        where('uuid', '==', uuid),
-        where('isActive', '==', true),
-        limit(1)
-      );
+      const q = query(profilesRef, where('uuid', '==', uuid), where('isActive', '==', true), limit(1));
       const querySnapshot = await getDocs(q);
       return !querySnapshot.empty;
     } catch (error) {
@@ -23,109 +16,45 @@ export const profile = {
     }
   },
 
-  async createProfile(profileData) {
+  async create(data) {
     try {
-      const docRef = await addDoc(collection(db, API_ENDPOINTS.PROFILES), profileData.toFirestore());
-      return { id: docRef.id, ...profileData };
+      const docRef = await addDoc(collection(db, API_ENDPOINTS.PROFILES), data);
+      return { id: docRef.id, ...data };
     } catch (error) {
       console.error('프로필 생성 실패:', error);
       throw error;
     }
   },
 
-  async getProfile(uuid) {
+  async get(uuid) {
     try {
       const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
-      const q = query(
-        profilesRef,
-        where('uuid', '==', uuid),
-        where('isActive', '==', true),
-        limit(1)
-      );
+      const q = query(profilesRef, where('uuid', '==', uuid), where('isActive', '==', true), limit(1));
       const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        return null;
-      }
-
-      const profileDoc = querySnapshot.docs[0];
-      return Profile.fromFirestore(profileDoc);
+      return querySnapshot.empty ? null : querySnapshot.docs[0];
     } catch (error) {
       return handleApiError(error);
     }
   },
 
-  async updateProfile(profileData) {
+  async update(id, data) {
     try {
-      const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
-      const q = query(
-        profilesRef,
-        where('uuid', '==', profileData.uuid),
-        where('isActive', '==', true),
-        limit(1)
-      );
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        throw new Error('프로필을 찾을 수 없습니다.');
-      }
-
-      const profileDoc = querySnapshot.docs[0];
-      const profileRef = doc(db, API_ENDPOINTS.PROFILES, profileDoc.id);
-
-      await updateDoc(profileRef, profileData.toFirestore());
-      return profileData;
+      const profileRef = doc(db, API_ENDPOINTS.PROFILES, id);
+      await updateDoc(profileRef, data);
+      return data;
     } catch (error) {
       console.error('프로필 업데이트 실패:', error);
       throw error;
     }
   },
 
-  async uploadPhotos(uuid, photos) {
+  async upload(path, blob) {
     try {
-      // 1. 프로필 존재 확인
-      const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
-      const q = query(
-        profilesRef,
-        where('uuid', '==', uuid),
-        where('isActive', '==', true),
-        limit(1)
-      );
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        throw new Error('프로필을 찾을 수 없습니다.');
-      }
-
-      const profileDoc = querySnapshot.docs[0];
-      const profileRef = doc(db, API_ENDPOINTS.PROFILES, profileDoc.id);
-
-      // 2. 사진 업로드
-      const photoUrls = [];
-      for (const photo of photos) {
-        if (photo && photo.uri) {
-          const storageRef = ref(storage, `profiles/${uuid}/${Date.now()}_${photo.name}`);
-          const response = await fetch(photo.uri);
-          const blob = await response.blob();
-          await uploadBytes(storageRef, blob);
-          const url = await getDownloadURL(storageRef);
-          photoUrls.push(url);
-        }
-      }
-
-      // 3. 프로필 업데이트
-      if (photoUrls.length > 0) {
-        const updateData = {
-          photoURLs: photoUrls,
-          mainPhotoURL: photoUrls[0],
-          updatedAt: getCurrentKST()
-        };
-        await updateDoc(profileRef, updateData);
-      }
-
-      return photoUrls;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, blob);
+      return getDownloadURL(storageRef);
     } catch (error) {
-      console.error('사진 업로드 실패:', error);
+      console.error('파일 업로드 실패:', error);
       throw error;
     }
   }

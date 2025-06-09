@@ -19,14 +19,13 @@ import { LocationSelector } from '../components/profile-setup/form-inputs/Locati
 import { Button } from '../components/Button';
 import { ProfileHeader } from '../components/profile-setup/common/ProfileHeader';
 import { ORIENTATION_OPTIONS, MAX_PHOTOS } from '../components/profile-setup/constants';
-import { profileService } from '../services/profileService';
-import userStore from '../store/userStore';
+import useUserStore from '../store/userStore';
 
 const ProfileEditScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { currentProfile } = route.params || {};
-  const { setUserProfile } = userStore();
+  const { setUserProfile } = useUserStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 

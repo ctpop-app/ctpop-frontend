@@ -128,7 +128,7 @@ export default function JwtPhoneLoginScreen() {
               try {
                 const response = await auth.getSuperPassToken();
                 console.log('슈퍼패스 응답:', response);  // 디버깅용 로그
-                if (response.success) {
+                if (response.refreshToken) {
                   // 리프레시 토큰 저장
                   await auth.storeTokens(null, response.refreshToken);
                   
@@ -140,7 +140,7 @@ export default function JwtPhoneLoginScreen() {
                   await auth.storeUser(user);
                   setUser(user);
                 } else {
-                  Alert.alert('오류', response.message || '슈퍼패스 인증에 실패했습니다.');
+                  Alert.alert('오류', '슈퍼패스 인증에 실패했습니다.');
                 }
               } catch (error) {
                 console.error('슈퍼패스 에러:', error);  // 디버깅용 로그

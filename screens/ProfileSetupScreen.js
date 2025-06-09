@@ -10,13 +10,13 @@ import { OptionSelector } from '../components/profile-setup/form-inputs/OptionSe
 import { LocationSelector } from '../components/profile-setup/form-inputs/LocationSelector';
 import { Button } from '../components/Button';
 import { ProfileHeader } from '../components/profile-setup/common/ProfileHeader';
-import userStore from '../store/userStore';
+import useUserStore from '../store/userStore';
 import { ORIENTATION_OPTIONS } from '../components/profile-setup/constants';
 import { profileService } from '../services/profileService';
 
 const ProfileSetupScreen = () => {
   const navigation = useNavigation();
-  const { user, setUserProfile } = userStore();
+  const { user, setUserProfile } = useUserStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -28,7 +28,7 @@ const ProfileSetupScreen = () => {
     uploadPhotos,
     isLoading: isPhotoLoading,
     isValid: isPhotoValid
-  } = usePhotoGrid(user?.uuid || '');
+  } = usePhotoGrid(user?.uuid, []);
 
   const {
     formData,
@@ -37,7 +37,7 @@ const ProfileSetupScreen = () => {
     updateField,
     isValid: isFormValid,
     handleSubmit
-  } = useProfileForm(user?.uuid || '');
+  } = useProfileForm(user?.uuid);
 
   useEffect(() => {
     const checkProfile = async () => {

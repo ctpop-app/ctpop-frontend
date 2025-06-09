@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ROUTES } from '../navigation/constants';
-import userStore from '../store/userStore';
+import useUserStore from '../store/userStore';
 import { profileService } from '../services/profileService';
 
 const fieldLabels = {
@@ -16,9 +16,9 @@ const fieldLabels = {
   bio: '자기소개'
 };
 
-export const useProfileForm = (userId, initialData = null) => {
+export const useProfileForm = (uuid, initialData = null) => {
   const navigation = useNavigation();
-  const { user } = userStore();
+  const { user } = useUserStore();
 
   // 상태 관리 훅들 - 항상 호출됨
   const [formData, setFormData] = useState(initialData || {
@@ -39,17 +39,17 @@ export const useProfileForm = (userId, initialData = null) => {
 
   // userId 유효성 검사 - 항상 호출됨
   useEffect(() => {
-    if (!userId) {
-      setErrors(prev => ({ ...prev, userId: '사용자 정보를 불러올 수 없습니다.' }));
+    if (!uuid) {
+      setErrors(prev => ({ ...prev, uuid: '사용자 정보를 불러올 수 없습니다.' }));
       setIsValid(false);
     } else {
       setErrors(prev => {
-        const { userId, ...rest } = prev;
+        const { uuid, ...rest } = prev;
         return rest;
       });
       setIsValid(true);
     }
-  }, [userId]);
+  }, [uuid]);
 
   const updateField = useCallback((field, value) => {
     if (!isValid) return;
@@ -111,12 +111,18 @@ export const useProfileForm = (userId, initialData = null) => {
   }, [formData, isValid]);
 
   const handleSubmit = useCallback(async (data) => {
+    console.log('handleSubmit 시작 - 받은 데이터:', data);
+    
     if (!isValid) {
+      console.log('유효성 검사 실패 - isValid:', isValid);
       setErrors(prev => ({ ...prev, submit: '사용자 정보를 불러올 수 없습니다.' }));
       return null;
     }
 
-    if (isLoading) return null;
+    if (isLoading) {
+      console.log('이미 로딩 중');
+      return null;
+    }
 
     setIsLoading(true);
     setErrors({});
@@ -138,6 +144,7 @@ export const useProfileForm = (userId, initialData = null) => {
       }
 
       if (Object.keys(newErrors).length > 0) {
+        console.log('검증 에러 발생:', newErrors);
         setErrors(newErrors);
         return null;
       }
@@ -148,16 +155,20 @@ export const useProfileForm = (userId, initialData = null) => {
         ...data, // 사진 URL 데이터 추가
         mainPhotoURL: data.mainPhotoURL || null // 빈 문자열 대신 null 사용
       };
+      
+      console.log('생성된 프로필 데이터:', profileData);
 
       // 프로필 저장 (생성 또는 업데이트)
       let response;
       if (initialData) {
-        // 프로필 수정
-        response = await profileService.updateProfile(userId, profileData);
+        console.log('프로필 수정 시도');
+        response = await profileService.update(uuid, profileData);
       } else {
-        // 프로필 생성
-        response = await profileService.createProfile(userId, profileData);
+        console.log('프로필 생성 시도');
+        response = await profileService.create(uuid, profileData);
       }
+      
+      console.log('프로필 저장 응답:', response);
       
       if (!response) {
         throw new Error('프로필 저장에 실패했습니다.');
@@ -171,7 +182,7 @@ export const useProfileForm = (userId, initialData = null) => {
     } finally {
       setIsLoading(false);
     }
-  }, [formData, userId, isLoading, isValid, initialData]);
+  }, [formData, uuid, isLoading, isValid, initialData]);
 
   return {
     formData,

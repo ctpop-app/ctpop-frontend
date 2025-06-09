@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import * as authApi from '../api/auth';
 import { isValidOtpCode } from '../services/authService';
@@ -10,6 +10,7 @@ import { formatDate } from '../utils/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
 import * as authService from '../services/authService';
+import { useProfile } from './useProfile';
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,8 +20,8 @@ export const useAuth = () => {
   const [otpSent, setOtpSent] = useState(false);
 
   // Zustand store 사용
-  const userStore = useUserStore();
-  const { user, isAuthenticated, hasProfile, setUser, setUserProfile, setHasProfile, clearUser, userProfile } = userStore;
+  const { user, isAuthenticated, hasProfile, setUser, setUserProfile, setHasProfile, clearUser, userProfile } = useUserStore();
+  const { exists: checkProfileExists, get: loadUserProfile } = useProfile();
 
   // 서버 연결 테스트
   const handleTestConnection = useCallback(async () => {
@@ -176,85 +177,35 @@ export const useAuth = () => {
 
   // 인증 상태 확인
   const checkAuth = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
     try {
-      console.log('인증 상태 확인 시작');
-      
-      // 1. 리프레시 토큰 확인
-      const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
-      console.log('저장된 리프레시 토큰:', refreshToken ? '있음' : '없음');
-      
-      if (!refreshToken) {
-        console.log('리프레시 토큰 없음 - 로그아웃 필요');
+      const isAuth = await authService.isAuthenticated();
+      if (!isAuth) {
+        clearUser();
         return false;
       }
 
-      // 2. 토큰 유효성 검증 및 갱신
-      console.log('토큰 검증 시작');
-      const result = await authService.validateAndRefreshToken();
-      console.log('토큰 검증 결과:', result);
-      
-      if (!result.success) {
-        return isAuthenticated;
-      }
-
-      // 3. 사용자 정보 확인
-      console.log('사용자 정보 확인 시작');
       const user = await authService.getStoredUser();
-      console.log('저장된 사용자 정보:', user);
-      
       if (!user) {
-        console.log('사용자 정보 없음 - 로그아웃 필요');
+        clearUser();
         return false;
       }
 
-      // 4. 프로필 확인
-      console.log('프로필 확인 시작');
-      const hasProfile = await profileService.checkProfileExists(user.uuid);
-      console.log('프로필 존재 여부:', hasProfile);
-      setHasProfile(hasProfile);
-
-      // 5. 사용자 정보 설정
       setUser(user);
-
-      console.log('인증 상태 확인 완료 - 성공');
+      const hasProfile = await checkProfileExists();
+      setHasProfile(hasProfile);
       return true;
     } catch (error) {
-      console.error('인증 확인 중 예상치 못한 에러 발생:', error);
-      setError('인증 확인 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
-      return isAuthenticated;
-    } finally {
-      setIsLoading(false);
+      console.error('인증 상태 확인 실패:', error);
+      clearUser();
+      return false;
     }
-  }, [setHasProfile, isAuthenticated, setUser]);
+  }, [setUser, setHasProfile, clearUser, checkProfileExists]);
 
   // OTP 재전송
   const handleResendOtp = useCallback(() => {
     setVerificationCode('');
     setOtpSent(false);
   }, []);
-
-  // 프로필 로드
-  const loadUserProfile = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      if (!user?.uuid) return;
-      
-      const profile = await profileService.getProfile(user.uuid);
-      if (profile) {
-        setUserProfile(profile);
-      }
-      return profile;
-    } catch (error) {
-      console.error('프로필 로드 실패:', error);
-      setError('프로필 정보를 불러오는데 실패했습니다.');
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.uuid, setUserProfile]);
 
   // 프로필 수정
   const handleEditProfile = useCallback(() => {
@@ -280,29 +231,20 @@ export const useAuth = () => {
 
   // 회원 탈퇴
   const handleWithdraw = useCallback(async () => {
-    if (!user?.uuid) return false;
-
-    setIsLoading(true);
-    setError(null);
     try {
-      // 프로필 비활성화
-      await profileService.deactivateProfile(user.uuid);
-      
-      // 사용자 비활성화
-      await userService.deactivateUser(user.uuid);
-      
-      // 로컬 상태 초기화
-      await handleLogout();
-      
-      return true;
+      await authService.withdraw();
+      clearUser();
     } catch (error) {
       console.error('회원 탈퇴 실패:', error);
-      setError('회원 탈퇴 중 오류가 발생했습니다.');
-      return false;
-    } finally {
-      setIsLoading(false);
+      throw error;
     }
-  }, [user?.uuid, handleLogout]);
+  }, [clearUser]);
+
+  useEffect(() => {
+    if (isAuthenticated && !hasProfile) {
+      checkProfileExists();
+    }
+  }, [isAuthenticated, hasProfile, checkProfileExists]);
 
   return {
     isLoading,

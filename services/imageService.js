@@ -7,11 +7,11 @@ import { formatDate } from '../utils/dateUtils';
 /**
  * 프로필 사진을 Firebase Storage에 업로드합니다.
  * @param {Object} photo - 업로드할 사진 객체 { uri, name }
- * @param {string} userId - 사용자 UUID
+ * @param {string} uuid - 사용자 UUID
  * @returns {Promise<string>} - 업로드된 이미지의 URL
  */
-export const uploadProfilePhoto = async (photo, userId) => {
-  if (!photo?.uri || !userId) {
+export const uploadProfilePhoto = async (photo, uuid) => {
+  if (!photo?.uri || !uuid) {
     throw new Error('사진과 사용자 ID가 필요합니다.');
   }
 
@@ -33,7 +33,7 @@ export const uploadProfilePhoto = async (photo, userId) => {
     const filename = `${timestamp}_${originalName}.jpg`;
     
     // Storage 참조 생성
-    const storageRef = ref(storage, `profiles/${userId}/${filename}`);
+    const storageRef = ref(storage, `profiles/${uuid}/${filename}`);
     
     // 메타데이터 설정
     const metadata = {
@@ -41,7 +41,7 @@ export const uploadProfilePhoto = async (photo, userId) => {
       customMetadata: {
         uploadedAt: formatDate(new Date()),
         originalName: originalName,
-        userId: userId,
+        uuid: uuid,
         originalWidth: manipResult.width.toString(),
         originalHeight: manipResult.height.toString()
       }
@@ -59,23 +59,30 @@ export const uploadProfilePhoto = async (photo, userId) => {
 /**
  * 여러 프로필 사진을 업로드합니다.
  * @param {Object[]} photos - 업로드할 사진 객체 배열
- * @param {string} userId - 사용자 UUID
+ * @param {string} uuid - 사용자 UUID
  * @returns {Promise<string[]>} - 업로드된 이미지들의 URL 배열
  */
-export const uploadProfilePhotos = async (photos, userId) => {
-  if (!photos?.length || !userId) {
+export const uploadProfilePhotos = async (photos, uuid) => {
+  console.log('imageService - uploadProfilePhotos input:', { photos, uuid });
+  
+  if (!photos?.length || !uuid) {
+    console.error('imageService - uploadProfilePhotos validation failed:', { photos, uuid });
     throw new Error('사진과 사용자 ID가 필요합니다.');
   }
 
   try {
     const uploadPromises = photos.map(photo => {
+      console.log('imageService - processing photo:', photo);
       if (photo.uri.startsWith('https://')) {
+        console.log('imageService - photo is already a URL:', photo.uri);
         return Promise.resolve(photo.uri);
       }
-      return uploadProfilePhoto(photo, userId);
+      return uploadProfilePhoto(photo, uuid);
     });
 
-    return await Promise.all(uploadPromises);
+    const urls = await Promise.all(uploadPromises);
+    console.log('imageService - uploadProfilePhotos result:', urls);
+    return urls;
   } catch (error) {
     console.error('프로필 사진 업로드 실패:', error);
     throw new Error('프로필 사진 업로드에 실패했습니다.');
@@ -85,11 +92,11 @@ export const uploadProfilePhotos = async (photos, userId) => {
 /**
  * 채팅 이미지를 업로드합니다.
  * @param {Object} photo - 업로드할 사진 객체
- * @param {string} userId - 사용자 UUID
+ * @param {string} uuid - 사용자 UUID
  * @returns {Promise<string>} - 업로드된 이미지의 URL
  */
-export const uploadChatImage = async (photo, userId) => {
-  if (!photo?.uri || !userId) {
+export const uploadChatImage = async (photo, uuid) => {
+  if (!photo?.uri || !uuid) {
     throw new Error('사진과 사용자 ID가 필요합니다.');
   }
 
@@ -110,14 +117,14 @@ export const uploadChatImage = async (photo, userId) => {
     const filename = `${timestamp}_chat.jpg`;
     
     // Storage 참조 생성
-    const storageRef = ref(storage, `chat/${userId}/${filename}`);
+    const storageRef = ref(storage, `chat/${uuid}/${filename}`);
     
     // 메타데이터 설정
     const metadata = {
       contentType: 'image/jpeg',
       customMetadata: {
         uploadedAt: formatDate(new Date()),
-        userId: userId,
+        uuid: uuid,
         type: 'chat'
       }
     };
@@ -135,12 +142,12 @@ export const uploadChatImage = async (photo, userId) => {
  * 이미지를 Firebase Storage에 업로드합니다.
  * @param {string} uri - 이미지 URI
  * @param {string} path - 저장할 경로 (예: 'profile', 'chat')
- * @param {string} userId - 사용자 UUID
+ * @param {string} uuid - 사용자 UUID
  * @returns {Promise<string>} - 업로드된 이미지의 URL
  */
-export const uploadImage = async (uri, path = 'profile', userId = null) => {
+export const uploadImage = async (uri, path = 'profile', uuid = null) => {
   try {
-    console.log('이미지 업로드 시작:', { uri, path, userId });
+    console.log('이미지 업로드 시작:', { uri, path, uuid });
 
     // 이미지 압축 및 리사이징
     console.log('이미지 압축 시작...');
@@ -166,8 +173,8 @@ export const uploadImage = async (uri, path = 'profile', userId = null) => {
 
     // 파일명 생성
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = userId 
-      ? `${path}/${userId}_${timestamp}.jpg`
+    const filename = uuid 
+      ? `${path}/${uuid}_${timestamp}.jpg`
       : `${path}/${timestamp}.jpg`;
     
     const storageRef = ref(storage, filename);
@@ -180,7 +187,7 @@ export const uploadImage = async (uri, path = 'profile', userId = null) => {
         'uploadedAt': formatDate(new Date()),
         'originalWidth': manipResult.width.toString(),
         'originalHeight': manipResult.height.toString(),
-        'userId': userId || 'unknown'
+        'uuid': uuid || 'unknown'
       }
     };
     console.log('메타데이터 준비 완료:', metadata);
@@ -198,8 +205,9 @@ export const uploadImage = async (uri, path = 'profile', userId = null) => {
   } catch (error) {
     console.error('이미지 업로드 실패:', {
       error: error.message,
-      code: error.code,
-      stack: error.stack
+      uri,
+      path,
+      uuid
     });
     throw new Error('이미지 업로드에 실패했습니다.');
   }
@@ -209,12 +217,12 @@ export const uploadImage = async (uri, path = 'profile', userId = null) => {
  * 여러 이미지를 Firebase Storage에 업로드합니다.
  * @param {string[]} uris - 이미지 URI 배열
  * @param {string} path - 저장할 경로
- * @param {string} userId - 사용자 UUID
+ * @param {string} uuid - 사용자 UUID
  * @returns {Promise<string[]>} - 업로드된 이미지들의 URL 배열
  */
-export const uploadMultipleImages = async (uris, path = 'profile', userId = null) => {
+export const uploadMultipleImages = async (uris, path = 'profile', uuid = null) => {
   try {
-    const uploadPromises = uris.map(uri => uploadImage(uri, path, userId));
+    const uploadPromises = uris.map(uri => uploadImage(uri, path, uuid));
     const urls = await Promise.all(uploadPromises);
     return urls;
   } catch (error) {

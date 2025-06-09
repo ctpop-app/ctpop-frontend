@@ -8,7 +8,7 @@ import { handleError } from '../utils/errorHandler';
 
 const MESSAGES_PER_PAGE = 20;
 
-export const useChat = (chatId, userId) => {
+export const useChat = (chatId, uuid) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,7 +54,7 @@ export const useChat = (chatId, userId) => {
     try {
       const messageData = {
         content,
-        senderId: userId,
+        senderId: uuid,
         type,
         metadata,
         status: 'sending'
@@ -80,7 +80,7 @@ export const useChat = (chatId, userId) => {
       setError(handledError);
       throw handledError;
     }
-  }, [chatId, userId, addOperation]);
+  }, [chatId, uuid, addOperation]);
 
   // 메시지 읽음 상태 업데이트
   const markMessageAsRead = useCallback(async (messageId) => {

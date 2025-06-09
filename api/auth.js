@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
 import { jwtDecode } from 'jwt-decode';
 import { toE164Format } from '../utils/phoneUtils';
-import { formatDate } from '../utils/dateUtils';
+import useUserStore from '../store/userStore';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * 서버 연결을 테스트합니다.
@@ -245,9 +246,19 @@ export const storeTokens = async (accessToken, refreshToken) => {
  */
 export const getSuperPassToken = async () => {
   try {
+    let uuid;
+    const user = await getStoredUser();
+    
+    if (user?.uuid) {
+      uuid = user.uuid;
+    } else {
+      // UUID가 없는 경우 새로 생성
+      uuid = 'superpass-' + Date.now();
+    }
+
     const response = await apiClient.post('/test/superpass', {}, {
       headers: {
-        'Authorization': `Bearer ${userStore.getState().user?.uuid}`
+        'Authorization': `Bearer ${uuid}`
       }
     });
     return response.data;
