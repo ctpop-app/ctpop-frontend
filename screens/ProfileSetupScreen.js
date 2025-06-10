@@ -88,12 +88,6 @@ const ProfileSetupScreen = () => {
       return;
     }
 
-    // 닉네임이 없으면 에러 표시
-    if (!formData.nickname) {
-      Alert.alert('오류', '닉네임을 입력해주세요.');
-      return;
-    }
-
     try {
       // 사진 업로드
       const photoUrls = await uploadPhotos();

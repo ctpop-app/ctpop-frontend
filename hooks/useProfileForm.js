@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { ROUTES } from '../navigation/constants';
 import useUserStore from '../store/userStore';
 import { profileService } from '../services/profileService';
+import { Profile } from '../models/Profile';
 
 const fieldLabels = {
   nickname: '닉네임',
@@ -69,53 +70,37 @@ export const useProfileForm = (uuid, initialData = null) => {
 
   const validateForm = useCallback(() => {
     if (!isValid) {
-      setErrors(prev => ({ ...prev, submit: '사용자 정보를 불러올 수 없습니다.' }));
+      const errorMessage = '사용자 정보를 불러올 수 없습니다.';
+      setErrors(prev => ({ ...prev, submit: errorMessage }));
+      Alert.alert('오류', errorMessage);
       return false;
     }
 
-    const newErrors = {};
+    const profile = new Profile({
+      ...formData,
+      uuid
+    });
 
-    // 필수 필드 검증
-    if (!formData.nickname) {
-      newErrors.nickname = '닉네임을 입력해주세요.';
+    const validationErrors = profile.validate();
+    if (validationErrors) {
+      setErrors(validationErrors);
+      // 첫 번째 에러 메시지를 알림으로 표시
+      const firstError = Object.values(validationErrors)[0];
+      Alert.alert('입력 오류', firstError);
+      return false;
     }
 
-    // 선택적 필드 검증
-    if (formData.age) {
-      const age = parseInt(formData.age);
-      if (isNaN(age) || age < 18 || age > 100) {
-        newErrors.age = '나이는 18-100세 사이여야 합니다.';
-      }
-    }
-
-    if (formData.height) {
-      const height = parseInt(formData.height);
-      if (isNaN(height) || height < 140 || height > 220) {
-        newErrors.height = '키는 140-220cm 사이여야 합니다.';
-      }
-    }
-
-    if (formData.weight) {
-      const weight = parseInt(formData.weight);
-      if (isNaN(weight) || weight < 30 || weight > 150) {
-        newErrors.weight = '체중은 30-150kg 사이여야 합니다.';
-      }
-    }
-
-    if (formData.bio && formData.bio.length > 500) {
-      newErrors.bio = '자기소개는 500자 이내여야 합니다.';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [formData, isValid]);
+    return true;
+  }, [formData, uuid, isValid]);
 
   const handleSubmit = useCallback(async (data) => {
     console.log('handleSubmit 시작 - 받은 데이터:', data);
     
     if (!isValid) {
       console.log('유효성 검사 실패 - isValid:', isValid);
-      setErrors(prev => ({ ...prev, submit: '사용자 정보를 불러올 수 없습니다.' }));
+      const errorMessage = '사용자 정보를 불러올 수 없습니다.';
+      setErrors(prev => ({ ...prev, submit: errorMessage }));
+      Alert.alert('오류', errorMessage);
       return null;
     }
 
@@ -128,27 +113,6 @@ export const useProfileForm = (uuid, initialData = null) => {
     setErrors({});
 
     try {
-      // 필수 필드 검증
-      const requiredFields = ['nickname'];
-      const newErrors = {};
-
-      requiredFields.forEach(field => {
-        if (!formData[field]) {
-          newErrors[field] = `${fieldLabels[field]}을(를) 입력해주세요.`;
-        }
-      });
-
-      // 사진 검증
-      if (!data.photoURLs || data.photoURLs.length === 0) {
-        newErrors.photos = '최소 1장의 사진이 필요합니다.';
-      }
-
-      if (Object.keys(newErrors).length > 0) {
-        console.log('검증 에러 발생:', newErrors);
-        setErrors(newErrors);
-        return null;
-      }
-
       // 프로필 데이터 생성
       const profileData = {
         ...formData,
@@ -167,7 +131,7 @@ export const useProfileForm = (uuid, initialData = null) => {
         console.log('프로필 생성 시도');
         response = await profileService.create(uuid, profileData);
       }
-      
+
       console.log('프로필 저장 응답:', response);
       
       if (!response) {
@@ -177,7 +141,9 @@ export const useProfileForm = (uuid, initialData = null) => {
       return response;
     } catch (error) {
       console.error('프로필 저장 실패:', error);
-      setErrors(prev => ({ ...prev, submit: error.message }));
+      const errorMessage = error.message || '프로필 저장 중 오류가 발생했습니다.';
+      setErrors(prev => ({ ...prev, submit: errorMessage }));
+      Alert.alert('오류', errorMessage);
       return null;
     } finally {
       setIsLoading(false);
