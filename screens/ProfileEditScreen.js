@@ -19,34 +19,25 @@ import { LocationSelector } from '../components/profile-setup/form-inputs/Locati
 import { Button } from '../components/Button';
 import { ProfileHeader } from '../components/profile-setup/common/ProfileHeader';
 import { ORIENTATION_OPTIONS, MAX_PHOTOS } from '../components/profile-setup/constants';
-import { profile } from '../api';
-import userStore from '../store/userStore';
+import useUserStore from '../store/userStore';
 
 const ProfileEditScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { currentProfile } = route.params || {};
-  const { setUserProfile } = userStore();
-  const [isSaving, setIsSaving] = useState(false);
+  const { setUserProfile } = useUserStore();
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // usePhotoGrid에서 photoList와 사진 관련 메서드만 사용
+  // 모든 로직을 훅으로 이동
   const {
     photoList,
     handlePhotoPress,
     removePhoto,
     handlePhotoMove,
-    uploadPhotos
-  } = usePhotoGrid(currentProfile?.id, currentProfile?.photoURLs || []);
-
-  useEffect(() => {
-    if (!currentProfile) {
-      Alert.alert('오류', '프로필 정보를 불러올 수 없습니다.');
-      navigation.goBack();
-      return;
-    }
-    setIsLoading(false);
-  }, [currentProfile, navigation]);
+    uploadPhotos,
+    isLoading: isPhotoLoading
+  } = usePhotoGrid(currentProfile?.uuid || '', currentProfile?.photoURLs || []);
 
   const {
     formData,
@@ -54,7 +45,7 @@ const ProfileEditScreen = () => {
     isLoading: isFormLoading,
     updateField,
     handleSubmit
-  } = useProfileForm(currentProfile?.id, {
+  } = useProfileForm(currentProfile?.uuid || '', {
     nickname: currentProfile?.nickname || '',
     age: currentProfile?.age || '',
     height: currentProfile?.height || '',
@@ -67,93 +58,49 @@ const ProfileEditScreen = () => {
     photoURLs: currentProfile?.photoURLs || []
   });
 
-  console.log('Current Profile PhotoURLs:', currentProfile?.photoURLs);
-  console.log('PhotoList:', photoList);
+  useEffect(() => {
+    if (!currentProfile) {
+      setError('프로필 정보를 불러올 수 없습니다.');
+      navigation.goBack();
+      return;
+    }
+
+    if (!currentProfile.uuid) {
+      setError('프로필 정보가 올바르지 않습니다.');
+      navigation.goBack();
+      return;
+    }
+
+    setIsLoading(false);
+  }, [currentProfile, navigation]);
 
   const handleSave = async () => {
-    if (isSaving) return;
     try {
-      setIsSaving(true);
-      // 1. 사진 업로드 준비 - 중복 제거 및 유효한 사진만 필터링
-      const uniquePhotos = photoList.filter((item, index, self) => 
-        item?.photo?.uri && 
-        index === self.findIndex((t) => t?.photo?.uri === item?.photo?.uri)
-      );
-      
-      const photosToUpload = uniquePhotos.filter(item => item?.photo?.uri);
-      if (photosToUpload.length === 0) {
-        throw new Error('대표 사진을 등록해주세요.');
-      }
-      // 2. file://로 된 새 사진만 따로 모으고, 기존 https:// 사진은 그대로 저장
-      const localPhotos = [];
-      const existingPhotoURLs = [];
-      photosToUpload.forEach(item => {
-        if (!item?.photo?.uri) return;
-        const uri = item.photo.uri;
-        if (uri.startsWith('file://')) {
-          localPhotos.push({ uri });
-        } else if (uri.startsWith('https://')) {
-          existingPhotoURLs.push(uri);
-        }
-      });
-      // 3. 새로 추가된 사진만 Storage에 업로드
-      let newPhotoURLs = [];
-      if (localPhotos.length > 0) {
-        newPhotoURLs = await uploadPhotos(); // 여러 장 한 번에 업로드
-      }
-      // 4. photoList 순서대로 최종 https:// URL 배열 만들기
-      let newPhotoIndex = 0;
-      const finalPhotoURLs = photosToUpload.map(item => {
-        const uri = item?.photo?.uri;
-        if (uri?.startsWith('file://')) {
-          return newPhotoURLs[newPhotoIndex++];
-        } else if (uri?.startsWith('https://')) {
-          return uri;
-        }
-        return null;
-      }).filter(Boolean);
-      if (finalPhotoURLs.length === 0) {
-        throw new Error('사진 업로드에 실패했습니다.');
+      // 사진 업로드
+      const photoURLs = await uploadPhotos();
+      if (!photoURLs) {
+        Alert.alert('오류', '사진 업로드에 실패했습니다.');
+        return;
       }
 
-      // 5. Firestore에 프로필 정보 저장 (대표사진, 전체 사진 배열)
-      const profileData = await profile.updateProfile(currentProfile.id, {
-        id: currentProfile.id,
-        nickname: formData.nickname,
-        age: formData.age,
-        height: formData.height,
-        weight: formData.weight,
-        city: formData.city,
-        district: formData.district,
-        orientation: formData.orientation,
-        bio: formData.bio,
-        mainPhotoURL: finalPhotoURLs[0],
-        photoURLs: finalPhotoURLs,
-        createdAt: currentProfile.createdAt,
-        updatedAt: new Date()
+      // 프로필 저장
+      const profileData = await handleSubmit({
+        mainPhotoURL: photoURLs[0],
+        photoURLs: photoURLs
       });
 
-      // Profile 객체가 반환되면 성공으로 처리
-      if (!profileData || !profileData.id) {
-        throw new Error('프로필 저장에 실패했습니다.');
+      if (profileData) {
+        setUserProfile(profileData);
+        navigation.goBack();
       }
-      setUserProfile(profileData);
-      // 6. 이전 화면으로 이동
-      navigation.goBack();
     } catch (error) {
-      console.error('프로필 저장 중 오류:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        response: error.response
-      });
-      Alert.alert('오류', error.message);
-    } finally {
-      setIsSaving(false);
+      console.error('프로필 저장 실패:', error);
+      setError(error.message);
+      Alert.alert('오류', error.message || '프로필 저장에 실패했습니다.');
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isPhotoLoading || isFormLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
@@ -196,8 +143,8 @@ const ProfileEditScreen = () => {
                   onPhotoPress={handlePhotoPress}
                   onPhotoRemove={removePhoto}
                   onPhotoMove={handlePhotoMove}
-                  isLoading={false}
-                  error={null}
+                  isLoading={isPhotoLoading}
+                  error={error}
                 />
               </View>
 
@@ -275,8 +222,8 @@ const ProfileEditScreen = () => {
               <Button
                 title="저장하기"
                 onPress={handleSave}
-                disabled={isSaving}
-                loading={isSaving}
+                disabled={isPhotoLoading || isFormLoading}
+                loading={isPhotoLoading || isFormLoading}
                 style={styles.saveButton}
               />
             </View>

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../../services/imageService';
 
-const MessageInput = ({ onSend, onSendImage }) => {
+const MessageInput = ({ onSend, onSendImage, uuid }) => {
   const [message, setMessage] = useState('');
 
   const handleSend = async () => {
@@ -30,7 +30,7 @@ const MessageInput = ({ onSend, onSendImage }) => {
       });
 
       if (!result.canceled) {
-        const imageUrl = await uploadImage(result.assets[0].uri);
+        const imageUrl = await uploadImage(result.assets[0].uri, 'chat', uuid);
         await onSendImage(imageUrl);
       }
     } catch (error) {

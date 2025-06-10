@@ -4,8 +4,11 @@
  * API 호출은 api/profile.js의 profile 모듈과 api/user.js의 user 모듈을 사용합니다.
  */
 
-import { profile, user } from '../api';
+import { profileApi } from '../api/profile';
 import { Profile } from '../models/Profile';
+import { getCurrentKST } from '../utils/dateUtils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AUTH_KEYS } from '../utils/constants';
 
 export const profileService = {
   /**
@@ -14,32 +17,40 @@ export const profileService = {
    * @returns {Promise<boolean>}
    */
   async checkProfileExists(uuid) {
-    const response = await profile.checkProfileExists(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
-    }
-    return response.data;
+    return await profileApi.exists(uuid);
   },
 
   /**
    * 프로필 생성
    * @param {string} uuid - 사용자 UUID
-   * @param {Object} profileData - 프로필 데이터
+   * @param {Object} data - 프로필 데이터
    * @returns {Promise<Profile>}
    */
-  async createProfile(uuid, profileData) {
-    // 사용자 확인
-    const userResponse = await user.getUser(uuid);
-    if (!userResponse.success) {
-      throw new Error('사용자를 찾을 수 없습니다.');
+  async create(uuid, data) {
+    console.log('profileService.create 시작 - uuid:', uuid);
+    console.log('profileService.create - 받은 데이터:', data);
+
+    const profile = new Profile({
+      ...data,
+      uuid,
+      createdAt: getCurrentKST(),
+      updatedAt: getCurrentKST(),
+      isActive: true
+    });
+    console.log('Profile 객체 생성 완료:', profile);
+
+    const errors = profile.validate();
+    console.log('Profile 유효성 검사 결과:', errors);
+    
+    if (errors) {
+      console.error('Profile 유효성 검사 실패:', errors);
+      throw new Error(Object.values(errors).join(', '));
     }
 
-    // 프로필 생성
-    const response = await profile.createProfile(uuid, profileData);
-    if (!response.success) {
-      throw new Error(response.error);
-    }
-    return response.data;
+    const firestoreData = profile.toFirestore();
+    console.log('Firestore 데이터:', firestoreData);
+
+    return await profileApi.create(firestoreData);
   },
 
   /**
@@ -48,36 +59,86 @@ export const profileService = {
    * @returns {Promise<Profile>}
    */
   async getProfile(uuid) {
-    const response = await profile.getProfile(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
-    }
-    return response.data;
+    const doc = await profileApi.get(uuid);
+    return doc ? Profile.fromFirestore(doc) : null;
   },
 
   /**
    * 프로필 업데이트
    * @param {string} uuid - 사용자 UUID
-   * @param {Object} updateData - 업데이트할 데이터
+   * @param {Object} data - 업데이트할 데이터
    * @returns {Promise<Profile>}
    */
-  async updateProfile(uuid, updateData) {
-    const response = await profile.updateProfile(uuid, updateData);
-    if (!response.success) {
-      throw new Error(response.error);
+  async update(uuid, data) {
+    console.log('profileService.update 시작 - uuid:', uuid);
+    console.log('profileService.update - 받은 데이터:', data);
+
+    const existing = await this.getProfile(uuid);
+    if (!existing) {
+      throw new Error('프로필을 찾을 수 없습니다.');
     }
-    return response.data;
+
+    // 변경된 필드만 업데이트
+    const updateData = {
+      ...data,
+      uuid,
+      updatedAt: getCurrentKST()
+    };
+    
+    // 유효성 검사는 변경된 필드만 수행
+    const tempProfile = new Profile({
+      ...existing,
+      ...updateData
+    });
+    const errors = tempProfile.validate();
+    
+    if (errors) {
+      console.error('Profile 유효성 검사 실패:', errors);
+      throw new Error(Object.values(errors).join(', '));
+    }
+
+    console.log('업데이트 데이터:', updateData);
+    return await profileApi.update(existing.id, updateData);
   },
 
   /**
-   * 프로필 비활성화
+   * 회원 탈퇴
    * @param {string} uuid - 사용자 UUID
-   * @returns {Promise<void>}
+   * @returns {Promise<Object>} - 성공 여부와 메시지가 포함된 객체
    */
-  async deactivateProfile(uuid) {
-    const response = await profile.deactivateProfile(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
+  async withdraw(uuid) {
+    try {
+      // 1. 프로필 비활성화
+      const existing = await this.getProfile(uuid);
+      if (!existing) {
+        throw new Error('프로필을 찾을 수 없습니다.');
+      }
+
+      const updateData = {
+        isActive: false,
+        updatedAt: getCurrentKST(),
+        lastActive: getCurrentKST()
+      };
+
+      await profileApi.update(existing.id, updateData);
+
+      // 2. AsyncStorage 데이터 삭제
+      await AsyncStorage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
+      await AsyncStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
+      await AsyncStorage.removeItem(AUTH_KEYS.USER);
+      await AsyncStorage.removeItem(AUTH_KEYS.PHONE_NUMBER);
+      await AsyncStorage.removeItem('user-storage');
+
+      return {
+        success: true,
+        message: '회원 탈퇴가 완료되었습니다.'
+      };
+    } catch (error) {
+      console.error('회원 탈퇴 실패:', error);
+      return {
+        success: false,
+        message: error.message || '회원 탈퇴 중 오류가 발생했습니다.'
+      };
     }
   }
 }; 

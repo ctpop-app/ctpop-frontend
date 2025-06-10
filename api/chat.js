@@ -6,16 +6,16 @@ import { handleError, withNetworkRetry } from '../utils/errorHandler';
 
 /**
  * 사용자의 채팅방 목록을 가져옵니다.
- * @param {string} userId - 사용자 ID (전화번호)
+ * @param {string} uuid - 사용자 UUID
  * @param {Object} params - 페이징 등의 파라미터
  * @returns {Promise<Object>} - 성공 여부와 채팅방 목록
  */
-export const getChatRooms = async (userId, params = {}) => {
+export const getChatRooms = async (uuid, params = {}) => {
   return withNetworkRetry(async () => {
     try {
       const chatsQuery = query(
         collection(db, 'chats'),
-        where('participants', 'array-contains', userId),
+        where('participants', 'array-contains', uuid),
         orderBy('updatedAt', 'desc')
       );
       const snapshot = await getDocs(chatsQuery);
@@ -144,17 +144,17 @@ export const leaveChatRoom = async (roomId) => {
 /**
  * 채팅방에 사용자를 초대합니다.
  * @param {string} roomId - 채팅방 ID
- * @param {Array} userIds - 초대할 사용자 ID 목록
+ * @param {Array} uuids - 초대할 사용자 UUID 목록
  * @returns {Promise<Object>} - 성공 여부와 초대 결과
  */
-export const inviteToChat = async (roomId, userIds) => {
+export const inviteToChat = async (roomId, uuids) => {
   return withNetworkRetry(async () => {
     try {
       const chatRef = doc(db, 'chats', roomId);
       const chatDoc = await getDocs(chatRef);
       if (!chatDoc.empty) {
         const chat = Chat.fromFirestore(chatDoc.id, chatDoc.data());
-        userIds.forEach(userId => chat.addParticipant(userId));
+        uuids.forEach(uuid => chat.addParticipant(uuid));
         await updateDoc(chatRef, chat.toFirestore());
       }
       return { success: true, data: {} };

@@ -31,17 +31,5 @@ export const userService = {
       throw new Error(response.error);
     }
     return response.data;
-  },
-
-  /**
-   * 사용자 비활성화
-   * @param {string} uuid - 사용자 UUID
-   * @returns {Promise<void>}
-   */
-  async deactivateUser(uuid) {
-    const response = await userApi.deactivateUser(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
-    }
   }
 }; 

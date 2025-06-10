@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 export const ROUTES = {
   // 인증 관련
   AUTH: {
-    LOGIN: 'Login',
+    LOGIN: 'PhoneLogin',
     PROFILE_SETUP: 'ProfileSetup',
     OTP_VERIFICATION: 'OtpVerification'
   },
@@ -54,7 +54,11 @@ export const ROUTES = {
   
   // 공통
   SPLASH: 'Splash',
-  ERROR: 'Error'
+  ERROR: 'Error',
+  ROOT: {
+    AUTH: 'Auth',
+    MAIN: 'MainNavigator',
+  }
 };
 
 /**

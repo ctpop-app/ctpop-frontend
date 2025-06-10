@@ -6,7 +6,7 @@ class Message {
     this.id = data.id || uuidv4();
     this.chatId = data.chatId;
     this.content = data.content;
-    this.senderId = data.senderId;
+    this.uuid = data.uuid;
     this.timestamp = data.timestamp || Timestamp.now();
     this.isRead = data.isRead || false;
     this.type = data.type || 'text';
@@ -16,28 +16,28 @@ class Message {
   }
 
   // 텍스트 메시지 생성
-  static createText(chatId, senderId, content) {
+  static createText(chatId, uuid, content) {
     if (!content || typeof content !== 'string') {
       throw new Error('메시지 내용이 올바르지 않습니다.');
     }
 
     return new Message({
       chatId,
-      senderId,
+      uuid,
       content,
       type: 'text'
     });
   }
 
   // 이미지 메시지 생성
-  static createImage(chatId, senderId, imageUrl, imageSize, imageWidth, imageHeight) {
+  static createImage(chatId, uuid, imageUrl, imageSize, imageWidth, imageHeight) {
     if (!imageUrl) {
       throw new Error('이미지 URL이 필요합니다.');
     }
 
     return new Message({
       chatId,
-      senderId,
+      uuid,
       content: imageUrl,
       type: 'image',
       metadata: {
@@ -53,7 +53,7 @@ class Message {
   static createSystem(chatId, content, systemType) {
     return new Message({
       chatId,
-      senderId: 'system',
+      uuid: 'system',
       content,
       type: 'system',
       metadata: {
@@ -88,7 +88,7 @@ class Message {
     return {
       chatId: this.chatId,
       content: this.content,
-      senderId: this.senderId,
+      uuid: this.uuid,
       timestamp: this.timestamp,
       isRead: this.isRead,
       type: this.type,
@@ -112,7 +112,7 @@ class Message {
       throw new Error('채팅방 ID가 필요합니다.');
     }
 
-    if (!this.senderId) {
+    if (!this.uuid) {
       throw new Error('발신자 ID가 필요합니다.');
     }
 
