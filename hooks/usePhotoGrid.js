@@ -85,13 +85,12 @@ export const usePhotoGrid = (uuid, initialPhotos = []) => {
 
     setPhotoList(prev => {
       const newList = [...prev];
-      newList[index] = { ...newList[index], photo: null };
-      for (let i = index + 1; i < MAX_PHOTOS; i++) {
-        newList[i] = { ...newList[i], isAddable: false };
+      // 1. 삭제할 위치부터 끝까지의 사진들을 한 칸씩 앞으로 당김
+      for (let i = index; i < MAX_PHOTOS - 1; i++) {
+        newList[i] = newList[i + 1];
       }
-      if (index > 0) {
-        newList[index - 1] = { ...newList[index - 1], isAddable: true };
-      }
+      // 2. 마지막 위치는 빈 칸으로 설정
+      newList[MAX_PHOTOS - 1] = { photo: null, isAddable: true };
       return newList;
     });
   }, [isValid, photoList]);
