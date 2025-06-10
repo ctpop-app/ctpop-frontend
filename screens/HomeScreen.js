@@ -3,39 +3,17 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useProfile } from '../hooks/useProfile';
-import { socketService } from '../services/socketService';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useAuth } from '../hooks/useAuth';
 import { getLastActiveText } from '../utils/dateUtils';
-
-const isOnline = (lastActive) => {
-  if (!lastActive) return false;
-  const now = new Date();
-  const lastActiveDate = new Date(lastActive);
-  return (now - lastActiveDate) < 60000; // 1분 이내 접속
-};
 
 export default function HomeScreen() {
   const navigation = useNavigation();
   const { getAll, loading } = useProfile();
   const { user } = useAuth();
+  const { isUserOnline, subscribeToUser, unsubscribeFromUser } = useOnlineStatus();
   const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [onlineUsers, setOnlineUsers] = useState(new Set());
-
-  useEffect(() => {
-    if (user?.uuid) {
-      socketService.connect(user.uuid);
-      // 현재 사용자의 온라인 상태 추가
-      setOnlineUsers(prev => {
-        const newSet = new Set(prev);
-        newSet.add(user.uuid);
-        return newSet;
-      });
-    }
-    return () => {
-      socketService.disconnect();
-    };
-  }, [user]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -44,17 +22,7 @@ export default function HomeScreen() {
         setProfiles(data);
         // 각 프로필에 대한 온라인 상태 구독
         data.forEach(profile => {
-          socketService.subscribeToUserStatus(profile.uuid, (isOnline) => {
-            setOnlineUsers(prev => {
-              const newSet = new Set(prev);
-              if (isOnline) {
-                newSet.add(profile.uuid);
-              } else {
-                newSet.delete(profile.uuid);
-              }
-              return newSet;
-            });
-          });
+          subscribeToUser(profile.uuid);
         });
       })
       .finally(() => setIsLoading(false));
@@ -62,21 +30,16 @@ export default function HomeScreen() {
     return () => {
       // 구독 해제
       profiles.forEach(profile => {
-        socketService.unsubscribeFromUserStatus(profile.uuid);
+        unsubscribeFromUser(profile.uuid);
       });
     };
-  }, [getAll]);
-
-  const isUserOnline = (uuid) => {
-    return onlineUsers.has(uuid);
-  };
+  }, [getAll, subscribeToUser, unsubscribeFromUser]);
 
   const renderUserCard = ({ item }) => (
     <TouchableOpacity 
       style={styles.card}
       onPress={() => {
-        // 프로필 상세 페이지로 이동 (구현 예정)
-        console.log(`사용자 ${item.uuid} 프로필 보기`);
+        navigation.navigate('ProfileDetail', { profile: item });
       }}
     >
       <Image 

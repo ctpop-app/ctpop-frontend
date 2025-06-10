@@ -23,6 +23,12 @@ export const useOnlineStatus = () => {
   useEffect(() => {
     if (user?.uuid) {
       socketService.connect(user.uuid);
+      // 현재 사용자의 온라인 상태 추가
+      setOnlineUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.add(user.uuid);
+        return newSet;
+      });
     }
     return () => {
       socketService.disconnect();
