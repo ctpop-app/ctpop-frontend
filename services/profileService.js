@@ -7,6 +7,8 @@
 import { profileApi } from '../api/profile';
 import { Profile } from '../models/Profile';
 import { getCurrentKST } from '../utils/dateUtils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AUTH_KEYS } from '../utils/constants';
 
 export const profileService = {
   /**
@@ -100,16 +102,43 @@ export const profileService = {
   },
 
   /**
-   * 프로필 비활성화
+   * 회원 탈퇴
    * @param {string} uuid - 사용자 UUID
-   * @returns {Promise<void>}
+   * @returns {Promise<Object>} - 성공 여부와 메시지가 포함된 객체
    */
-  async deactivateProfile(uuid) {
-    const exists = await this.checkProfileExists(uuid);
-    if (!exists) {
-      throw new Error('프로필을 찾을 수 없습니다.');
-    }
+  async withdraw(uuid) {
+    try {
+      // 1. 프로필 비활성화
+      const existing = await this.getProfile(uuid);
+      if (!existing) {
+        throw new Error('프로필을 찾을 수 없습니다.');
+      }
 
-    return await this.update(uuid, { isActive: false });
+      const updateData = {
+        isActive: false,
+        updatedAt: getCurrentKST(),
+        lastActive: getCurrentKST()
+      };
+
+      await profileApi.update(existing.id, updateData);
+
+      // 2. AsyncStorage 데이터 삭제
+      await AsyncStorage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
+      await AsyncStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
+      await AsyncStorage.removeItem(AUTH_KEYS.USER);
+      await AsyncStorage.removeItem(AUTH_KEYS.PHONE_NUMBER);
+      await AsyncStorage.removeItem('user-storage');
+
+      return {
+        success: true,
+        message: '회원 탈퇴가 완료되었습니다.'
+      };
+    } catch (error) {
+      console.error('회원 탈퇴 실패:', error);
+      return {
+        success: false,
+        message: error.message || '회원 탈퇴 중 오류가 발생했습니다.'
+      };
+    }
   }
 }; 

@@ -4,13 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import useUserStore from '../store/userStore';
 import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
 import { ROUTES } from '../navigation/constants';
 import { CommonActions } from '@react-navigation/native';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { user, userProfile, setUserProfile } = useUserStore();
-  const { handleLogout, loadUserProfile, handleEditProfile, handleWithdraw } = useAuth();
+  const { handleLogout, loadUserProfile, handleEditProfile } = useAuth();
+  const { profile: userProfileFromProfile, withdraw } = useProfile();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -79,7 +81,7 @@ const SettingsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const success = await handleWithdraw();
+              const success = await withdraw();
               if (success) {
                 // 로그인 화면으로 이동
                 navigation.dispatch(

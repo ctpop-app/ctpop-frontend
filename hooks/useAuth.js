@@ -228,17 +228,6 @@ export const useAuth = () => {
     };
   }, [userProfile]);
 
-  // 회원 탈퇴
-  const handleWithdraw = useCallback(async () => {
-    try {
-      await authService.withdraw();
-      clearUser();
-    } catch (error) {
-      console.error('회원 탈퇴 실패:', error);
-      throw error;
-    }
-  }, [clearUser]);
-
   useEffect(() => {
     if (isAuthenticated && !hasProfile) {
       checkProfileExists();
@@ -267,7 +256,6 @@ export const useAuth = () => {
     handleResendOtp,
     loadUserProfile,
     handleEditProfile,
-    handleWithdraw,
     clearUser
   };
 }; 

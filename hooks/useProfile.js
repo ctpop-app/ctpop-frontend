@@ -5,7 +5,7 @@ import useUserStore from '../store/userStore';
 export const useProfile = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { user, userProfile, setUserProfile, setHasProfile } = useUserStore();
+  const { user, userProfile, setUserProfile, setHasProfile, clearUser } = useUserStore();
 
   const exists = useCallback(async () => {
     try {
@@ -70,20 +70,25 @@ export const useProfile = () => {
     }
   }, [user?.uuid, setUserProfile]);
 
-  const deactivate = useCallback(async () => {
+  const withdraw = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      await profileService.deactivateProfile(user?.uuid);
-      setUserProfile(null);
-      setHasProfile(false);
+      const result = await profileService.withdraw(user?.uuid);
+      if (result.success) {
+        clearUser();
+        return true;
+      } else {
+        console.error('회원 탈퇴 실패:', result.message);
+        return false;
+      }
     } catch (err) {
-      setError(err.message);
-      throw err;
+      console.error('회원 탈퇴 중 오류 발생:', err);
+      return false;
     } finally {
       setLoading(false);
     }
-  }, [user?.uuid, setUserProfile, setHasProfile]);
+  }, [user?.uuid, clearUser]);
 
   return {
     loading,
@@ -93,6 +98,6 @@ export const useProfile = () => {
     get,
     create,
     update,
-    deactivate
+    withdraw
   };
 }; 
