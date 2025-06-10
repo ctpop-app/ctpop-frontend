@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as authApi from '../api/auth';
 import { AUTH_KEYS } from '../utils/constants';
 import { jwtDecode } from 'jwt-decode';
-import { formatDateTime, getCurrentKST } from '../utils/dateUtils';
+import { getCurrentKST } from '../utils/dateUtils';
 import { toE164Format, isValidPhoneNumber } from '../utils/phoneUtils';
 
 // Auth token keys in AsyncStorage
@@ -130,7 +130,7 @@ export const verifyOtp = async (phoneNumber, code) => {
           console.log('authService.js - 사용자 정보 저장');
           const user = {
             uuid: response.uuid,
-            createdAt: formatDateTime(getCurrentKST()),
+            createdAt: getCurrentKST(),
             hasProfile: false
           };
           await AsyncStorage.setItem(AUTH_KEYS.USER, JSON.stringify(user));

@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { toKST, formatDate, getCurrentKST } from '../utils/dateUtils';
+import { toKST, getCurrentKST } from '../utils/dateUtils';
 import { AUTH_KEYS } from '../utils/constants';
 
 const useUserStore = create(

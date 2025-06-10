@@ -20,6 +20,7 @@ import { ROUTES, navigationUtils } from '../navigation/constants';
 import * as authService from '../services/authService';
 import * as auth from '../api/auth';
 import useUserStore from '../store/userStore';
+import { getCurrentKST } from '../utils/dateUtils';
 
 export default function JwtPhoneLoginScreen() {
   const navigation = useNavigation();
@@ -134,7 +135,7 @@ export default function JwtPhoneLoginScreen() {
                   
                   const user = {
                     uuid: response.uuid,
-                    createdAt: new Date().toISOString(),
+                    createdAt: getCurrentKST(),
                     hasProfile: false
                   };
                   await auth.storeUser(user);

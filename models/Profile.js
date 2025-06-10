@@ -1,7 +1,7 @@
 /**
  * 사용자 프로필 데이터 모델
  */
-import { toKST, getCurrentKST, toFirestoreTimestamp, fromFirestoreTimestamp } from '../utils/dateUtils';
+import { getCurrentKST } from '../utils/dateUtils';
 
 export class Profile {
   /**
@@ -39,9 +39,9 @@ export class Profile {
     this.mainPhotoURL = mainPhotoURL;
     this.photoURLs = photoURLs;
     this.isActive = isActive;
-    this.createdAt = createdAt ? toKST(createdAt) : null;
-    this.updatedAt = updatedAt ? toKST(updatedAt) : null;
-    this.lastActive = lastActive ? toKST(lastActive) : null;
+    this.createdAt = createdAt ? getCurrentKST() : null;
+    this.updatedAt = updatedAt ? getCurrentKST() : null;
+    this.lastActive = lastActive ? getCurrentKST() : null;
   }
 
   /**
@@ -53,10 +53,7 @@ export class Profile {
     const data = doc.data();
     return new Profile({
       id: doc.id,
-      ...data,
-      createdAt: data.createdAt ? fromFirestoreTimestamp(data.createdAt) : null,
-      updatedAt: data.updatedAt ? fromFirestoreTimestamp(data.updatedAt) : null,
-      lastActive: data.lastActive ? fromFirestoreTimestamp(data.lastActive) : null
+      ...data
     });
   }
 
@@ -78,9 +75,9 @@ export class Profile {
       mainPhotoURL: this.mainPhotoURL,
       photoURLs: this.photoURLs || [],
       isActive: this.isActive,
-      createdAt: this.createdAt ? toFirestoreTimestamp(this.createdAt) : toFirestoreTimestamp(getCurrentKST()),
-      updatedAt: toFirestoreTimestamp(getCurrentKST()),
-      lastActive: toFirestoreTimestamp(getCurrentKST())
+      createdAt: this.createdAt ? getCurrentKST() : getCurrentKST(),
+      updatedAt: getCurrentKST(),
+      lastActive: getCurrentKST()
     };
   }
 

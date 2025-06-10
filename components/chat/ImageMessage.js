@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Image, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { Image as CachedImage } from 'expo-image';
-import { formatTime } from '../../utils/dateUtils';
+import { getCurrentKST } from '../../utils/dateUtils';
 
 const ImageMessage = ({ message, isOwnMessage, onPress }) => {
   const { content, timestamp, status } = message;
@@ -21,7 +21,7 @@ const ImageMessage = ({ message, isOwnMessage, onPress }) => {
         />
       </TouchableOpacity>
       <Text style={styles.timestamp}>
-        {formatTime(timestamp.toDate())}
+        {getCurrentKST(timestamp.toDate())}
       </Text>
       {isOwnMessage && (
         <Text style={styles.status}>

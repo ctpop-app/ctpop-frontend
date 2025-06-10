@@ -6,7 +6,7 @@ import { isValidPhoneNumber } from '../utils/phoneUtils';
 import useUserStore from '../store/userStore';
 import { profileService } from '../services/profileService';
 import { userService } from '../services/userService';
-import { formatDate } from '../utils/dateUtils';
+import { getCurrentKST } from '../utils/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
 import * as authService from '../services/authService';
@@ -114,7 +114,7 @@ export const useAuth = () => {
         // 사용자 정보 업데이트
         const user = {
           uuid: result.data.uuid,
-          createdAt: formatDate(new Date())
+          createdAt: user?.createdAt || getCurrentKST()
         };
         setUser(user);
       } else {
@@ -220,12 +220,11 @@ export const useAuth = () => {
       return null;
     }
 
-    // Date 객체를 문자열로 변환
+    // createdAt은 수정하지 않고 원래 값 유지
     return {
       ...userProfile,
-      createdAt: formatDate(userProfile.createdAt),
-      updatedAt: formatDate(userProfile.updatedAt),
-      lastActive: formatDate(userProfile.lastActive)
+      updatedAt: getCurrentKST(),
+      lastActive: getCurrentKST()
     };
   }, [userProfile]);
 

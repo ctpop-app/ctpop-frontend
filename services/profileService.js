@@ -6,7 +6,7 @@
 
 import { profileApi } from '../api/profile';
 import { Profile } from '../models/Profile';
-import { formatDateTime, getCurrentKST } from '../utils/dateUtils';
+import { getCurrentKST } from '../utils/dateUtils';
 
 export const profileService = {
   /**
@@ -76,25 +76,27 @@ export const profileService = {
       throw new Error('프로필을 찾을 수 없습니다.');
     }
 
-    const profile = new Profile({
-      ...existing,
+    // 변경된 필드만 업데이트
+    const updateData = {
       ...data,
+      uuid,
       updatedAt: getCurrentKST()
+    };
+    
+    // 유효성 검사는 변경된 필드만 수행
+    const tempProfile = new Profile({
+      ...existing,
+      ...updateData
     });
-    console.log('Profile 객체 생성 완료:', profile);
-
-    const errors = profile.validate();
-    console.log('Profile 유효성 검사 결과:', errors);
+    const errors = tempProfile.validate();
     
     if (errors) {
       console.error('Profile 유효성 검사 실패:', errors);
       throw new Error(Object.values(errors).join(', '));
     }
 
-    const firestoreData = profile.toFirestore();
-    console.log('Firestore 데이터:', firestoreData);
-
-    return await profileApi.update(existing.id, firestoreData);
+    console.log('업데이트 데이터:', updateData);
+    return await profileApi.update(existing.id, updateData);
   },
 
   /**
@@ -108,7 +110,6 @@ export const profileService = {
       throw new Error('프로필을 찾을 수 없습니다.');
     }
 
-    const profile = await this.getProfile(uuid);
-    return await this.update(uuid, { ...profile, isActive: false });
+    return await this.update(uuid, { isActive: false });
   }
 }; 

@@ -2,7 +2,7 @@ import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import { formatDate } from '../utils/dateUtils';
+import { getCurrentKST } from '../utils/dateUtils';
 
 /**
  * 프로필 사진을 Firebase Storage에 업로드합니다.
@@ -28,7 +28,7 @@ export const uploadProfilePhoto = async (photo, uuid) => {
     const blob = await response.blob();
     
     // 파일명 생성
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = getCurrentKST().replace(/[:.]/g, '-');
     const originalName = photo.name || 'photo';
     const filename = `${timestamp}_${originalName}.jpg`;
     
@@ -39,7 +39,7 @@ export const uploadProfilePhoto = async (photo, uuid) => {
     const metadata = {
       contentType: 'image/jpeg',
       customMetadata: {
-        uploadedAt: formatDate(new Date()),
+        uploadedAt: getCurrentKST(),
         originalName: originalName,
         uuid: uuid,
         originalWidth: manipResult.width.toString(),
@@ -113,7 +113,7 @@ export const uploadChatImage = async (photo, uuid) => {
     const blob = await response.blob();
     
     // 파일명 생성
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = getCurrentKST().replace(/[:.]/g, '-');
     const filename = `${timestamp}_chat.jpg`;
     
     // Storage 참조 생성
@@ -123,7 +123,7 @@ export const uploadChatImage = async (photo, uuid) => {
     const metadata = {
       contentType: 'image/jpeg',
       customMetadata: {
-        uploadedAt: formatDate(new Date()),
+        uploadedAt: getCurrentKST(),
         uuid: uuid,
         type: 'chat'
       }
@@ -172,7 +172,7 @@ export const uploadImage = async (uri, path = 'profile', uuid = null) => {
     });
 
     // 파일명 생성
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = getCurrentKST().replace(/[:.]/g, '-');
     const filename = uuid 
       ? `${path}/${uuid}_${timestamp}.jpg`
       : `${path}/${timestamp}.jpg`;
@@ -184,7 +184,7 @@ export const uploadImage = async (uri, path = 'profile', uuid = null) => {
     const metadata = {
       contentType: 'image/jpeg',
       customMetadata: {
-        'uploadedAt': formatDate(new Date()),
+        'uploadedAt': getCurrentKST(),
         'originalWidth': manipResult.width.toString(),
         'originalHeight': manipResult.height.toString(),
         'uuid': uuid || 'unknown'
