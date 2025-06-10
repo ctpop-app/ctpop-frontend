@@ -30,8 +30,7 @@ export class Profile {
     photoURLs = [],
     isActive = true,
     createdAt = null,
-    updatedAt = null,
-    lastActive = null
+    updatedAt = null
   }) {
     this.id = id;
     this.uuid = uuid;
@@ -48,7 +47,6 @@ export class Profile {
     this.isActive = isActive;
     this.createdAt = createdAt ? getCurrentKST() : null;
     this.updatedAt = updatedAt ? getCurrentKST() : null;
-    this.lastActive = lastActive ? getCurrentKST() : null;
   }
 
   /**
@@ -144,8 +142,7 @@ export class Profile {
       photoURLs: this.photoURLs || [],
       isActive: this.isActive,
       createdAt: this.createdAt ? getCurrentKST() : getCurrentKST(),
-      updatedAt: getCurrentKST(),
-      lastActive: getCurrentKST()
+      updatedAt: getCurrentKST()
     };
   }
 } 

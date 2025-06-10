@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { profileService } from '../services/profileService';
 import useUserStore from '../store/userStore';
 
@@ -90,6 +90,21 @@ export const useProfile = () => {
     }
   }, [user?.uuid, clearUser]);
 
+  // getAll: isActive가 true인 모든 프로필을 가져옴
+  const getAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const profiles = await profileService.getAllProfile();
+      return profiles;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     loading,
     error,
@@ -98,6 +113,7 @@ export const useProfile = () => {
     get,
     create,
     update,
-    withdraw
+    withdraw,
+    getAll,
   };
-}; 
+};

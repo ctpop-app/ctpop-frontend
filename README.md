@@ -146,7 +146,7 @@ screens/
 4. 화면 (`screens/JwtPhoneLoginScreen.js`)
    - 전화번호 입력
    - OTP 인증
-   - 에러 처리
+     - 에러 처리
 
 ### 2. 프로필 관리
 1. API (`api/profile.js`)
@@ -210,8 +210,7 @@ screens/
       "photoURLs": ["string"],
       "isActive": "boolean",
       "createdAt": "timestamp",
-      "updatedAt": "timestamp",
-      "lastActive": "timestamp"
+      "updatedAt": "timestamp"
     }
   }
 }

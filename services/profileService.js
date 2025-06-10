@@ -152,8 +152,7 @@ export const profileService = {
 
       const updateData = {
         isActive: false,
-        updatedAt: getCurrentKST(),
-        lastActive: getCurrentKST()
+        updatedAt: getCurrentKST()
       };
 
       await profileApi.update(existing.id, updateData);
@@ -176,5 +175,13 @@ export const profileService = {
         message: error.message || '회원 탈퇴 중 오류가 발생했습니다.'
       };
     }
-  }
+  },
+
+  /**
+   * isActive가 true인 모든 프로필을 가져온다
+   * @returns {Promise<Array>} 프로필 배열
+   */
+  async getAllProfile() {
+    return await profileApi.getAll();
+  },
 }; 

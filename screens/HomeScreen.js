@@ -1,54 +1,110 @@
 // HomeScreen.js
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useProfile } from '../hooks/useProfile';
+import { socketService } from '../services/socketService';
+import { useAuth } from '../hooks/useAuth';
+import { getLastActiveText } from '../utils/dateUtils';
 
-const dummyUsers = [
-  {
-    id: '1',
-    name: '김민준',
-    age: 28,
-    location: '서울',
-    profilePhotoURL: null,
-    bio: '커뮤니티에서 만나게 되어 반갑습니다.',
-  },
-  {
-    id: '2',
-    name: '이서연',
-    age: 24,
-    location: '부산',
-    profilePhotoURL: null,
-    bio: '친구를 만들고 싶어요.',
-  },
-  {
-    id: '3',
-    name: '박지훈',
-    age: 30,
-    location: '대구',
-    profilePhotoURL: null,
-    bio: '취미는 영화 감상과 여행입니다.',
-  },
-];
+const isOnline = (lastActive) => {
+  if (!lastActive) return false;
+  const now = new Date();
+  const lastActiveDate = new Date(lastActive);
+  return (now - lastActiveDate) < 60000; // 1분 이내 접속
+};
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const { getAll, loading } = useProfile();
+  const { user } = useAuth();
+  const [profiles, setProfiles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+
+  useEffect(() => {
+    if (user?.uuid) {
+      socketService.connect(user.uuid);
+      // 현재 사용자의 온라인 상태 추가
+      setOnlineUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.add(user.uuid);
+        return newSet;
+      });
+    }
+    return () => {
+      socketService.disconnect();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    setIsLoading(true);
+    getAll()
+      .then(data => {
+        setProfiles(data);
+        // 각 프로필에 대한 온라인 상태 구독
+        data.forEach(profile => {
+          socketService.subscribeToUserStatus(profile.uuid, (isOnline) => {
+            setOnlineUsers(prev => {
+              const newSet = new Set(prev);
+              if (isOnline) {
+                newSet.add(profile.uuid);
+              } else {
+                newSet.delete(profile.uuid);
+              }
+              return newSet;
+            });
+          });
+        });
+      })
+      .finally(() => setIsLoading(false));
+
+    return () => {
+      // 구독 해제
+      profiles.forEach(profile => {
+        socketService.unsubscribeFromUserStatus(profile.uuid);
+      });
+    };
+  }, [getAll]);
+
+  const isUserOnline = (uuid) => {
+    return onlineUsers.has(uuid);
+  };
 
   const renderUserCard = ({ item }) => (
     <TouchableOpacity 
       style={styles.card}
       onPress={() => {
         // 프로필 상세 페이지로 이동 (구현 예정)
-        console.log(`사용자 ${item.id} 프로필 보기`);
+        console.log(`사용자 ${item.uuid} 프로필 보기`);
       }}
     >
       <Image 
         style={styles.profilePhoto}
-        source={item.profilePhotoURL ? { uri: item.profilePhotoURL } : require('../assets/default-profile.png')}
+        source={item.mainPhotoURL ? { uri: item.mainPhotoURL } : require('../assets/default-profile.png')}
       />
       <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.name}, {item.age}</Text>
-        <Text style={styles.userLocation}>{item.location}</Text>
-        <Text style={styles.userBio} numberOfLines={2}>{item.bio}</Text>
+        <View style={styles.nameAgeContainer}>
+          <Text style={styles.userName}>{item.nickname}</Text>
+          {item.age && <Text style={styles.userAge}>{item.age}세</Text>}
+          <View style={styles.statusContainer}>
+            {isUserOnline(item.uuid) ? (
+              <>
+                <View style={styles.onlineDot} />
+                <Text style={styles.onlineText}>접속중</Text>
+              </>
+            ) : (
+              <Text style={styles.lastActiveText}>{getLastActiveText(item.lastActive)}</Text>
+            )}
+          </View>
+        </View>
+        <Text style={styles.userLocation}>
+          {item.height && `${item.height}cm`}
+          {item.weight && ` ${item.weight}kg`}
+          {(item.height || item.weight) && (item.city || item.district) ? ' / ' : ''}
+          {item.city && `${item.city} ${item.district || ''}`}
+        </Text>
+        <Text style={styles.userBio} numberOfLines={2}>{item.bio || ''}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -61,13 +117,16 @@ export default function HomeScreen() {
           <Text style={styles.filterButtonText}>필터</Text>
         </TouchableOpacity>
       </View>
-      
-      <FlatList
-        data={dummyUsers}
-        renderItem={renderUserCard}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
-      />
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#FF6B6B" style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={profiles}
+          renderItem={renderUserCard}
+          keyExtractor={item => item.uuid}
+          contentContainerStyle={styles.listContainer}
+        />
+      )}
     </View>
   );
 }
@@ -107,10 +166,10 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 12,
     backgroundColor: '#fff',
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -118,28 +177,58 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   profilePhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 16,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginRight: 12,
   },
   userInfo: {
     flex: 1,
     justifyContent: 'center',
   },
-  userName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  nameAgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  userLocation: {
-    fontSize: 14,
+  userName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 6,
+  },
+  userAge: {
+    fontSize: 15,
     color: '#666',
-    marginBottom: 8,
+  },
+  userLocation: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 6,
   },
   userBio: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#444',
-    lineHeight: 20,
+    lineHeight: 18,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
+    marginRight: 4,
+  },
+  onlineText: {
+    fontSize: 13,
+    color: '#4CAF50',
+  },
+  lastActiveText: {
+    fontSize: 13,
+    color: '#999',
   },
 }); 
