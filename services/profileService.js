@@ -9,6 +9,8 @@ import { Profile } from '../models/Profile';
 import { getCurrentKST } from '../utils/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
+import { db } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export const profileService = {
   /**
@@ -21,36 +23,27 @@ export const profileService = {
   },
 
   /**
-   * 프로필 생성
-   * @param {string} uuid - 사용자 UUID
-   * @param {Object} data - 프로필 데이터
-   * @returns {Promise<Profile>}
+   * 닉네임 중복 검사
+   * @param {string} nickname 검사할 닉네임
+   * @param {string} [excludeUuid] 제외할 사용자의 UUID (수정 시 사용)
+   * @returns {Promise<boolean>} 중복 여부 (true: 중복됨, false: 중복되지 않음)
    */
-  async create(uuid, data) {
-    console.log('profileService.create 시작 - uuid:', uuid);
-    console.log('profileService.create - 받은 데이터:', data);
+  async isNicknameDuplicate(nickname, excludeUuid = null) {
+    try {
+      const profilesRef = collection(db, 'profiles');
+      let q = query(profilesRef, where('nickname', '==', nickname));
+      
+      // 수정 시 현재 사용자의 닉네임은 중복 검사에서 제외
+      if (excludeUuid) {
+        q = query(q, where('uuid', '!=', excludeUuid));
+      }
 
-    const profile = new Profile({
-      ...data,
-      uuid,
-      createdAt: getCurrentKST(),
-      updatedAt: getCurrentKST(),
-      isActive: true
-    });
-    console.log('Profile 객체 생성 완료:', profile);
-
-    const errors = profile.validate();
-    console.log('Profile 유효성 검사 결과:', errors);
-    
-    if (errors) {
-      console.error('Profile 유효성 검사 실패:', errors);
-      throw new Error(Object.values(errors).join(', '));
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error) {
+      console.error('닉네임 중복 검사 중 오류:', error);
+      throw error;
     }
-
-    const firestoreData = profile.toFirestore();
-    console.log('Firestore 데이터:', firestoreData);
-
-    return await profileApi.create(firestoreData);
   },
 
   /**
@@ -64,7 +57,42 @@ export const profileService = {
   },
 
   /**
-   * 프로필 업데이트
+   * 프로필 생성
+   * @param {string} uuid - 사용자 UUID
+   * @param {Object} data - 프로필 데이터
+   * @returns {Promise<Profile>}
+   */
+  async create(uuid, data) {
+    try {
+      // 닉네임 중복 검사
+      const isDuplicate = await this.isNicknameDuplicate(data.nickname);
+      if (isDuplicate) {
+        throw new Error('이미 사용 중인 닉네임입니다.');
+      }
+
+      const profile = new Profile({
+        ...data,
+        uuid,
+        createdAt: getCurrentKST(),
+        updatedAt: getCurrentKST(),
+        isActive: true
+      });
+
+      // 프로필 유효성 검사
+      const validationErrors = profile.validate();
+      if (validationErrors) {
+        throw new Error(JSON.stringify(validationErrors));
+      }
+
+      return await profileApi.create(profile.toFirestore());
+    } catch (error) {
+      console.error('프로필 생성 중 오류:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 프로필 수정
    * @param {string} uuid - 사용자 UUID
    * @param {Object} data - 업데이트할 데이터
    * @returns {Promise<Profile>}
@@ -76,6 +104,14 @@ export const profileService = {
     const existing = await this.getProfile(uuid);
     if (!existing) {
       throw new Error('프로필을 찾을 수 없습니다.');
+    }
+
+    // 닉네임이 변경되는 경우 중복 검사
+    if (data.nickname && data.nickname !== existing.nickname) {
+      const isDuplicate = await this.isNicknameDuplicate(data.nickname, uuid);
+      if (isDuplicate) {
+        throw new Error('이미 사용 중인 닉네임입니다.');
+      }
     }
 
     // 변경된 필드만 업데이트
@@ -116,8 +152,7 @@ export const profileService = {
 
       const updateData = {
         isActive: false,
-        updatedAt: getCurrentKST(),
-        lastActive: getCurrentKST()
+        updatedAt: getCurrentKST()
       };
 
       await profileApi.update(existing.id, updateData);
@@ -140,5 +175,13 @@ export const profileService = {
         message: error.message || '회원 탈퇴 중 오류가 발생했습니다.'
       };
     }
-  }
+  },
+
+  /**
+   * isActive가 true인 모든 프로필을 가져온다
+   * @returns {Promise<Array>} 프로필 배열
+   */
+  async getAllProfile() {
+    return await profileApi.getAll();
+  },
 }; 

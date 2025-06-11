@@ -6,6 +6,7 @@ import { ROUTES, HEADER_OPTIONS } from './constants';
 import MainTabs from './MainTabs';
 import ProfileTestScreen from '../screens/ProfileTestScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
+import ProfileDetailScreen from '../screens/ProfileDetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -29,6 +30,19 @@ const MainNavigator = () => {
         name={ROUTES.MAIN.PROFILE_EDIT} 
         component={ProfileEditScreen}
         options={{ title: '프로필 수정' }}
+      />
+      <Stack.Screen 
+        name="ProfileDetail" 
+        component={ProfileDetailScreen}
+        options={{ 
+          title: '프로필',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#fff',
+            elevation: 0,
+            shadowOpacity: 0
+          }
+        }}
       />
     </Stack.Navigator>
   );

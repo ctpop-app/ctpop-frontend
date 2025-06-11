@@ -3,8 +3,6 @@
  */
 import { Timestamp } from 'firebase/firestore';
 
-const KST_OFFSET = 9 * 60 * 60 * 1000; // KST offset in milliseconds
-
 /**
  * UTC 시간을 한국 시간(KST)으로 변환
  * @param {string|Date|Timestamp} date - 변환할 날짜/시간
@@ -40,5 +38,18 @@ export const getCurrentKST = () => {
     console.error('getCurrentKST 실패:', error);
     return null;
   }
+};
+
+export const getLastActiveText = (lastActive) => {
+  if (!lastActive) return '';
+  
+  const now = new Date();
+  const lastActiveDate = new Date(lastActive);
+  const diffMinutes = Math.floor((now - lastActiveDate) / (1000 * 60));
+  
+  if (diffMinutes < 1) return '접속중';
+  if (diffMinutes < 60) return `${diffMinutes}분 전`;
+  if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)}시간 전`;
+  return `${Math.floor(diffMinutes / 1440)}일 전`;
 };
 

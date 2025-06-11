@@ -223,8 +223,7 @@ export const useAuth = () => {
     // createdAt은 수정하지 않고 원래 값 유지
     return {
       ...userProfile,
-      updatedAt: getCurrentKST(),
-      lastActive: getCurrentKST()
+      updatedAt: getCurrentKST()
     };
   }, [userProfile]);
 

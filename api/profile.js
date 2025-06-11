@@ -36,7 +36,7 @@ export const profileApi = {
       return handleApiError(error);
     }
   },
-
+  
   async update(id, data) {
     try {
       const profileRef = doc(db, API_ENDPOINTS.PROFILES, id);
@@ -57,5 +57,16 @@ export const profileApi = {
       console.error('파일 업로드 실패:', error);
       throw error;
     }
-  }
+  },
+
+  /**
+   * isActive가 true인 모든 프로필을 가져온다
+   * @returns {Promise<Array>} 프로필 배열
+   */
+  async getAll() {
+    const profilesRef = collection(db, 'profiles');
+    const q = query(profilesRef, where('isActive', '==', true));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  },
 }; 
