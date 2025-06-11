@@ -1,7 +1,7 @@
 // HomeScreen.js
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useProfile } from '../hooks/useProfile';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useAuth } from '../hooks/useAuth';
@@ -14,8 +14,9 @@ export default function HomeScreen() {
   const { isUserOnline, subscribeToUser, unsubscribeFromUser } = useOnlineStatus();
   const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  const loadProfiles = () => {
     setIsLoading(true);
     getAll()
       .then(data => {
@@ -26,6 +27,10 @@ export default function HomeScreen() {
         });
       })
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    loadProfiles();
 
     return () => {
       // 구독 해제
@@ -34,6 +39,12 @@ export default function HomeScreen() {
       });
     };
   }, [getAll, subscribeToUser, unsubscribeFromUser]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfiles();
+    }, [])
+  );
 
   const renderUserCard = ({ item }) => (
     <TouchableOpacity 
@@ -88,6 +99,19 @@ export default function HomeScreen() {
           renderItem={renderUserCard}
           keyExtractor={item => item.uuid}
           contentContainerStyle={styles.listContainer}
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            getAll()
+              .then(data => {
+                setProfiles(data);
+                // 각 프로필에 대한 온라인 상태 구독
+                data.forEach(profile => {
+                  subscribeToUser(profile.uuid);
+                });
+              })
+              .finally(() => setRefreshing(false));
+          }}
         />
       )}
     </View>
