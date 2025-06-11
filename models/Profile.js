@@ -29,6 +29,7 @@ export class Profile {
     mainPhotoURL,
     photoURLs = [],
     isActive = true,
+    lastActive = null,
     createdAt = null,
     updatedAt = null
   }) {
@@ -45,6 +46,7 @@ export class Profile {
     this.mainPhotoURL = mainPhotoURL;
     this.photoURLs = photoURLs;
     this.isActive = isActive;
+    this.lastActive = lastActive;
     this.createdAt = createdAt ? getCurrentKST() : null;
     this.updatedAt = updatedAt ? getCurrentKST() : null;
   }
@@ -141,6 +143,7 @@ export class Profile {
       mainPhotoURL: this.mainPhotoURL,
       photoURLs: this.photoURLs || [],
       isActive: this.isActive,
+      lastActive: this.lastActive,
       createdAt: this.createdAt ? getCurrentKST() : getCurrentKST(),
       updatedAt: getCurrentKST()
     };

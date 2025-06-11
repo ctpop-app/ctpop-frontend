@@ -1,4 +1,6 @@
 import { socketApi } from '../api/socket';
+import { profileService } from './profileService';
+import { getCurrentKST } from '../utils/dateUtils';
 
 class SocketService {
   constructor() {
@@ -12,9 +14,19 @@ class SocketService {
     this.startHeartbeat();
   }
 
-  disconnect() {
+  async disconnect() {
     this.stopHeartbeat();
     this.statusListeners.clear();
+    
+    // 연결 해제 시 lastActive 업데이트
+    if (socketApi.socket?.auth?.uuid) {
+      try {
+        await profileService.updateLastActive(socketApi.socket.auth.uuid, getCurrentKST());
+      } catch (error) {
+        console.error('Failed to update lastActive:', error);
+      }
+    }
+    
     socketApi.disconnect();
   }
 
@@ -23,9 +35,18 @@ class SocketService {
       console.log('Socket connected');
     });
 
-    socketApi.on('disconnect', () => {
+    socketApi.on('disconnect', async () => {
       console.log('Socket disconnected');
       this.stopHeartbeat();
+      
+      // 연결 끊김 시 lastActive 업데이트
+      if (socketApi.socket?.auth?.uuid) {
+        try {
+          await profileService.updateLastActive(socketApi.socket.auth.uuid, getCurrentKST());
+        } catch (error) {
+          console.error('Failed to update lastActive:', error);
+        }
+      }
     });
 
     socketApi.on('error', (error) => {
