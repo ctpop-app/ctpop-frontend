@@ -280,7 +280,7 @@ screens/
    - 사용자 상태 변경 리스너 관리
    - 연결 해제 시 lastActive 업데이트
 
-3. 훅 (`hooks/useOnlineStatus.js`)
+3. 훅 (`hooks/useSocket.js`)
    - 온라인 사용자 상태 관리
    - 컴포넌트 마운트 시 소켓 연결
    - 사용자별 상태 구독/구독해제

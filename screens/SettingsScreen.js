@@ -152,7 +152,7 @@ const SettingsScreen = () => {
           />
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{userProfile?.nickname || '사용자'}</Text>
-            <Text style={styles.profileEmail}>{userProfile?.location || '위치 미설정'}</Text>
+            <Text style={styles.profileEmail}>{userProfile?.city + " " + userProfile?.district || '위치 미설정'}</Text>
           </View>
           <TouchableOpacity style={styles.editButton} onPress={onEditProfile}>
             <Ionicons name="pencil" size={20} color="#FFF" />
@@ -197,6 +197,14 @@ const SettingsScreen = () => {
           {renderLinkItem('shield-outline', '개인정보 처리방침', () => Alert.alert('준비중', '곧 서비스될 예정입니다.'))}
         </View>
 
+        {/* 차단 목록 메뉴 - 빨간색 글씨로 강조 */}
+        <TouchableOpacity
+          style={styles.blockedMenuItem}
+          onPress={() => navigation.navigate('BlockedList')}
+        >
+          <Text style={styles.blockedMenuText}>차단 목록</Text>
+        </TouchableOpacity>
+        
         {/* 개발자 옵션 */}
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>개발자 옵션</Text>
@@ -341,6 +349,20 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 12,
     marginBottom: 20,
+  },
+  blockedMenuItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  blockedMenuText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    fontWeight: 'bold',
   },
 }); 
 

@@ -31,7 +31,8 @@ export class Profile {
     isActive = true,
     lastActive = null,
     createdAt = null,
-    updatedAt = null
+    updatedAt = null,
+    blockedUuid = []
   }) {
     this.id = id;
     this.uuid = uuid;
@@ -49,6 +50,7 @@ export class Profile {
     this.lastActive = lastActive;
     this.createdAt = createdAt ? getCurrentKST() : null;
     this.updatedAt = updatedAt ? getCurrentKST() : null;
+    this.blockedUuid = blockedUuid;
   }
 
   /**
@@ -145,7 +147,8 @@ export class Profile {
       isActive: this.isActive,
       lastActive: this.lastActive,
       createdAt: this.createdAt ? getCurrentKST() : getCurrentKST(),
-      updatedAt: getCurrentKST()
+      updatedAt: getCurrentKST(),
+      blockedUuid: this.blockedUuid || []
     };
   }
 } 

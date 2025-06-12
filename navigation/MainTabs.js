@@ -72,7 +72,7 @@ const MainTabs = () => {
           tabBarLabel: '메시지',
           tabBarIcon: ({ focused, color, size }) => (
             <Ionicons 
-              name={focused ? 'chatbubble' : 'chatbubble-outline'} 
+              name={focused ? 'mail' : 'mail-outline'} 
               size={size} 
               color={color} 
             />

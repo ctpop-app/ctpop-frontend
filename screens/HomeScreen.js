@@ -1,9 +1,9 @@
 // HomeScreen.js
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useProfile } from '../hooks/useProfile';
-import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import { getLastActiveText } from '../utils/dateUtils';
 import { getOrientationColor } from '../utils/colors';
@@ -12,7 +12,7 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { getAll, loading } = useProfile();
   const { user } = useAuth();
-  const { isUserOnline, subscribeToUser, unsubscribeFromUser } = useOnlineStatus();
+  const { isUserOnline, subscribeToUser, unsubscribeFromUser } = useSocket();
   const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,22 +27,18 @@ export default function HomeScreen() {
 
     try {
       const newData = await getAll();
-      
       if (isBackground) {
-        // 백그라운드 새로고침: 기존 데이터와 병합
         setProfiles(prevProfiles => {
           const mergedProfiles = newData.map(newProfile => {
             const existingProfile = prevProfiles.find(p => p.uuid === newProfile.uuid);
             if (existingProfile) {
-              // 기존 프로필이 있으면 lastActive만 업데이트
               return {
                 ...existingProfile,
-                lastActive: newProfile.lastActive
+                ...newProfile
               };
             }
             return newProfile;
           });
-          // lastActive 기준으로 정렬 (최신순)
           return mergedProfiles.sort((a, b) => {
             const timeA = a.lastActive ? new Date(a.lastActive).getTime() : 0;
             const timeB = b.lastActive ? new Date(b.lastActive).getTime() : 0;
@@ -50,7 +46,6 @@ export default function HomeScreen() {
           });
         });
       } else {
-        // 일반 로드: 전체 데이터 교체 및 정렬
         const sortedData = newData.sort((a, b) => {
           const timeA = a.lastActive ? new Date(a.lastActive).getTime() : 0;
           const timeB = b.lastActive ? new Date(b.lastActive).getTime() : 0;
@@ -58,8 +53,6 @@ export default function HomeScreen() {
         });
         setProfiles(sortedData);
       }
-
-      // 각 프로필에 대한 온라인 상태 구독
       newData.forEach(profile => {
         subscribeToUser(profile.uuid);
       });
@@ -74,21 +67,12 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadProfiles();
-
     return () => {
-      // 구독 해제
       profiles.forEach(profile => {
         unsubscribeFromUser(profile.uuid);
       });
     };
   }, [loadProfiles, unsubscribeFromUser]);
-
-  useFocusEffect(
-    useCallback(() => {
-      // 화면이 포커스를 받을 때 백그라운드 새로고침
-      loadProfiles(true);
-    }, [loadProfiles])
-  );
 
   const renderUserCard = ({ item }) => (
     <TouchableOpacity 
