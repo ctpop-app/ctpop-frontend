@@ -12,6 +12,7 @@ import {
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { getLastActiveText } from '../utils/dateUtils';
+import { getOrientationColor } from '../utils/colors';
 
 const { width } = Dimensions.get('window');
 
@@ -95,19 +96,17 @@ export default function ProfileDetailScreen() {
           </View>
         </View>
 
-        {/* 위치 정보 */}
-        <Text style={styles.location}>
-          {profile.city} {profile.district}
-        </Text>
-
-        {/* 신체 정보 */}
-        <View style={styles.physicalInfo}>
-          {profile.height && (
-            <Text style={styles.physicalText}>키 {profile.height}cm</Text>
-          )}
-          {profile.weight && (
-            <Text style={styles.physicalText}>몸무게 {profile.weight}kg</Text>
-          )}
+        {/* 기본 정보 */}
+        <View style={styles.infoRow}>
+          <View style={[styles.orientationBadge, { backgroundColor: getOrientationColor(profile.orientation) }]}>
+            <Text style={styles.orientationText}>{profile.orientation || '미입력'}</Text>
+          </View>
+          <Text style={styles.userInfo}>
+            {profile.height && `${profile.height}cm`}
+            {profile.weight && ` ${profile.weight}kg`}
+            {(profile.height || profile.weight) && (profile.city || profile.district) ? ' · ' : ''}
+            {profile.city && `${profile.city} ${profile.district || ''}`}
+          </Text>
         </View>
 
         {/* 자기소개 */}
@@ -221,19 +220,27 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 14,
   },
-  location: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 12,
-  },
-  physicalInfo: {
+  infoRow: {
     flexDirection: 'row',
-    marginBottom: 20,
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  physicalText: {
+  orientationBadge: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginRight: 12,
+  },
+  orientationText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  userInfo: {
     fontSize: 16,
     color: '#666',
-    marginRight: 16,
+    flex: 1,
   },
   bioSection: {
     marginBottom: 24,
