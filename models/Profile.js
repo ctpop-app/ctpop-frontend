@@ -29,8 +29,10 @@ export class Profile {
     mainPhotoURL,
     photoURLs = [],
     isActive = true,
+    lastActive = null,
     createdAt = null,
-    updatedAt = null
+    updatedAt = null,
+    blockedUuid = []
   }) {
     this.id = id;
     this.uuid = uuid;
@@ -45,8 +47,10 @@ export class Profile {
     this.mainPhotoURL = mainPhotoURL;
     this.photoURLs = photoURLs;
     this.isActive = isActive;
+    this.lastActive = lastActive ? getCurrentKST() : null;
     this.createdAt = createdAt ? getCurrentKST() : null;
     this.updatedAt = updatedAt ? getCurrentKST() : null;
+    this.blockedUuid = blockedUuid;
   }
 
   /**
@@ -141,8 +145,10 @@ export class Profile {
       mainPhotoURL: this.mainPhotoURL,
       photoURLs: this.photoURLs || [],
       isActive: this.isActive,
+      lastActive: this.lastActive ? getCurrentKST() : null,
       createdAt: this.createdAt ? getCurrentKST() : getCurrentKST(),
-      updatedAt: getCurrentKST()
+      updatedAt: getCurrentKST(),
+      blockedUuid: this.blockedUuid || []
     };
   }
 } 

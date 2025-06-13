@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { profileService } from '../services/profileService';
 import useUserStore from '../store/userStore';
+import { Alert } from 'react-native';
 
 export const useProfile = () => {
   const [loading, setLoading] = useState(false);
@@ -90,20 +91,25 @@ export const useProfile = () => {
     }
   }, [user?.uuid, clearUser]);
 
-  // getAll: isActive가 true인 모든 프로필을 가져옴
+  // getAll: isActive가 true인 모든 프로필을 가져오고, 차단한 사용자와 내 프로필은 제외
   const getAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const profiles = await profileService.getAllProfile();
-      return profiles;
+      const profiles = await profileService.getAllProfile(); // isActive == true
+      const blockedUuids = userProfile?.blockedUuid || [];
+      return profiles.filter(
+        profile =>
+          profile.uuid !== userProfile?.uuid &&
+          !blockedUuids.includes(profile.uuid)
+      );
     } catch (err) {
       setError(err.message);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userProfile]);
 
   return {
     loading,
@@ -114,6 +120,6 @@ export const useProfile = () => {
     create,
     update,
     withdraw,
-    getAll,
+    getAll
   };
 };

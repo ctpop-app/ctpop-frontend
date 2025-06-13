@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,16 @@ import {
   TouchableOpacity,
   Dimensions,
   FlatList,
+  Alert,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useSocket } from '../hooks/useSocket';
 import { getLastActiveText } from '../utils/dateUtils';
+import { getOrientationColor } from '../utils/colors';
+import { useAuth } from '../hooks/useAuth';
+import { useBlock } from '../hooks/useBlock';
+import { MaterialIcons } from '@expo/vector-icons';
+import { ProfileMenuModal } from '../components/ProfileMenuModal';
 
 const { width } = Dimensions.get('window');
 
@@ -19,8 +25,12 @@ export default function ProfileDetailScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const { profile } = route.params;
-  const { isUserOnline } = useOnlineStatus();
+  const { isUserOnline } = useSocket();
+  const { user } = useAuth();
+  const { blockUser, unblockUser } = useBlock();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
 
   // 프로필 이미지 배열 생성 (메인 사진 + 추가 사진들)
   const images = [
@@ -55,89 +65,143 @@ export default function ProfileDetailScreen() {
     );
   };
 
+  const handleBlock = async () => {
+    try {
+      if (isBlocked) {
+        await unblockUser(profile.uuid);
+      } else {
+        await blockUser(profile.uuid);
+      }
+      setIsBlocked(!isBlocked);
+      setMenuVisible(false);
+    } catch (error) {
+      console.error('Error toggling block:', error);
+    }
+  };
+
+  const handleReport = () => {
+    setMenuVisible(false);
+    Alert.alert(
+      '신고하기',
+      '이 사용자를 신고하시겠습니까?',
+      [
+        {
+          text: '취소',
+          style: 'cancel'
+        },
+        {
+          text: '신고',
+          style: 'destructive',
+          onPress: () => {
+            // TODO: 신고 기능 구현
+            Alert.alert('알림', '신고가 접수되었습니다.');
+          }
+        }
+      ]
+    );
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      {/* 프로필 이미지 섹션 */}
-      <View style={styles.imageSection}>
-        <FlatList
-          data={images}
-          renderItem={renderImage}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(event) => {
-            const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-            setCurrentImageIndex(newIndex);
-          }}
-          keyExtractor={(_, index) => index.toString()}
-          style={styles.imageList}
-          contentContainerStyle={styles.imageListContent}
-        />
-        {renderPagination()}
-      </View>
+    <View style={styles.container}>
+      <ScrollView style={styles.container}>
+        {/* 프로필 이미지 섹션 */}
+        <View style={styles.imageSection}>
+          <FlatList
+            data={images}
+            renderItem={renderImage}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(event) => {
+              const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+              setCurrentImageIndex(newIndex);
+            }}
+            keyExtractor={(_, index) => index.toString()}
+            style={styles.imageList}
+            contentContainerStyle={styles.imageListContent}
+          />
+          {renderPagination()}
+        </View>
 
-      {/* 기본 정보 섹션 */}
-      <View style={styles.infoSection}>
-        <View style={styles.nameAgeContainer}>
-          <Text style={styles.name}>{profile.nickname}</Text>
-          {profile.age && <Text style={styles.age}>{profile.age}세</Text>}
-          <View style={styles.statusContainer}>
-            {isUserOnline(profile.uuid) ? (
-              <>
-                <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>접속중</Text>
-              </>
-            ) : (
-              <Text style={styles.lastActiveText}>
-                {getLastActiveText(profile.lastActive)}
-              </Text>
-            )}
+        {/* 기본 정보 섹션 */}
+        <View style={styles.infoSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>프로필</Text>
+            <TouchableOpacity 
+              style={styles.menuButton}
+              onPress={() => setMenuVisible(true)}
+            >
+              <MaterialIcons name="more-vert" size={24} color="#000" />
+            </TouchableOpacity>
           </View>
-        </View>
 
-        {/* 위치 정보 */}
-        <Text style={styles.location}>
-          {profile.city} {profile.district}
-        </Text>
-
-        {/* 신체 정보 */}
-        <View style={styles.physicalInfo}>
-          {profile.height && (
-            <Text style={styles.physicalText}>키 {profile.height}cm</Text>
-          )}
-          {profile.weight && (
-            <Text style={styles.physicalText}>몸무게 {profile.weight}kg</Text>
-          )}
-        </View>
-
-        {/* 자기소개 */}
-        <View style={styles.bioSection}>
-          <Text style={styles.bioTitle}>자기소개</Text>
-          <Text style={styles.bioText}>{profile.bio || '자기소개가 없습니다.'}</Text>
-        </View>
-
-        {/* 관심사 */}
-        {profile.interests && profile.interests.length > 0 && (
-          <View style={styles.interestsSection}>
-            <Text style={styles.interestsTitle}>관심사</Text>
-            <View style={styles.interestsContainer}>
-              {profile.interests.map((interest, index) => (
-                <View key={index} style={styles.interestTag}>
-                  <Text style={styles.interestText}>{interest}</Text>
-                </View>
-              ))}
+          <View style={styles.nameAgeContainer}>
+            <Text style={styles.name}>{profile.nickname}</Text>
+            {profile.age && <Text style={styles.age}>{profile.age}세</Text>}
+            <View style={styles.statusContainer}>
+              {isUserOnline(profile.uuid) ? (
+                <>
+                  <View style={styles.onlineDot} />
+                  <Text style={styles.onlineText}>접속중</Text>
+                </>
+              ) : (
+                <Text style={styles.lastActiveText}>
+                  {getLastActiveText(profile.lastActive)}
+                </Text>
+              )}
             </View>
           </View>
-        )}
-      </View>
 
-      {/* 하단 버튼 */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.messageButton}>
-          <Text style={styles.messageButtonText}>메시지 보내기</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          {/* 기본 정보 */}
+          <View style={styles.infoRow}>
+            <View style={[styles.orientationBadge, { backgroundColor: getOrientationColor(profile.orientation) }]}>
+              <Text style={styles.orientationText}>{profile.orientation || '미입력'}</Text>
+            </View>
+            <Text style={styles.userInfo}>
+              {profile.height && `${profile.height}cm`}
+              {profile.weight && ` ${profile.weight}kg`}
+              {(profile.height || profile.weight) && (profile.city || profile.district) ? ' · ' : ''}
+              {profile.city && `${profile.city} ${profile.district || ''}`}
+            </Text>
+          </View>
+
+          {/* 자기소개 */}
+          <View style={styles.bioSection}>
+            <Text style={styles.bioTitle}>자기소개</Text>
+            <Text style={styles.bioText}>{profile.bio || '자기소개가 없습니다.'}</Text>
+          </View>
+
+          {/* 관심사 */}
+          {profile.interests && profile.interests.length > 0 && (
+            <View style={styles.interestsSection}>
+              <Text style={styles.interestsTitle}>관심사</Text>
+              <View style={styles.interestsContainer}>
+                {profile.interests.map((interest, index) => (
+                  <View key={index} style={styles.interestTag}>
+                    <Text style={styles.interestText}>{interest}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* 하단 버튼 */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.messageButton}>
+            <Text style={styles.messageButtonText}>메시지 보내기</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      <ProfileMenuModal
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        onBlock={handleBlock}
+        onReport={handleReport}
+        isBlocked={isBlocked}
+      />
+    </View>
   );
 }
 
@@ -186,6 +250,20 @@ const styles = StyleSheet.create({
   infoSection: {
     padding: 20,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  menuButton: {
+    padding: 8,
+  },
   nameAgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -221,19 +299,27 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 14,
   },
-  location: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 12,
-  },
-  physicalInfo: {
+  infoRow: {
     flexDirection: 'row',
-    marginBottom: 20,
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  physicalText: {
+  orientationBadge: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginRight: 12,
+  },
+  orientationText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  userInfo: {
     fontSize: 16,
     color: '#666',
-    marginRight: 16,
+    flex: 1,
   },
   bioSection: {
     marginBottom: 24,

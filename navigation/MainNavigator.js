@@ -7,6 +7,9 @@ import MainTabs from './MainTabs';
 import ProfileTestScreen from '../screens/ProfileTestScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import ProfileDetailScreen from '../screens/ProfileDetailScreen';
+import BoardWriteScreen from '../screens/BoardWriteScreen';
+import BoardScreen from '../screens/BoardScreen';
+import BlockedListScreen from '../screens/BlockedListScreen';
 
 const Stack = createStackNavigator();
 
@@ -36,6 +39,45 @@ const MainNavigator = () => {
         component={ProfileDetailScreen}
         options={{ 
           title: '프로필',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#fff',
+            elevation: 0,
+            shadowOpacity: 0
+          }
+        }}
+      />
+      <Stack.Screen 
+        name="BoardWrite" 
+        component={BoardWriteScreen}
+        options={{ 
+          title: '토크 작성',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#fff',
+            elevation: 0,
+            shadowOpacity: 0
+          }
+        }}
+      />
+      <Stack.Screen 
+        name={ROUTES.MAIN.BOARD} 
+        component={BoardScreen}
+        options={{ 
+          title: '토크',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#fff',
+            elevation: 0,
+            shadowOpacity: 0
+          }
+        }}
+      />
+      <Stack.Screen 
+        name="BlockedList" 
+        component={BlockedListScreen}
+        options={{ 
+          title: '차단 목록',
           headerShown: true,
           headerStyle: {
             backgroundColor: '#fff',

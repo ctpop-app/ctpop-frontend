@@ -10,7 +10,7 @@ import { getCurrentKST } from '../utils/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
 import { db } from '../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, limit } from 'firebase/firestore';
 
 export const profileService = {
   /**
@@ -184,4 +184,29 @@ export const profileService = {
   async getAllProfile() {
     return await profileApi.getAll();
   },
+
+  /**
+   * 마지막 접속 시간 업데이트
+   * @param {string} uuid - 사용자 UUID
+   * @param {string} lastActive - 마지막 접속 시간
+   * @returns {Promise<void>}
+   */
+  async updateLastActive(uuid, lastActive) {
+    try {
+      const profilesRef = collection(db, 'profiles');
+      const q = query(profilesRef, where('uuid', '==', uuid), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const docRef = doc(db, 'profiles', querySnapshot.docs[0].id);
+        await updateDoc(docRef, {
+          lastActive,
+          updatedAt: getCurrentKST()
+        });
+      }
+    } catch (error) {
+      console.error('프로필 lastActive 업데이트 중 오류:', error);
+      throw error;
+    }
+  }
 }; 

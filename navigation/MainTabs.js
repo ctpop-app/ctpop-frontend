@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import MessageScreen from '../screens/MessageScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import BoardScreen from '../screens/BoardScreen';
 
 // 임시 화면 컴포넌트
 const TemporaryScreen = ({ name }) => (
@@ -50,13 +51,28 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen
+        name={ROUTES.MAIN.BOARD}
+        component={BoardScreen}
+        options={{
+          tabBarLabel: '토크',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons 
+              name={focused ? 'chatbubbles' : 'chatbubbles-outline'} 
+              size={size} 
+              color={color} 
+            />
+          ),
+          headerShown: false
+        }}
+      />
+      <Tab.Screen
         name={ROUTES.MAIN.MESSAGES}
         component={MessageScreen}
         options={{
           tabBarLabel: '메시지',
           tabBarIcon: ({ focused, color, size }) => (
             <Ionicons 
-              name={focused ? 'chatbubble' : 'chatbubble-outline'} 
+              name={focused ? 'mail' : 'mail-outline'} 
               size={size} 
               color={color} 
             />

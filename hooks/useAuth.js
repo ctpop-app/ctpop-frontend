@@ -5,7 +5,6 @@ import { isValidOtpCode } from '../services/authService';
 import { isValidPhoneNumber } from '../utils/phoneUtils';
 import useUserStore from '../store/userStore';
 import { profileService } from '../services/profileService';
-import { userService } from '../services/userService';
 import { getCurrentKST } from '../utils/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';

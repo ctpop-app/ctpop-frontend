@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { socketService } from '../services/socketService';
 import { useAuth } from './useAuth';
 
-export const useOnlineStatus = () => {
+export const useSocket = () => {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState(new Set());
 

@@ -124,6 +124,16 @@ export const TAB_OPTIONS = {
       />
     )
   },
+  [ROUTES.MAIN.BOARD]: {
+    tabBarLabel: '토크',
+    tabBarIcon: ({ focused, color, size }) => (
+      <Ionicons 
+        name={focused ? 'chatbubbles' : 'chatbubbles-outline'} 
+        size={size} 
+        color={color} 
+      />
+    )
+  },
   [ROUTES.MAIN.SETTINGS]: {
     tabBarLabel: '설정',
     tabBarIcon: ({ focused, color, size }) => (
