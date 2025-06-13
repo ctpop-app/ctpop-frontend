@@ -1,5 +1,4 @@
 // API 주소 설정 파일
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 서버 IP 저장용 키
