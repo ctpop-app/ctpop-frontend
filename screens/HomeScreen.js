@@ -7,12 +7,14 @@ import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import { getLastActiveText } from '../utils/dateUtils';
 import { getOrientationColor } from '../utils/colors';
+import useUserStore from '../store/userStore';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
   const { getAll, loading } = useProfile();
   const { user } = useAuth();
   const { isUserOnline, subscribeToUser, unsubscribeFromUser } = useSocket();
+  const { userProfile } = useUserStore();
   const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,9 +29,11 @@ export default function HomeScreen() {
 
     try {
       const newData = await getAll();
+      const dataWithUserProfile = userProfile ? [userProfile, ...newData] : newData;
+      
       if (isBackground) {
         setProfiles(prevProfiles => {
-          const mergedProfiles = newData.map(newProfile => {
+          const mergedProfiles = dataWithUserProfile.map(newProfile => {
             const existingProfile = prevProfiles.find(p => p.uuid === newProfile.uuid);
             if (existingProfile) {
               return {
@@ -46,7 +50,7 @@ export default function HomeScreen() {
           });
         });
       } else {
-        const sortedData = newData.sort((a, b) => {
+        const sortedData = dataWithUserProfile.sort((a, b) => {
           const timeA = a.lastActive ? new Date(a.lastActive).getTime() : 0;
           const timeB = b.lastActive ? new Date(b.lastActive).getTime() : 0;
           return timeB - timeA;
@@ -63,7 +67,7 @@ export default function HomeScreen() {
         setIsLoading(false);
       }
     }
-  }, [getAll, subscribeToUser]);
+  }, [getAll, subscribeToUser, userProfile]);
 
   useEffect(() => {
     loadProfiles();
@@ -80,6 +84,7 @@ export default function HomeScreen() {
       onPress={() => {
         navigation.navigate('ProfileDetail', { profile: item });
       }}
+      activeOpacity={0.8}
     >
       <Image 
         style={styles.profilePhoto}
@@ -186,21 +191,21 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    padding: 12,
+    padding: 8,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: 10,
+    marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 2,
+    elevation: 1,
   },
   profilePhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 35,
-    marginRight: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 10,
   },
   userInfo: {
     flex: 1,

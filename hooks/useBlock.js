@@ -69,7 +69,14 @@ export const useBlock = () => {
     try {
       setLoading(true);
       setError(null);
-      return await blockService.getBlockedUsers(user.uuid);
+      const blockedUuids = await blockService.getBlockedUsers(user.uuid);
+      if (blockedUuids.length === 0) {
+        return [];
+      }
+      const profiles = await Promise.all(
+        blockedUuids.map(uuid => profileService.getProfile(uuid))
+      );
+      return profiles.filter(Boolean);
     } catch (err) {
       setError(err.message);
       Alert.alert('오류', err.message);

@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useBlock } from '../hooks/useBlock';
 import useUserStore from '../store/userStore';
 import { profileService } from '../services/profileService';
-import { useBlock } from '../hooks/useBlock';
 
 export default function BlockedListScreen() {
   const navigation = useNavigation();
-  const { userProfile, setUserProfile } = useUserStore();
+  const { userProfile } = useUserStore();
   const [blockedProfiles, setBlockedProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const { unblockUser } = useBlock();
@@ -20,7 +20,6 @@ export default function BlockedListScreen() {
         if (blockedUuids.length === 0) {
           setBlockedProfiles([]);
         } else {
-          // 여러 uuid로 프로필 정보 가져오기
           const profiles = await Promise.all(
             blockedUuids.map(uuid => profileService.getProfile(uuid))
           );
@@ -38,14 +37,9 @@ export default function BlockedListScreen() {
   const handleUnblock = async (blockedUuid) => {
     try {
       await unblockUser(blockedUuid);
-      // 내 프로필을 새로고침해서 상태 갱신
-      if (userProfile?.uuid) {
-        const updatedProfile = await profileService.getProfile(userProfile.uuid);
-        setUserProfile(updatedProfile);
-      }
-      Alert.alert('알림', '차단을 해제했습니다.');
+      // 차단 해제 후 userProfile이 자동으로 업데이트되므로 별도의 새로고침이 필요 없음
     } catch (err) {
-      Alert.alert('오류', err.message || '차단 해제에 실패했습니다.');
+      // 에러 처리는 useBlock 훅에서 이미 하고 있으므로 여기서는 추가 처리가 필요 없음
     }
   };
 
