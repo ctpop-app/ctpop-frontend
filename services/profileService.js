@@ -4,8 +4,13 @@
  * API 호출은 api/profile.js의 profile 모듈과 api/user.js의 user 모듈을 사용합니다.
  */
 
-import { profile, user } from '../api';
+import { profileApi } from '../api/profile';
 import { Profile } from '../models/Profile';
+import { getCurrentKST } from '../utils/dateUtils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AUTH_KEYS } from '../utils/constants';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, doc, updateDoc, limit } from 'firebase/firestore';
 
 export const profileService = {
   /**
@@ -14,32 +19,31 @@ export const profileService = {
    * @returns {Promise<boolean>}
    */
   async checkProfileExists(uuid) {
-    const response = await profile.checkProfileExists(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
-    }
-    return response.data;
+    return await profileApi.exists(uuid);
   },
 
   /**
-   * 프로필 생성
-   * @param {string} uuid - 사용자 UUID
-   * @param {Object} profileData - 프로필 데이터
-   * @returns {Promise<Profile>}
+   * 닉네임 중복 검사
+   * @param {string} nickname 검사할 닉네임
+   * @param {string} [excludeUuid] 제외할 사용자의 UUID (수정 시 사용)
+   * @returns {Promise<boolean>} 중복 여부 (true: 중복됨, false: 중복되지 않음)
    */
-  async createProfile(uuid, profileData) {
-    // 사용자 확인
-    const userResponse = await user.getUser(uuid);
-    if (!userResponse.success) {
-      throw new Error('사용자를 찾을 수 없습니다.');
-    }
+  async isNicknameDuplicate(nickname, excludeUuid = null) {
+    try {
+      const profilesRef = collection(db, 'profiles');
+      let q = query(profilesRef, where('nickname', '==', nickname));
+      
+      // 수정 시 현재 사용자의 닉네임은 중복 검사에서 제외
+      if (excludeUuid) {
+        q = query(q, where('uuid', '!=', excludeUuid));
+      }
 
-    // 프로필 생성
-    const response = await profile.createProfile(uuid, profileData);
-    if (!response.success) {
-      throw new Error(response.error);
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error) {
+      console.error('닉네임 중복 검사 중 오류:', error);
+      throw error;
     }
-    return response.data;
   },
 
   /**
@@ -48,36 +52,161 @@ export const profileService = {
    * @returns {Promise<Profile>}
    */
   async getProfile(uuid) {
-    const response = await profile.getProfile(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
-    }
-    return response.data;
+    const doc = await profileApi.get(uuid);
+    return doc ? Profile.fromFirestore(doc) : null;
   },
 
   /**
-   * 프로필 업데이트
+   * 프로필 생성
    * @param {string} uuid - 사용자 UUID
-   * @param {Object} updateData - 업데이트할 데이터
+   * @param {Object} data - 프로필 데이터
    * @returns {Promise<Profile>}
    */
-  async updateProfile(uuid, updateData) {
-    const response = await profile.updateProfile(uuid, updateData);
-    if (!response.success) {
-      throw new Error(response.error);
+  async create(uuid, data) {
+    try {
+      // 닉네임 중복 검사
+      const isDuplicate = await this.isNicknameDuplicate(data.nickname);
+      if (isDuplicate) {
+        throw new Error('이미 사용 중인 닉네임입니다.');
+      }
+
+      const profile = new Profile({
+        ...data,
+        uuid,
+        createdAt: getCurrentKST(),
+        updatedAt: getCurrentKST(),
+        isActive: true
+      });
+
+      // 프로필 유효성 검사
+      const validationErrors = profile.validate();
+      if (validationErrors) {
+        throw new Error(JSON.stringify(validationErrors));
+      }
+
+      return await profileApi.create(profile.toFirestore());
+    } catch (error) {
+      console.error('프로필 생성 중 오류:', error);
+      throw error;
     }
-    return response.data;
   },
 
   /**
-   * 프로필 비활성화
+   * 프로필 수정
    * @param {string} uuid - 사용자 UUID
+   * @param {Object} data - 업데이트할 데이터
+   * @returns {Promise<Profile>}
+   */
+  async update(uuid, data) {
+    console.log('profileService.update 시작 - uuid:', uuid);
+    console.log('profileService.update - 받은 데이터:', data);
+
+    const existing = await this.getProfile(uuid);
+    if (!existing) {
+      throw new Error('프로필을 찾을 수 없습니다.');
+    }
+
+    // 닉네임이 변경되는 경우 중복 검사
+    if (data.nickname && data.nickname !== existing.nickname) {
+      const isDuplicate = await this.isNicknameDuplicate(data.nickname, uuid);
+      if (isDuplicate) {
+        throw new Error('이미 사용 중인 닉네임입니다.');
+      }
+    }
+
+    // 변경된 필드만 업데이트
+    const updateData = {
+      ...data,
+      uuid,
+      updatedAt: getCurrentKST()
+    };
+    
+    // 유효성 검사는 변경된 필드만 수행
+    const tempProfile = new Profile({
+      ...existing,
+      ...updateData
+    });
+    const errors = tempProfile.validate();
+    
+    if (errors) {
+      console.error('Profile 유효성 검사 실패:', errors);
+      throw new Error(Object.values(errors).join(', '));
+    }
+
+    console.log('업데이트 데이터:', updateData);
+    return await profileApi.update(existing.id, updateData);
+  },
+
+  /**
+   * 회원 탈퇴
+   * @param {string} uuid - 사용자 UUID
+   * @returns {Promise<Object>} - 성공 여부와 메시지가 포함된 객체
+   */
+  async withdraw(uuid) {
+    try {
+      // 1. 프로필 비활성화
+      const existing = await this.getProfile(uuid);
+      if (!existing) {
+        throw new Error('프로필을 찾을 수 없습니다.');
+      }
+
+      const updateData = {
+        isActive: false,
+        updatedAt: getCurrentKST()
+      };
+
+      await profileApi.update(existing.id, updateData);
+
+      // 2. AsyncStorage 데이터 삭제
+      await AsyncStorage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
+      await AsyncStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
+      await AsyncStorage.removeItem(AUTH_KEYS.USER);
+      await AsyncStorage.removeItem(AUTH_KEYS.PHONE_NUMBER);
+      await AsyncStorage.removeItem('user-storage');
+
+      return {
+        success: true,
+        message: '회원 탈퇴가 완료되었습니다.'
+      };
+    } catch (error) {
+      console.error('회원 탈퇴 실패:', error);
+      return {
+        success: false,
+        message: error.message || '회원 탈퇴 중 오류가 발생했습니다.'
+      };
+    }
+  },
+
+  /**
+   * isActive가 true인 모든 프로필을 가져온다
+   * @returns {Promise<Array>} 프로필 배열
+   */
+  async getAllProfile() {
+    return await profileApi.getAll();
+  },
+
+  /**
+   * 마지막 접속 시간 업데이트
+   * @param {string} uuid - 사용자 UUID
+   * @param {string} lastActive - 마지막 접속 시간
    * @returns {Promise<void>}
    */
-  async deactivateProfile(uuid) {
-    const response = await profile.deactivateProfile(uuid);
-    if (!response.success) {
-      throw new Error(response.error);
+  async updateLastActive(uuid, lastActive) {
+    try {
+      const profilesRef = collection(db, 'profiles');
+      const q = query(profilesRef, where('uuid', '==', uuid), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const docRef = doc(db, 'profiles', querySnapshot.docs[0].id);
+        await updateDoc(docRef, {
+          lastActive,
+          updatedAt: getCurrentKST()
+        });
+      }
+    } catch (error) {
+      console.error('프로필 lastActive 업데이트 중 오류:', error);
+      throw error;
     }
   }
 }; 

@@ -5,8 +5,8 @@ import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import ImageMessage from './ImageMessage';
 
-const ChatRoom = ({ chatId, userId, onSendImage }) => {
-  const { messages, loading, error, sendChatMessage, sendImageMessage, markMessageAsRead } = useChat(chatId, userId);
+const ChatRoom = ({ chatId, uuid, onSendImage }) => {
+  const { messages, loading, error, sendChatMessage, sendImageMessage, markMessageAsRead } = useChat(chatId, uuid);
   const flatListRef = useRef(null);
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
 
@@ -23,7 +23,7 @@ const ChatRoom = ({ chatId, userId, onSendImage }) => {
       return (
         <ImageMessage
           message={item}
-          isOwnMessage={item.senderId === userId}
+          isOwnMessage={item.senderId === uuid}
           onPress={() => {/* 이미지 확대 기능 */}}
         />
       );
@@ -31,7 +31,7 @@ const ChatRoom = ({ chatId, userId, onSendImage }) => {
     return (
       <MessageBubble
         message={item}
-        isOwnMessage={item.senderId === userId}
+        isOwnMessage={item.senderId === uuid}
       />
     );
   };
@@ -80,6 +80,7 @@ const ChatRoom = ({ chatId, userId, onSendImage }) => {
       <MessageInput
         onSend={handleSendMessage}
         onSendImage={handleSendImage}
+        uuid={uuid}
       />
     </KeyboardAvoidingView>
   );

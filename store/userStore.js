@@ -4,7 +4,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { toKST, getUTCTimestamp } from '../utils/dateUtils';
+import { toKST, getCurrentKST } from '../utils/dateUtils';
+import { AUTH_KEYS } from '../utils/constants';
 
 const useUserStore = create(
   persist(
@@ -28,6 +29,10 @@ const useUserStore = create(
       
       setUserProfile: (profile) => {
         console.log('setUserProfile called with:', profile);
+        if (!profile?.uuid) {
+          console.error('Invalid profile: missing uuid field', profile);
+          return;
+        }
         set((state) => ({ 
           ...state,
           userProfile: profile,

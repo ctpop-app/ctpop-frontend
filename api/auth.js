@@ -2,7 +2,9 @@ import apiClient, { handleApiResponse, handleApiError } from './client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
 import { jwtDecode } from 'jwt-decode';
-import { toE164Format } from '../services/authService';
+import { toE164Format } from '../utils/phoneUtils';
+import useUserStore from '../store/userStore';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * 서버 연결을 테스트합니다.
@@ -30,191 +32,103 @@ export const testConnection = async () => {
 };
 
 /**
- * 전화번호로 인증번호를 발송합니다.
+ * 인증번호 발송
  * @param {string} phoneNumber - 전화번호
- * @returns {Promise<Object>} - 응답 객체
+ * @returns {Promise<Object>} - 응답 데이터
  */
 export const sendOtp = async (phoneNumber) => {
   try {
+    console.log('auth.js - sendOtp 시작');
     const response = await apiClient.post('/api/otp/send', { phone: phoneNumber });
-    const data = response.data;
-    
-    // OTP 전송 시 받은 액세스 토큰 저장
-    if (data.accessToken) {
-      console.log('OTP 전송 성공 - 액세스 토큰 저장');
-      await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, data.accessToken);
-    }
-    
+    console.log('auth.js - sendOtp 원본 응답:', response.data);
     return handleApiResponse(response);
   } catch (error) {
+    console.error('auth.js - sendOtp 에러:', error);
     return handleApiError(error);
   }
 };
 
 /**
- * 인증번호를 확인하고 토큰을 발급받습니다.
+ * 인증번호 검증
  * @param {string} phoneNumber - 전화번호
- * @param {string} code - 인증 코드
- * @returns {Promise<Object>} - 성공 여부와 토큰 정보가 포함된 객체
+ * @param {string} code - 인증번호
+ * @param {string} accessToken - 액세스 토큰
+ * @returns {Promise<Object>} - 응답 데이터
  */
-export const verifyOtp = async (phoneNumber, code) => {
+export const verifyOtp = async (phoneNumber, code, accessToken) => {
   try {
-    // OTP 전송 시 받은 액세스 토큰 가져오기
-    const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
+    console.log('verifyOtp 호출 - 액세스 토큰:', accessToken);  // 디버깅용 로그
+    
     if (!accessToken) {
-      throw new Error('인증 정보가 없습니다. OTP를 다시 전송해주세요.');
+      console.log('액세스 토큰이 없습니다!');
+      return {
+        success: false,
+        message: '인증 토큰이 없습니다.'
+      };
     }
 
-    console.log('OTP 검증 요청 시작:', { phoneNumber, code });
     const response = await apiClient.post('/api/otp/verify', 
       { phone: phoneNumber, code },
-      { 
+      {
         headers: {
-          'Authorization': `Bearer ${accessToken}`
+          Authorization: `Bearer ${accessToken}`
         }
       }
     );
-    
-    const data = response.data;
-    console.log('OTP 검증 응답 데이터:', data);
-    
-    // refreshToken이 있으면 저장
-    if (data.refreshToken) {
-      console.log('토큰 저장 시작');
-      // 리프레시 토큰 저장
-      await AsyncStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
-      console.log('리프레시 토큰 저장 완료');
-      
-      // 사용자 정보 저장
-      if (data.uuid) {
-        console.log('사용자 정보 저장 시작');
-        const user = {
-          uuid: data.uuid,
-          createdAt: new Date().toISOString(),
-          hasProfile: false
-        };
-        await AsyncStorage.setItem(AUTH_KEYS.USER, JSON.stringify(user));
-        console.log('사용자 정보 저장 완료:', user);
-        
-        // 저장된 사용자 정보 확인
-        const storedUser = await getStoredUser();
-        console.log('저장된 사용자 정보 확인:', storedUser);
-      }
-    }
-    
     return handleApiResponse(response);
   } catch (error) {
-    console.error('OTP 검증 에러:', error);
     return handleApiError(error);
   }
 };
 
 /**
  * 리프레시 토큰으로 인증합니다.
+ * @param {string} refreshToken - 리프레시 토큰
+ * @param {string} uuid - 사용자 UUID
  * @returns {Promise<Object>} - 성공 여부와 새 토큰 정보가 포함된 객체
  */
-export const authenticateWithRefreshToken = async () => {
+export const authenticateWithRefreshToken = async (refreshToken, uuid) => {
   try {
-    const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
-    const user = await getStoredUser();
-    
-    if (!refreshToken || !user?.uuid) {
-      return { success: false, message: '인증 정보가 없습니다.' };
-    }
-    
     const response = await apiClient.post('/auth/refresh', 
-      { refreshToken, uuid: user.uuid },
+      { refreshToken, uuid },
       { authenticated: false }
     );
-    
-    const data = response.data;
-    
-    if (data.refreshToken) {
-      // 새로운 리프레시 토큰 저장
-      await AsyncStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
-      
-      // 기존 사용자 정보 유지하면서 토큰만 업데이트
-      if (user) {
-        await storeUser(user);
-      }
-      
-      return { success: true, data };
-    }
-    
-    return { success: false, message: '인증에 실패했습니다.' };
+    return handleApiResponse(response);
   } catch (error) {
-    console.error('인증 오류:', error);
-    return { 
-      success: false, 
-      message: error.response?.data?.message || '인증 중 오류가 발생했습니다.' 
-    };
+    return handleApiError(error);
   }
 };
 
 /**
  * 액세스 토큰을 발급받습니다.
+ * @param {string} refreshToken - 리프레시 토큰
+ * @param {string} uuid - 사용자 UUID
  * @returns {Promise<Object>} - 성공 여부와 액세스 토큰이 포함된 객체
  */
-export const getAccessToken = async () => {
+export const getAccessToken = async (refreshToken, uuid) => {
   try {
-    const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
-    const user = await getStoredUser();
-    
-    if (!refreshToken || !user?.uuid) {
-      return { success: false, message: '인증 정보가 없습니다.' };
-    }
-    
     const response = await apiClient.post('/auth/access-token', 
-      { refreshToken, uuid: user.uuid },
+      { refreshToken, uuid },
       { authenticated: false }
     );
-    
-    const data = response.data;
-    
-    if (data.accessToken) {
-      await AsyncStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, data.accessToken);
-      return { success: true, data };
-    }
-    
-    return { success: false, message: '액세스 토큰 발급에 실패했습니다.' };
+    return handleApiResponse(response);
   } catch (error) {
-    console.error('액세스 토큰 발급 오류:', error);
-    return { 
-      success: false, 
-      message: error.response?.data?.message || '액세스 토큰 발급 중 오류가 발생했습니다.' 
-    };
+    return handleApiError(error);
   }
 };
 
 /**
  * 로그아웃합니다.
+ * @param {string} uuid - 사용자 UUID
+ * @param {string} refreshToken - 리프레시 토큰
  * @returns {Promise<Object>} - 성공 여부가 포함된 객체
  */
-export const logout = async () => {
+export const logout = async (uuid, refreshToken) => {
   try {
-    // 현재 저장된 토큰과 사용자 정보 가져오기
-    const refreshToken = await AsyncStorage.getItem(AUTH_KEYS.REFRESH_TOKEN);
-    const user = await getStoredUser();
-
-    // 서버에 로그아웃 요청을 보내되, 실패해도 계속 진행
-    await apiClient.post('/auth/logout', {
-      uuid: user?.uuid,
-      refreshToken
-    }).catch(error => {
-      console.warn('서버 로그아웃 실패:', error);
-    });
-    
-    // 로컬 토큰 삭제
-    await AsyncStorage.multiRemove([
-      AUTH_KEYS.ACCESS_TOKEN,
-      AUTH_KEYS.REFRESH_TOKEN,
-      AUTH_KEYS.USER
-    ]);
-    
-    return { success: true, message: '로그아웃되었습니다.' };
+    const response = await apiClient.post('/auth/logout', { uuid, refreshToken });
+    return handleApiResponse(response);
   } catch (error) {
-    console.error('로그아웃 중 오류:', error);
-    return { success: false, message: '로그아웃 중 오류가 발생했습니다.' };
+    return handleApiError(error);
   }
 };
 
@@ -267,50 +181,47 @@ export const validateAndRefreshToken = async () => {
     const user = await getStoredUser();
     
     if (!refreshToken || !user?.uuid) {
+      console.log('인증 정보 없음:', { hasRefreshToken: !!refreshToken, hasUser: !!user });
       return { 
         success: false, 
-        message: '인증 정보가 없습니다.',
-        shouldLogout: true 
+        message: '인증 정보가 없습니다.'
       };
     }
     
-    // 리프레시 토큰 유효성 검증
-    const response = await apiClient.post('/auth/validate-refresh-token', 
+    // 리프레시 토큰으로 인증 시도
+    const response = await apiClient.post('/auth/refresh', 
       { refreshToken, uuid: user.uuid },
       { authenticated: false }
     );
     
     const data = response.data;
+    console.log('토큰 갱신 응답:', data);
     
-    if (data.isValid) {
-      // 유효한 경우 새로운 토큰 발급
-      const newTokens = await apiClient.post('/auth/refresh-tokens', 
-        { refreshToken, uuid: user.uuid },
-        { authenticated: false }
-      );
+    if (data.refreshToken) {
+      // 새로운 리프레시 토큰 저장
+      await AsyncStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
       
-      if (newTokens.data.accessToken && newTokens.data.refreshToken) {
-        // 토큰만 업데이트하고 사용자 정보는 유지
-        await storeTokens(newTokens.data.accessToken, newTokens.data.refreshToken);
-        return { 
-          success: true, 
-          data: newTokens.data 
-        };
+      // 기존 사용자 정보 유지하면서 토큰만 업데이트
+      if (user) {
+        await storeUser(user);
       }
+      
+      return { 
+        success: true, 
+        data 
+      };
     }
     
-    // 토큰이 유효하지 않은 경우
     return { 
       success: false, 
-      message: '인증이 만료되었습니다.',
-      shouldLogout: true 
+      message: '인증에 실패했습니다.' 
     };
     
   } catch (error) {
+    console.error('토큰 갱신 실패:', error);
     return { 
       success: false, 
-      message: error.message,
-      shouldLogout: true 
+      message: error.response?.data?.message || '인증 중 오류가 발생했습니다.' 
     };
   }
 };
@@ -326,5 +237,33 @@ export const storeTokens = async (accessToken, refreshToken) => {
     }
   } catch (error) {
     console.error('토큰 저장 실패:', error);
+  }
+};
+
+/**
+ * 슈퍼패스 토큰 발급 (개발용)
+ * @returns {Promise<Object>} - 응답 데이터
+ */
+export const getSuperPassToken = async () => {
+  try {
+    let uuid;
+    const user = await getStoredUser();
+    
+    if (user?.uuid) {
+      uuid = user.uuid;
+    } else {
+      // UUID가 없는 경우 새로 생성
+      uuid = 'superpass-' + Date.now();
+    }
+
+    const response = await apiClient.post('/test/superpass', {}, {
+      headers: {
+        'Authorization': `Bearer ${uuid}`
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('슈퍼패스 토큰 발급 실패:', error);
+    throw error;
   }
 }; 

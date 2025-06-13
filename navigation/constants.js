@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 export const ROUTES = {
   // 인증 관련
   AUTH: {
-    LOGIN: 'Login',
+    LOGIN: 'PhoneLogin',
     PROFILE_SETUP: 'ProfileSetup',
     OTP_VERIFICATION: 'OtpVerification'
   },
@@ -54,7 +54,11 @@ export const ROUTES = {
   
   // 공통
   SPLASH: 'Splash',
-  ERROR: 'Error'
+  ERROR: 'Error',
+  ROOT: {
+    AUTH: 'Auth',
+    MAIN: 'MainNavigator',
+  }
 };
 
 /**
@@ -115,6 +119,16 @@ export const TAB_OPTIONS = {
     tabBarIcon: ({ focused, color, size }) => (
       <Ionicons 
         name={focused ? 'chatbubble' : 'chatbubble-outline'} 
+        size={size} 
+        color={color} 
+      />
+    )
+  },
+  [ROUTES.MAIN.BOARD]: {
+    tabBarLabel: '토크',
+    tabBarIcon: ({ focused, color, size }) => (
+      <Ionicons 
+        name={focused ? 'chatbubbles' : 'chatbubbles-outline'} 
         size={size} 
         color={color} 
       />

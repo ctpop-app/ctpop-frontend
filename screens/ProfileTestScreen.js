@@ -9,11 +9,20 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  ScrollView
 } from 'react-native';
-import { profileService } from '../services/profileService';
+import { useProfile } from '../hooks/useProfile';
+import { useDummyProfile } from '../hooks/useDummyProfile';
+
+// 간단한 랜덤 문자열 생성 함수
+const generateRandomId = () => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  return `superpass-${timestamp}-${random}`;
+};
 
 export default function ProfileTestScreen() {
+  const { getAll } = useProfile();
+  const { create: createDummyProfile, update: updateDummyProfile } = useDummyProfile();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -24,7 +33,7 @@ export default function ProfileTestScreen() {
   const loadProfiles = async () => {
     setLoading(true);
     try {
-      const data = await profileService.getProfiles({ pageSize: 100 });
+      const data = await getAll();
       setProfiles(data);
     } catch (error) {
       console.error('프로필 로드 실패:', error);
@@ -50,7 +59,27 @@ export default function ProfileTestScreen() {
 
     setGenerating(true);
     try {
-      await profileService.createDummyProfiles(numProfiles);
+      const dummyProfiles = Array(numProfiles).fill().map(() => ({
+        uuid: generateRandomId(),
+        nickname: `테스트${Math.floor(Math.random() * 1000)}`,
+        age: Math.floor(Math.random() * 20) + 20, // 20-40세
+        height: Math.floor(Math.random() * 30) + 160, // 160-190cm
+        weight: Math.floor(Math.random() * 20) + 50, // 50-70kg
+        orientation: ['트젠', '시디', '러버', '기타'][Math.floor(Math.random() * 4)],
+        city: ['서울', '부산', '인천', '대구', '광주'][Math.floor(Math.random() * 5)],
+        district: ['강남구', '서초구', '송파구', '마포구', '용산구'][Math.floor(Math.random() * 5)],
+        bio: '안녕하세요! 반갑습니다.',
+        isActive: true,
+        lastActive: new Date(),
+        mainPhotoURL: 'https://picsum.photos/200',
+        photoURLs: ['https://picsum.photos/200', 'https://picsum.photos/200'],
+        blockedUuid: []
+      }));
+
+      for (const profile of dummyProfiles) {
+        await createDummyProfile(profile);
+      }
+
       Alert.alert('성공', `${numProfiles}개의 더미 프로필이 생성되었습니다.`);
       loadProfiles(); // 목록 새로고침
     } catch (error) {
@@ -61,13 +90,12 @@ export default function ProfileTestScreen() {
     }
   };
 
-  // 프로필 삭제
-  const deleteProfile = async (profileId) => {
+  // 프로필 삭제 (비활성화)
+  const deleteProfile = async (uuid) => {
     try {
-      await profileService.deleteProfile(profileId);
-      // 목록에서 삭제된 프로필 제거
-      setProfiles(profiles.filter(profile => profile.id !== profileId));
+      await updateDummyProfile(uuid);
       Alert.alert('성공', '프로필이 삭제되었습니다.');
+      loadProfiles(); // 목록 새로고침
     } catch (error) {
       console.error('프로필 삭제 실패:', error);
       Alert.alert('오류', '프로필을 삭제하는 중 오류가 발생했습니다.');
@@ -81,7 +109,7 @@ export default function ProfileTestScreen() {
       `정말 "${profile.nickname}" 프로필을 삭제하시겠습니까?`,
       [
         { text: '취소', style: 'cancel' },
-        { text: '삭제', style: 'destructive', onPress: () => deleteProfile(profile.id) }
+        { text: '삭제', style: 'destructive', onPress: () => deleteProfile(profile.uuid) }
       ]
     );
   };
@@ -90,7 +118,7 @@ export default function ProfileTestScreen() {
   const renderProfileCard = ({ item }) => (
     <View style={styles.card}>
       <Image
-        source={{ uri: item.photoURL }}
+        source={{ uri: item.mainPhotoURL }}
         style={styles.profileImage}
         defaultSource={require('../assets/default-profile.png')}
       />
@@ -102,9 +130,9 @@ export default function ProfileTestScreen() {
             {item.age}세 • {item.height}cm • {item.weight}kg
           </Text>
         </View>
-        <Text style={styles.location}>{item.location}</Text>
-        <Text style={styles.preference}>{item.preference}</Text>
-        <Text style={styles.bio} numberOfLines={2}>{item.bio}</Text>
+        <Text style={styles.location}>{item.city} {item.district}</Text>
+        <Text style={styles.preference}>{item.orientation}</Text>
+        <Text style={styles.bio} numberOfLines={1} ellipsizeMode="tail">{item.bio}</Text>
       </View>
       
       <TouchableOpacity
@@ -163,7 +191,7 @@ export default function ProfileTestScreen() {
       <FlatList
         data={profiles}
         renderItem={renderProfileCard}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item.uuid}
         contentContainerStyle={styles.listContainer}
         refreshing={refreshing}
         onRefresh={() => {

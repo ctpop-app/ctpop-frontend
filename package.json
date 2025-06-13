@@ -7,7 +7,8 @@
     "@react-navigation/stack": "^6.3.20",
     "axios": "^1.6.7",
     "crypto-js": "^4.2.0",
-    "expo": "^53.0.10",
+    "expo": "53.0.9",
+    "expo-av": "^15.1.6",
     "expo-firebase-recaptcha": "^2.3.1",
     "expo-image-manipulator": "~13.1.7",
     "expo-image-picker": "~16.1.4",
@@ -21,17 +22,18 @@
     "metro-runtime": "^0.76.8",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "react-native": "^0.79.3",
+    "react-native": "0.79.2",
     "react-native-device-info": "^14.0.4",
     "react-native-dotenv": "^3.4.11",
     "react-native-draggable-flatlist": "^4.0.3",
-    "react-native-gesture-handler": "~2.24.0",
+    "react-native-gesture-handler": "^2.25.0",
     "react-native-otp-verify": "^1.1.8",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
-    "react-native-screens": "~4.11.1",
+    "react-native-screens": "~4.10.0",
     "react-native-web": "^0.20.0",
     "react-native-webview": "13.13.5",
+    "socket.io-client": "^4.8.1",
     "source-map": "^0.7.4",
     "source-map-generator": "^2.0.0",
     "source-map-support": "^0.5.21",
@@ -45,8 +47,5 @@
     "start": "expo start",
     "web": "expo start --web",
     "clear": "expo start --clear"
-  },
-  "devDependencies": {
-    "@react-native-community/cli": "^18.0.0"
   }
 }

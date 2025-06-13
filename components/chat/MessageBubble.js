@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { getCurrentKST } from '../../utils/dateUtils';
 
 const MessageBubble = ({ message, isOwnMessage }) => {
   const { content, timestamp, status } = message;
@@ -21,10 +22,7 @@ const MessageBubble = ({ message, isOwnMessage }) => {
         </Text>
       </View>
       <Text style={styles.timestamp}>
-        {new Date(timestamp.toDate()).toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        })}
+        {getCurrentKST(timestamp.toDate())}
       </Text>
       {isOwnMessage && (
         <Text style={styles.status}>

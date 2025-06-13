@@ -1,54 +1,137 @@
 // HomeScreen.js
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-
-const dummyUsers = [
-  {
-    id: '1',
-    name: '김민준',
-    age: 28,
-    location: '서울',
-    profilePhotoURL: null,
-    bio: '커뮤니티에서 만나게 되어 반갑습니다.',
-  },
-  {
-    id: '2',
-    name: '이서연',
-    age: 24,
-    location: '부산',
-    profilePhotoURL: null,
-    bio: '친구를 만들고 싶어요.',
-  },
-  {
-    id: '3',
-    name: '박지훈',
-    age: 30,
-    location: '대구',
-    profilePhotoURL: null,
-    bio: '취미는 영화 감상과 여행입니다.',
-  },
-];
+import { useProfile } from '../hooks/useProfile';
+import { useSocket } from '../hooks/useSocket';
+import { useAuth } from '../hooks/useAuth';
+import { getLastActiveText } from '../utils/dateUtils';
+import { getOrientationColor } from '../utils/colors';
+import useUserStore from '../store/userStore';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const { getAll, loading } = useProfile();
+  const { user } = useAuth();
+  const { isUserOnline, subscribeToUser, unsubscribeFromUser } = useSocket();
+  const { userProfile } = useUserStore();
+  const [profiles, setProfiles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+
+  const loadProfiles = useCallback(async (isBackground = false) => {
+    if (isBackground) {
+      setIsBackgroundRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+
+    try {
+      const newData = await getAll();
+      const dataWithUserProfile = userProfile ? [userProfile, ...newData] : newData;
+      
+      const sortProfiles = (a, b) => {
+        // 0. 사용자 자신의 프로필을 최상위로
+        if (a.uuid === user?.uid) return -1;
+        if (b.uuid === user?.uid) return 1;
+
+        // 1. 접속 중인 사용자를 그 다음으로
+        const aIsOnline = isUserOnline(a.uuid);
+        const bIsOnline = isUserOnline(b.uuid);
+        if (aIsOnline && !bIsOnline) return -1;
+        if (!aIsOnline && bIsOnline) return 1;
+        
+        // 2. 둘 다 접속 중이거나 둘 다 접속 중이 아닌 경우 lastActive로 정렬
+        if (!a.lastActive) return 1;
+        if (!b.lastActive) return -1;
+
+        // lastActive를 Date 객체로 변환
+        const dateA = a.lastActive.toDate ? a.lastActive.toDate() : new Date(a.lastActive);
+        const dateB = b.lastActive.toDate ? b.lastActive.toDate() : new Date(b.lastActive);
+        return dateB - dateA;
+      };
+      
+      if (isBackground) {
+        setProfiles(prevProfiles => {
+          const mergedProfiles = dataWithUserProfile.map(newProfile => {
+            const existingProfile = prevProfiles.find(p => p.uuid === newProfile.uuid);
+            if (existingProfile) {
+              return {
+                ...existingProfile,
+                ...newProfile
+              };
+            }
+            return newProfile;
+          });
+          return mergedProfiles.sort(sortProfiles);
+        });
+      } else {
+        const sortedData = dataWithUserProfile.sort(sortProfiles);
+        setProfiles(sortedData);
+      }
+      newData.forEach(profile => {
+        subscribeToUser(profile.uuid);
+      });
+    } catch (error) {
+      console.error('프로필 로드 실패:', error);
+    } finally {
+      if (isBackground) {
+        setIsBackgroundRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
+    }
+  }, [getAll, subscribeToUser, userProfile, isUserOnline, user]);
+
+  useEffect(() => {
+    loadProfiles();
+    return () => {
+      profiles.forEach(profile => {
+        unsubscribeFromUser(profile.uuid);
+      });
+    };
+  }, [loadProfiles, unsubscribeFromUser]);
 
   const renderUserCard = ({ item }) => (
     <TouchableOpacity 
       style={styles.card}
       onPress={() => {
-        // 프로필 상세 페이지로 이동 (구현 예정)
-        console.log(`사용자 ${item.id} 프로필 보기`);
+        navigation.navigate('ProfileDetail', { profile: item });
       }}
+      activeOpacity={0.8}
     >
       <Image 
         style={styles.profilePhoto}
-        source={item.profilePhotoURL ? { uri: item.profilePhotoURL } : require('../assets/default-profile.png')}
+        source={item.mainPhotoURL ? { uri: item.mainPhotoURL } : require('../assets/default-profile.png')}
       />
       <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.name}, {item.age}</Text>
-        <Text style={styles.userLocation}>{item.location}</Text>
-        <Text style={styles.userBio} numberOfLines={2}>{item.bio}</Text>
+        <View style={styles.nameAgeContainer}>
+          <Text style={styles.userName}>{item.nickname}</Text>
+          {item.age && <Text style={styles.userAge}>{item.age}세</Text>}
+          <View style={styles.statusContainer}>
+            {isUserOnline(item.uuid) ? (
+              <>
+                <View style={styles.onlineDot} />
+                <Text style={styles.onlineText}>접속중</Text>
+              </>
+            ) : (
+              <Text style={styles.lastActiveText}>{getLastActiveText(item.lastActive)}</Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.infoRow}>
+          <View style={[styles.orientationBadge, { backgroundColor: getOrientationColor(item.orientation) }]}>
+            <Text style={styles.orientationText}>{item.orientation || '미입력'}</Text>
+          </View>
+          <Text style={styles.userInfo}>
+            {item.height && `${item.height}cm`}
+            {item.weight && ` ${item.weight}kg`}
+            {(item.height || item.weight) && (item.city || item.district) ? ' · ' : ''}
+            {item.city && `${item.city} ${item.district || ''}`}
+          </Text>
+        </View>
+        <Text style={styles.userBio} numberOfLines={1} ellipsizeMode="tail">{item.bio || ''}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -61,13 +144,29 @@ export default function HomeScreen() {
           <Text style={styles.filterButtonText}>필터</Text>
         </TouchableOpacity>
       </View>
-      
-      <FlatList
-        data={dummyUsers}
-        renderItem={renderUserCard}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
-      />
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#FF6B6B" style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={profiles}
+          renderItem={renderUserCard}
+          keyExtractor={item => item.uuid}
+          contentContainerStyle={styles.listContainer}
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            loadProfiles().finally(() => setRefreshing(false));
+          }}
+          ListHeaderComponent={
+            isBackgroundRefreshing ? (
+              <View style={styles.refreshIndicator}>
+                <ActivityIndicator size="small" color="#FF6B6B" />
+                <Text style={styles.refreshText}>접속 상태 업데이트 중...</Text>
+              </View>
+            ) : null
+          }
+        />
+      )}
     </View>
   );
 }
@@ -103,43 +202,109 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContainer: {
-    padding: 16,
+    padding: 6,
   },
   card: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 8,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 16,
+    borderRadius: 10,
+    marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 2,
+    elevation: 1,
   },
   profilePhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 16,
+    width: 50,
+    height: 50,
+    borderRadius: 24,
+    marginRight: 10,
   },
   userInfo: {
     flex: 1,
     justifyContent: 'center',
   },
-  userName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  nameAgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  userLocation: {
-    fontSize: 14,
+  userName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 6,
+  },
+  userAge: {
+    fontSize: 15,
     color: '#666',
-    marginBottom: 8,
+  },
+  userLocation: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 6,
   },
   userBio: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#444',
-    lineHeight: 20,
+    lineHeight: 18,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
+    marginRight: 4,
+  },
+  onlineText: {
+    fontSize: 13,
+    color: '#4CAF50',
+  },
+  lastActiveText: {
+    fontSize: 13,
+    color: '#999',
+  },
+  refreshIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  refreshText: {
+    marginLeft: 8,
+    color: '#FF6B6B',
+    fontSize: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  orientationBadge: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  orientationText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  userInfo: {
+    fontSize: 13,
+    color: '#666',
+    flex: 1,
   },
 }); 
