@@ -46,8 +46,11 @@ export default function MessageScreen() {
     <TouchableOpacity 
       style={styles.messageItem}
       onPress={() => {
-        // 채팅 상세 화면으로 이동 (구현 예정)
-        console.log(`${item.sender}와의 대화 열기`);
+        // 채팅 상세 화면으로 이동
+        navigation.navigate('ChatDetail', {
+          sender: item.sender,
+          profilePhotoURL: item.profilePhotoURL
+        });
       }}
     >
       <Image 

@@ -10,6 +10,7 @@ import ProfileDetailScreen from '../screens/ProfileDetailScreen';
 import BoardWriteScreen from '../screens/BoardWriteScreen';
 import BoardScreen from '../screens/BoardScreen';
 import BlockedListScreen from '../screens/BlockedListScreen';
+import ChatDetailScreen from '../screens/ChatDetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -78,6 +79,19 @@ const MainNavigator = () => {
         component={BlockedListScreen}
         options={{ 
           title: '차단 목록',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#fff',
+            elevation: 0,
+            shadowOpacity: 0
+          }
+        }}
+      />
+      <Stack.Screen 
+        name={ROUTES.CHAT.CHAT_DETAIL} 
+        component={ChatDetailScreen}
+        options={{ 
+          title: '채팅',
           headerShown: true,
           headerStyle: {
             backgroundColor: '#fff',
