@@ -31,6 +31,27 @@ export default function HomeScreen() {
       const newData = await getAll();
       const dataWithUserProfile = userProfile ? [userProfile, ...newData] : newData;
       
+      const sortProfiles = (a, b) => {
+        // 0. 사용자 자신의 프로필을 최상위로
+        if (a.uuid === user?.uid) return -1;
+        if (b.uuid === user?.uid) return 1;
+
+        // 1. 접속 중인 사용자를 그 다음으로
+        const aIsOnline = isUserOnline(a.uuid);
+        const bIsOnline = isUserOnline(b.uuid);
+        if (aIsOnline && !bIsOnline) return -1;
+        if (!aIsOnline && bIsOnline) return 1;
+        
+        // 2. 둘 다 접속 중이거나 둘 다 접속 중이 아닌 경우 lastActive로 정렬
+        if (!a.lastActive) return 1;
+        if (!b.lastActive) return -1;
+
+        // lastActive를 Date 객체로 변환
+        const dateA = a.lastActive.toDate ? a.lastActive.toDate() : new Date(a.lastActive);
+        const dateB = b.lastActive.toDate ? b.lastActive.toDate() : new Date(b.lastActive);
+        return dateB - dateA;
+      };
+      
       if (isBackground) {
         setProfiles(prevProfiles => {
           const mergedProfiles = dataWithUserProfile.map(newProfile => {
@@ -43,23 +64,17 @@ export default function HomeScreen() {
             }
             return newProfile;
           });
-          return mergedProfiles.sort((a, b) => {
-            const timeA = a.lastActive ? new Date(a.lastActive).getTime() : 0;
-            const timeB = b.lastActive ? new Date(b.lastActive).getTime() : 0;
-            return timeB - timeA;
-          });
+          return mergedProfiles.sort(sortProfiles);
         });
       } else {
-        const sortedData = dataWithUserProfile.sort((a, b) => {
-          const timeA = a.lastActive ? new Date(a.lastActive).getTime() : 0;
-          const timeB = b.lastActive ? new Date(b.lastActive).getTime() : 0;
-          return timeB - timeA;
-        });
+        const sortedData = dataWithUserProfile.sort(sortProfiles);
         setProfiles(sortedData);
       }
       newData.forEach(profile => {
         subscribeToUser(profile.uuid);
       });
+    } catch (error) {
+      console.error('프로필 로드 실패:', error);
     } finally {
       if (isBackground) {
         setIsBackgroundRefreshing(false);
@@ -67,7 +82,7 @@ export default function HomeScreen() {
         setIsLoading(false);
       }
     }
-  }, [getAll, subscribeToUser, userProfile]);
+  }, [getAll, subscribeToUser, userProfile, isUserOnline, user]);
 
   useEffect(() => {
     loadProfiles();
@@ -116,7 +131,7 @@ export default function HomeScreen() {
             {item.city && `${item.city} ${item.district || ''}`}
           </Text>
         </View>
-        <Text style={styles.userBio} numberOfLines={2}>{item.bio || ''}</Text>
+        <Text style={styles.userBio} numberOfLines={1} ellipsizeMode="tail">{item.bio || ''}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -187,7 +202,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContainer: {
-    padding: 16,
+    padding: 6,
   },
   card: {
     flexDirection: 'row',
@@ -202,8 +217,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   profilePhoto: {
-    width: 48,
-    height: 48,
+    width: 50,
+    height: 50,
     borderRadius: 24,
     marginRight: 10,
   },

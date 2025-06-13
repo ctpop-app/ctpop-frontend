@@ -1,4 +1,4 @@
-import { collection, query, where, limit, getDocs, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, limit, getDocs, setDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { API_ENDPOINTS } from './constants';
@@ -7,10 +7,9 @@ import { handleApiError } from './utils/errorHandler';
 export const profileApi = {
   async exists(uuid) {
     try {
-      const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
-      const q = query(profilesRef, where('uuid', '==', uuid), where('isActive', '==', true), limit(1));
-      const querySnapshot = await getDocs(q);
-      return !querySnapshot.empty;
+      const profileRef = doc(db, API_ENDPOINTS.PROFILES, uuid);
+      const profileDoc = await getDoc(profileRef);
+      return profileDoc.exists() && profileDoc.data().isActive;
     } catch (error) {
       return handleApiError(error);
     }
@@ -18,8 +17,9 @@ export const profileApi = {
 
   async create(data) {
     try {
-      const docRef = await addDoc(collection(db, API_ENDPOINTS.PROFILES), data);
-      return { id: docRef.id, ...data };
+      const profileRef = doc(db, API_ENDPOINTS.PROFILES, data.uuid);
+      await setDoc(profileRef, data);
+      return data;
     } catch (error) {
       console.error('프로필 생성 실패:', error);
       throw error;
@@ -28,18 +28,17 @@ export const profileApi = {
 
   async get(uuid) {
     try {
-      const profilesRef = collection(db, API_ENDPOINTS.PROFILES);
-      const q = query(profilesRef, where('uuid', '==', uuid), where('isActive', '==', true), limit(1));
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.empty ? null : querySnapshot.docs[0];
+      const profileRef = doc(db, API_ENDPOINTS.PROFILES, uuid);
+      const profileDoc = await getDoc(profileRef);
+      return profileDoc.exists() && profileDoc.data().isActive ? profileDoc : null;
     } catch (error) {
       return handleApiError(error);
     }
   },
   
-  async update(id, data) {
+  async update(uuid, data) {
     try {
-      const profileRef = doc(db, API_ENDPOINTS.PROFILES, id);
+      const profileRef = doc(db, API_ENDPOINTS.PROFILES, uuid);
       await updateDoc(profileRef, data);
       return data;
     } catch (error) {
@@ -67,6 +66,6 @@ export const profileApi = {
     const profilesRef = collection(db, 'profiles');
     const q = query(profilesRef, where('isActive', '==', true));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map(doc => ({ ...doc.data() }));
   },
 }; 

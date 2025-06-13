@@ -8,6 +8,7 @@
     "axios": "^1.6.7",
     "crypto-js": "^4.2.0",
     "expo": "53.0.9",
+    "expo-av": "^15.1.6",
     "expo-firebase-recaptcha": "^2.3.1",
     "expo-image-manipulator": "~13.1.7",
     "expo-image-picker": "~16.1.4",
