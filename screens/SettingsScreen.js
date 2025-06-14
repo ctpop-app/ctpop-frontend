@@ -209,6 +209,7 @@ const SettingsScreen = () => {
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>개발자 옵션</Text>
           {renderLinkItem('people-outline', '프로필 테스트', () => navigation.navigate(ROUTES.MAIN.PROFILE_TEST))}
+          {renderLinkItem('people-outline', '접속자 목록', () => navigation.navigate('OnlineUsers'))}
         </View>
 
         {/* 로그아웃 및 회원탈퇴 */}
