@@ -3,8 +3,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useProfile } from '../hooks/useProfile';
-import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
+import { useSocket } from '../hooks/useSocket';
 import { getLastActiveText } from '../utils/dateUtils';
 import { getOrientationColor } from '../utils/colors';
 import useUserStore from '../store/userStore';
@@ -13,12 +13,18 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { getAll, loading } = useProfile();
   const { user } = useAuth();
-  const { isUserOnline, subscribeToUser, unsubscribeFromUser } = useSocket();
+  const { isUserOnline, subscribeToUser, unsubscribeFromUser, onlineUsers } = useSocket();
   const { userProfile } = useUserStore();
   const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (onlineUsers.size > 0) {
+      console.log('현재 접속자 목록:', Array.from(onlineUsers));
+    }
+  }, [onlineUsers]);
 
   const loadProfiles = useCallback(async (isBackground = false) => {
     if (isBackground) {

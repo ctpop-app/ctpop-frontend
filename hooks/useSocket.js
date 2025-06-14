@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { socketService } from '../services/socketService';
 import { useAuth } from './useAuth';
 
+// 전역 변수로 연결 상태 관리
+let isConnecting = false;
+
 export const useSocket = () => {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState(new Set());
@@ -21,19 +24,36 @@ export const useSocket = () => {
 
   // 소켓 연결 설정
   useEffect(() => {
-    if (user?.uuid) {
-      socketService.connect(user.uuid);
-      // 현재 사용자의 온라인 상태 추가
-      setOnlineUsers(prev => {
-        const newSet = new Set(prev);
-        newSet.add(user.uuid);
-        return newSet;
-      });
-    }
+    // 이미 연결 중이거나 user가 없으면 무시
+    if (isConnecting || !user?.uuid) return;
+
+    isConnecting = true;
+    socketService.connect(user.uuid);
+    
+    // 현재 사용자의 온라인 상태 추가
+    setOnlineUsers(prev => {
+      const newSet = new Set(prev);
+      newSet.add(user.uuid);
+      return newSet;
+    });
+
+    // 하트비트 시작
+    socketService.startHeartbeat();
+
+    // cleanup 함수
     return () => {
+      isConnecting = false;
+      socketService.stopHeartbeat();
       socketService.disconnect();
     };
-  }, [user]);
+  }, [user?.uuid]); // user.uuid만 의존성으로 사용
+
+  // 하트비트 로깅을 위한 별도의 useEffect
+  useEffect(() => {
+    if (onlineUsers.size > 0) {
+      console.log('현재 접속자 목록:', Array.from(onlineUsers));
+    }
+  }, [onlineUsers]);
 
   // 특정 사용자의 온라인 상태 구독
   const subscribeToUser = useCallback((uuid) => {

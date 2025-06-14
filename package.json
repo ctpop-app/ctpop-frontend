@@ -33,7 +33,7 @@
     "react-native-screens": "~4.10.0",
     "react-native-web": "^0.20.0",
     "react-native-webview": "13.13.5",
-    "socket.io-client": "^4.8.1",
+    "socket.io-client": "^2.0.4",
     "source-map": "^0.7.4",
     "source-map-generator": "^2.0.0",
     "source-map-support": "^0.5.21",
