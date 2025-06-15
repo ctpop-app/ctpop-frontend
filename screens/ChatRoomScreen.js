@@ -43,30 +43,6 @@ const dummyMessages = {
       timestamp: new Date(Date.now() - 3400000).toISOString(),
       status: 'read'
     }
-  ],
-  '2': [
-    {
-      id: '2-1',
-      text: '오늘 저녁에 시간 되세요?',
-      senderId: '2',
-      timestamp: new Date(Date.now() - 7200000).toISOString(), // 2시간 전
-    }
-  ],
-  '3': [
-    {
-      id: '3-1',
-      text: '추천해주신 카페 정말 좋았어요.',
-      senderId: '3',
-      timestamp: new Date(Date.now() - 86400000).toISOString(), // 1일 전
-    }
-  ],
-  '4': [
-    {
-      id: '4-1',
-      text: '행사 정보 공유해 주셔서 감사합니다!',
-      senderId: '4',
-      timestamp: new Date(Date.now() - 172800000).toISOString(), // 2일 전
-    }
   ]
 };
 
