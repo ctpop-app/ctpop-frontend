@@ -10,6 +10,7 @@ import ProfileDetailScreen from '../screens/ProfileDetailScreen';
 import BoardWriteScreen from '../screens/BoardWriteScreen';
 import BoardScreen from '../screens/BoardScreen';
 import BlockedListScreen from '../screens/BlockedListScreen';
+import OnlineUsersScreen from '../screens/OnlineUsersScreen';
 
 const Stack = createStackNavigator();
 
@@ -78,6 +79,19 @@ const MainNavigator = () => {
         component={BlockedListScreen}
         options={{ 
           title: '차단 목록',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#fff',
+            elevation: 0,
+            shadowOpacity: 0
+          }
+        }}
+      />
+      <Stack.Screen 
+        name="OnlineUsers" 
+        component={OnlineUsersScreen}
+        options={{ 
+          title: '접속자 목록',
           headerShown: true,
           headerStyle: {
             backgroundColor: '#fff',

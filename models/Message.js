@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Timestamp } from 'firebase/firestore';
+import { getCurrentKST } from '../utils/dateUtils';
 
 class Message {
   constructor(data = {}) {
@@ -7,7 +8,7 @@ class Message {
     this.chatId = data.chatId;
     this.content = data.content;
     this.uuid = data.uuid;
-    this.timestamp = data.timestamp || Timestamp.now();
+    this.timestamp = data.timestamp || getCurrentKST();
     this.isRead = data.isRead || false;
     this.type = data.type || 'text';
     this.metadata = data.metadata || {};

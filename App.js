@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // State management
 import useUserStore from './store/userStore';
 import { useAuth } from './hooks/useAuth';
+import { useSocket } from './hooks/useSocket';
 
 // 서버 설정
 import { discoverServer } from './utils/discovery';
@@ -25,25 +26,12 @@ import { ROUTES, HEADER_OPTIONS } from './navigation/constants';
 import { COLORS } from './components/profile-setup/constants';
 import { refreshAccessToken, isRefreshTokenExpired, clearTokens } from './services/authService';
 import { AUTH_KEYS } from './utils/constants';
+import ErrorScreen from './components/ErrorScreen';
 
 const Stack = createStackNavigator();
 
-// 에러 화면 컴포넌트
-const ErrorScreen = ({ error, onRetry }) => (
-  <View style={styles.errorContainer}>
-    <Text style={styles.errorTitle}>초기화 오류</Text>
-    <Text style={styles.errorMessage}>{error}</Text>
-    <Text style={styles.errorHint}>앱을 다시 시작하거나 네트워크 연결을 확인해주세요.</Text>
-    {onRetry && (
-      <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-        <Text style={styles.retryButtonText}>다시 시도</Text>
-      </TouchableOpacity>
-    )}
-  </View>
-);
-
 // 앱 초기화 함수
-const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, clearUser) => {
+const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, clearUser, connect) => {
   try {
     console.log('앱 초기화 시작');
     setIsLoading(true);
@@ -72,6 +60,13 @@ const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, cle
     }
     console.log('인증 상태 확인 완료:', isAuth);
 
+    // 4. 소켓 연결
+    if (isAuth) {
+      console.log('소켓 연결 시작');
+      connect();
+      console.log('소켓 연결 완료');
+    }
+
   } catch (err) {
     console.error('앱 초기화 실패:', err);
     setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
@@ -87,6 +82,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const { checkAuth } = useAuth();
+  const { connect } = useSocket();
   
   // Zustand store 사용
   const userStore = useUserStore();
@@ -98,7 +94,7 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       try {
-        await initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser);
+        await initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser, connect);
       } catch (err) {
         console.error('앱 초기화 실패:', err);
         setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
@@ -113,8 +109,8 @@ export default function App() {
   const handleRetry = useCallback(() => {
     setError(null);
     setIsLoading(true);
-    initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser);
-  }, [checkAuth, clearTokens, clearUser]);
+    initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser, connect);
+  }, [checkAuth, clearTokens, clearUser, connect]);
 
   // 디버그 로그
   console.log('=== 렌더링 상태 ===');
