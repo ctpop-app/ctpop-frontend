@@ -1,86 +1,104 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { getCurrentKST } from '../../utils/dateUtils';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import { formatMessageTime } from '../../utils/dateUtils';
 
-const MessageBubble = ({ message, isOwnMessage }) => {
-  const { content, timestamp, status } = message;
+const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
+  const { text, timestamp, status } = message;
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'sending': return '전송 중';
+      case 'sent': return '전송됨';
+      case 'delivered': return '전달됨';
+      case 'read': return '읽음';
+      default: return '';
+    }
+  };
 
   return (
-    <View style={[
-      styles.container,
-      isOwnMessage ? styles.ownMessage : styles.otherMessage
-    ]}>
-      <View style={[
-        styles.bubble,
-        isOwnMessage ? styles.ownBubble : styles.otherBubble
-      ]}>
-        <Text style={[
-          styles.text,
-          isOwnMessage ? styles.ownText : styles.otherText
-        ]}>
-          {content}
-        </Text>
-      </View>
-      <Text style={styles.timestamp}>
-        {getCurrentKST(timestamp.toDate())}
-      </Text>
-      {isOwnMessage && (
-        <Text style={styles.status}>
-          {status === 'sending' ? '전송 중' : 
-           status === 'sent' ? '전송됨' :
-           status === 'delivered' ? '전달됨' :
-           status === 'read' ? '읽음' : ''}
-        </Text>
+    <View style={[styles.messageRow, isOwnMessage ? styles.messageRowMe : styles.messageRowOther]}>
+      {!isOwnMessage && (
+        <Image
+          source={otherUserPhotoURL ? { uri: otherUserPhotoURL } : require('../../assets/default-profile.png')}
+          style={styles.avatar}
+        />
       )}
+      <View style={styles.messageContainer}>
+        <View style={[styles.messageBubble, isOwnMessage ? styles.messageBubbleMe : styles.messageBubbleOther]}>
+          <Text style={[styles.messageText, isOwnMessage ? styles.messageTextMe : styles.messageTextOther]}>
+            {text}
+          </Text>
+        </View>
+        <View style={styles.messageFooter}>
+          <Text style={styles.messageTime}>
+            {formatMessageTime(timestamp)}
+            {isOwnMessage && status && (
+              <Text style={styles.status}> · {getStatusText(status)}</Text>
+            )}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: 4,
-    maxWidth: '80%',
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 8,
   },
-  ownMessage: {
-    alignSelf: 'flex-end',
+  messageRowMe: {
+    flexDirection: 'row-reverse',
   },
-  otherMessage: {
-    alignSelf: 'flex-start',
+  messageRowOther: {
+    flexDirection: 'row',
   },
-  bubble: {
-    padding: 12,
-    borderRadius: 20,
-    maxWidth: '100%',
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 6,
   },
-  ownBubble: {
-    backgroundColor: '#007AFF',
+  messageContainer: {
+    maxWidth: '70%',
+    alignItems: 'flex-end',
+  },
+  messageBubble: {
+    padding: 10,
+    borderRadius: 16,
+  },
+  messageBubbleMe: {
+    backgroundColor: '#FF6B6B',
     borderBottomRightRadius: 4,
   },
-  otherBubble: {
-    backgroundColor: '#E5E5EA',
+  messageBubbleOther: {
+    backgroundColor: '#fff',
     borderBottomLeftRadius: 4,
   },
-  text: {
-    fontSize: 16,
+  messageText: {
+    fontSize: 15,
     lineHeight: 20,
   },
-  ownText: {
-    color: '#FFFFFF',
+  messageTextMe: {
+    color: '#fff',
   },
-  otherText: {
-    color: '#000000',
+  messageTextOther: {
+    color: '#222',
   },
-  timestamp: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 4,
-    alignSelf: 'flex-end',
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    marginHorizontal: 4,
+  },
+  messageTime: {
+    fontSize: 11,
+    color: '#aaa',
   },
   status: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 2,
-    alignSelf: 'flex-end',
+    fontSize: 11,
+    color: '#aaa',
   },
 });
 

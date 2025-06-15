@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -14,6 +13,59 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
+import MessageBubble from '../components/chat/MessageBubble';
+import MessageInput from '../components/chat/MessageInput';
+
+// 더미 메시지 데이터
+const dummyMessages = {
+  '1': [
+    {
+      id: '1-1',
+      text: '안녕하세요! 반갑습니다.',
+      senderId: '1',
+      timestamp: new Date(Date.now() - 3600000).toISOString(), // 1시간 전
+      status: 'read'
+    },
+    {
+      id: '1-2',
+      text: '네, 반갑습니다!',
+      senderId: 'current-user',
+      timestamp: new Date(Date.now() - 3500000).toISOString(),
+      status: 'delivered'
+    },
+    {
+      id: '1-3',
+      text: '오늘 날씨가 정말 좋네요.',
+      senderId: '1',
+      timestamp: new Date(Date.now() - 3400000).toISOString(),
+      status: 'read'
+    }
+  ],
+  '2': [
+    {
+      id: '2-1',
+      text: '오늘 저녁에 시간 되세요?',
+      senderId: '2',
+      timestamp: new Date(Date.now() - 7200000).toISOString(), // 2시간 전
+    }
+  ],
+  '3': [
+    {
+      id: '3-1',
+      text: '추천해주신 카페 정말 좋았어요.',
+      senderId: '3',
+      timestamp: new Date(Date.now() - 86400000).toISOString(), // 1일 전
+    }
+  ],
+  '4': [
+    {
+      id: '4-1',
+      text: '행사 정보 공유해 주셔서 감사합니다!',
+      senderId: '4',
+      timestamp: new Date(Date.now() - 172800000).toISOString(), // 2일 전
+    }
+  ]
+};
 
 export default function ChatRoomScreen() {
   const route = useRoute();
@@ -22,43 +74,56 @@ export default function ChatRoomScreen() {
   const { user } = useAuth();
   const { isUserOnline } = useSocket();
   const [messages, setMessages] = useState([]);
-  const [inputText, setInputText] = useState('');
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
-    
+  // 채팅방 ID에 해당하는 더미 메시지 로드
+  useEffect(() => {
+    const chatMessages = dummyMessages[chatRoomId] || [];
+    setMessages(chatMessages);
+  }, [chatRoomId]);
+
+  const handleSend = (text) => {
     const newMessage = {
       id: Date.now().toString(),
-      text: inputText.trim(),
-      senderId: user.uuid,
+      text: text,
+      senderId: 'current-user',
       timestamp: new Date().toISOString(),
+      status: 'sending' // 초기 상태는 'sending'
     };
     
     setMessages(prev => [...prev, newMessage]);
-    setInputText('');
-    // TODO: 소켓을 통해 메시지 전송
+
+    // 메시지 전송 시뮬레이션 (실제 구현 시에는 소켓 이벤트로 대체)
+    setTimeout(() => {
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { ...msg, status: 'sent' }
+            : msg
+        )
+      );
+    }, 1000);
+
+    // 전달 상태 시뮬레이션
+    setTimeout(() => {
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { ...msg, status: 'delivered' }
+            : msg
+        )
+      );
+    }, 2000);
   };
 
   const renderMessage = ({ item }) => {
-    const isMe = item.senderId === user.uuid;
+    const isMe = item.senderId === 'current-user';
     
     return (
-      <View style={[styles.messageRow, isMe ? styles.messageRowMe : styles.messageRowOther]}>
-        {!isMe && (
-          <Image
-            source={otherUser.mainPhotoURL ? { uri: otherUser.mainPhotoURL } : require('../assets/default-profile.png')}
-            style={styles.avatar}
-          />
-        )}
-        <View style={[styles.messageBubble, isMe ? styles.messageBubbleMe : styles.messageBubbleOther]}>
-          <Text style={[styles.messageText, isMe ? styles.messageTextMe : styles.messageTextOther]}>
-            {item.text}
-          </Text>
-        </View>
-        <Text style={styles.messageTime}>
-          {new Date(item.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-        </Text>
-      </View>
+      <MessageBubble
+        message={item}
+        isOwnMessage={isMe}
+        otherUserPhotoURL={otherUser.mainPhotoURL}
+      />
     );
   };
 
@@ -95,25 +160,10 @@ export default function ChatRoomScreen() {
       />
 
       {/* 입력 영역 */}
-      <View style={styles.inputContainer}>
-        <TouchableOpacity style={styles.plusButton}>
-          <MaterialIcons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
-        <TextInput
-          style={styles.input}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="메시지를 입력하세요..."
-          placeholderTextColor="#999"
-        />
-        <TouchableOpacity 
-          style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!inputText.trim()}
-        >
-          <Text style={styles.sendButtonText}>전송</Text>
-        </TouchableOpacity>
-      </View>
+      <MessageInput
+        onSend={handleSend}
+        uuid={user.uuid}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -157,91 +207,5 @@ const styles = StyleSheet.create({
   },
   messageListContent: {
     padding: 12,
-  },
-  messageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 8,
-  },
-  messageRowMe: {
-    flexDirection: 'row-reverse',
-  },
-  messageRowOther: {
-    flexDirection: 'row',
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 6,
-  },
-  messageBubble: {
-    maxWidth: '70%',
-    padding: 10,
-    borderRadius: 16,
-    marginHorizontal: 6,
-  },
-  messageBubbleMe: {
-    backgroundColor: '#FF6B6B',
-    borderBottomRightRadius: 4,
-  },
-  messageBubbleOther: {
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  messageTextMe: {
-    color: '#fff',
-  },
-  messageTextOther: {
-    color: '#222',
-  },
-  messageTime: {
-    fontSize: 11,
-    color: '#aaa',
-    marginHorizontal: 4,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  plusButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#FF6B6B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    height: 40,
-    backgroundColor: '#f2f2f2',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    fontSize: 15,
-    marginRight: 8,
-  },
-  sendButton: {
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#ffb3b3',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '500',
   },
 }); 
