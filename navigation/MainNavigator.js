@@ -10,7 +10,7 @@ import ProfileDetailScreen from '../screens/ProfileDetailScreen';
 import BoardWriteScreen from '../screens/BoardWriteScreen';
 import BoardScreen from '../screens/BoardScreen';
 import BlockedListScreen from '../screens/BlockedListScreen';
-import ChatDetailScreen from '../screens/ChatDetailScreen';
+import ChatRoomScreen from '../screens/ChatRoomScreen';
 
 const Stack = createStackNavigator();
 
@@ -88,11 +88,11 @@ const MainNavigator = () => {
         }}
       />
       <Stack.Screen 
-        name={ROUTES.CHAT.CHAT_DETAIL} 
-        component={ChatDetailScreen}
+        name="ChatRoom" 
+        component={ChatRoomScreen}
         options={{ 
           title: '채팅',
-          headerShown: true,
+          headerShown: false,
           headerStyle: {
             backgroundColor: '#fff',
             elevation: 0,

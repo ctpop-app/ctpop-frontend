@@ -47,9 +47,14 @@ export default function MessageScreen() {
       style={styles.messageItem}
       onPress={() => {
         // 채팅 상세 화면으로 이동
-        navigation.navigate('ChatDetail', {
-          sender: item.sender,
-          profilePhotoURL: item.profilePhotoURL
+        console.debug('채팅 상세 화면으로 이동', item);
+        navigation.navigate('ChatRoom', {
+          chatRoomId: item.id,
+          otherUser: {
+            uuid: item.id,
+            nickname: item.sender,
+            mainPhotoURL: item.profilePhotoURL
+          }
         });
       }}
     >
