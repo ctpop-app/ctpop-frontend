@@ -11,6 +11,7 @@ import BoardWriteScreen from '../screens/BoardWriteScreen';
 import BoardScreen from '../screens/BoardScreen';
 import BlockedListScreen from '../screens/BlockedListScreen';
 import ChatRoomScreen from '../screens/ChatRoomScreen';
+import OnlineUsersScreen from '../screens/OnlineUsersScreen';
 
 const Stack = createStackNavigator();
 
@@ -93,6 +94,14 @@ const MainNavigator = () => {
         options={{ 
           title: '채팅',
           headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="OnlineUsers" 
+        component={OnlineUsersScreen}
+        options={{ 
+          title: '접속자 목록',
+          headerShown: true,
           headerStyle: {
             backgroundColor: '#fff',
             elevation: 0,

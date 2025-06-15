@@ -72,7 +72,7 @@ const useUserStore = create(
             user: null, 
             userProfile: null, 
             isAuthenticated: false, 
-            hasProfile: false 
+            hasProfile: false
           }));
           // 2. persist 스토리지 초기화
           await AsyncStorage.removeItem('user-storage');
