@@ -1,16 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { socketService } from '../services/socketService';
 import { useAuth } from './useAuth';
-
-// 전역 변수로 연결 상태 관리
-let isConnecting = false;
 
 export const useSocket = () => {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState(new Set());
 
   // 사용자 상태 변경 핸들러
-  const handleStatusChange = useCallback((uuid, isOnline) => {
+  const handleUserStatus = useCallback(({ uuid, isOnline }) => {
+    console.log('Handling user status:', { uuid, isOnline });
     setOnlineUsers(prev => {
       const newSet = new Set(prev);
       if (isOnline) {
@@ -22,13 +20,19 @@ export const useSocket = () => {
     });
   }, []);
 
-  // 소켓 연결 설정
-  useEffect(() => {
-    // 이미 연결 중이거나 user가 없으면 무시
-    if (isConnecting || !user?.uuid) return;
+  // 온라인 사용자 목록 핸들러
+  const handleOnlineUsersList = useCallback((users) => {
+    console.log('Received online users list:', users);
+    setOnlineUsers(new Set(users));
+  }, []);
 
-    isConnecting = true;
+  // 소켓 연결
+  const connect = useCallback(() => {
+    if (!user?.uuid) return;
+    
     socketService.connect(user.uuid);
+    socketService.on('userStatusUpdate', handleUserStatus);
+    socketService.on('onlineUsersList', handleOnlineUsersList);
     
     // 현재 사용자의 온라인 상태 추가
     setOnlineUsers(prev => {
@@ -36,46 +40,34 @@ export const useSocket = () => {
       newSet.add(user.uuid);
       return newSet;
     });
+  }, [user?.uuid, handleUserStatus, handleOnlineUsersList]);
 
-    // 하트비트 시작
-    socketService.startHeartbeat();
-
-    // cleanup 함수
-    return () => {
-      isConnecting = false;
-      socketService.stopHeartbeat();
-      socketService.disconnect();
-    };
-  }, [user?.uuid]); // user.uuid만 의존성으로 사용
-
-  // 하트비트 로깅을 위한 별도의 useEffect
-  useEffect(() => {
-    if (onlineUsers.size > 0) {
-      console.log('현재 접속자 목록:', Array.from(onlineUsers));
-    }
-  }, [onlineUsers]);
-
-  // 특정 사용자의 온라인 상태 구독
-  const subscribeToUser = useCallback((uuid) => {
-    socketService.subscribeToUserStatus(uuid, (isOnline) => {
-      handleStatusChange(uuid, isOnline);
-    });
-  }, [handleStatusChange]);
-
-  // 특정 사용자의 온라인 상태 구독 해제
-  const unsubscribeFromUser = useCallback((uuid) => {
-    socketService.unsubscribeFromUserStatus(uuid, handleStatusChange);
-  }, [handleStatusChange]);
+  // 소켓 연결 해제
+  const disconnect = useCallback(async () => {
+    socketService.off('userStatusUpdate', handleUserStatus);
+    socketService.off('onlineUsersList', handleOnlineUsersList);
+    await socketService.disconnect();
+  }, [handleUserStatus, handleOnlineUsersList]);
 
   // 사용자가 온라인인지 확인
   const isUserOnline = useCallback((uuid) => {
     return onlineUsers.has(uuid);
   }, [onlineUsers]);
 
+  // 컴포넌트 마운트/언마운트 시 이벤트 리스너 설정/해제
+  useEffect(() => {
+    if (user?.uuid) {
+      connect();
+    }
+    return () => {
+      disconnect();
+    };
+  }, [user?.uuid, connect, disconnect]);
+
   return {
     isUserOnline,
-    subscribeToUser,
-    unsubscribeFromUser,
-    onlineUsers
+    onlineUsers,
+    connect,
+    disconnect
   };
 }; 

@@ -1,132 +1,123 @@
 import { socketApi } from '../api/socket';
 import { profileService } from './profileService';
 import { getCurrentKST } from '../utils/dateUtils';
+import { userStore } from '../store/userStore';
 
-class SocketService {
-  constructor() {
-    this.heartbeatInterval = null;
-    this.statusListeners = new Map();
-    this.lastPongTime = null;
-    this.connectionCheckInterval = null;
+let heartbeatInterval = null;
+
+const startHeartbeat = () => {
+  console.log('SocketService: Setting up heartbeat interval...');
+  heartbeatInterval = setInterval(() => {
+    if (socketApi.isConnected()) {
+      console.log('Ping sent');
+      socketApi.emit('heartbeat');
+    } else {
+      console.log('Socket not connected, skipping heartbeat');
+    }
+  }, 30000);
+};
+
+const stopHeartbeat = () => {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
   }
+};
 
-  connect(uuid) {
-    console.log('SocketService: Starting connection...');
-    socketApi.connect(uuid);
-    this.setupEventListeners();
-    console.log('SocketService: Starting heartbeat...');
-    this.startHeartbeat();
-    this.startConnectionCheck();
-  }
+const setupEventListeners = () => {
+  socketApi.on('connect', () => {
+    console.log('Socket connected');
+    userStore.setOnlineStatus(true);
+  });
 
-  async disconnect() {
-    this.stopHeartbeat();
-    this.stopConnectionCheck();
-    this.statusListeners.clear();
+  socketApi.on('disconnect', async () => {
+    console.log('Socket disconnected');
+    stopHeartbeat();
+    userStore.setOnlineStatus(false);
     
-    // 연결 해제 시 lastActive 업데이트
-    if (socketApi.socket?.auth?.uuid) {
+    const uuid = socketApi.getUuid();
+    if (uuid) {
       try {
-        await profileService.updateLastActive(socketApi.socket.auth.uuid, getCurrentKST());
+        await profileService.updateLastActive(uuid, getCurrentKST());
       } catch (error) {
         console.error('Failed to update lastActive:', error);
       }
     }
-    
-    socketApi.disconnect();
+  });
+
+  socketApi.on('error', (error) => {
+    console.error('Socket error:', error);
+  });
+
+  socketApi.on('pong', () => {
+    console.log('Pong received');
+    console.log('Connection alive');
+  });
+
+  socketApi.on('userStatus', ({ uuid, isOnline }) => {
+    console.log('User status update:', { uuid, isOnline });
+    // 소켓이 연결된 상태에서만 이벤트 emit
+    if (socketApi.isConnected()) {
+      socketApi.emit('userStatusUpdate', { uuid, isOnline });
+    } else {
+      console.log('Socket not connected, skipping userStatusUpdate emit');
+    }
+  });
+
+  // 소켓이 연결된 상태에서만 온라인 사용자 목록 요청
+  if (socketApi.isConnected()) {
+    socketApi.emit('getOnlineUsers');
   }
+};
 
-  setupEventListeners() {
-    socketApi.on('connect', () => {
-      console.log('Socket connected');
-      this.lastPongTime = Date.now();
-    });
-
-    socketApi.on('disconnect', async () => {
-      console.log('Socket disconnected');
-      this.stopHeartbeat();
-      this.stopConnectionCheck();
-      
-      // 연결 끊김 시 lastActive 업데이트
-      if (socketApi.socket?.auth?.uuid) {
-        try {
-          await profileService.updateLastActive(socketApi.socket.auth.uuid, getCurrentKST());
-        } catch (error) {
-          console.error('Failed to update lastActive:', error);
-        }
-      }
-    });
-
-    socketApi.on('error', (error) => {
-      console.error('Socket error:', error);
-    });
-
-    socketApi.on('pong', () => {
-      console.log('Pong received');
-      this.lastPongTime = Date.now();
-      console.log('Connection alive');
-    });
-
-    socketApi.on('userStatus', ({ uuid, isOnline }) => {
-      const listeners = this.statusListeners.get(uuid);
-      if (listeners) {
-        listeners.forEach(callback => callback(isOnline));
-      }
-    });
+const connect = async (uuid) => {
+  console.log('SocketService: Starting connection...');
+  try {
+    const connected = await socketApi.connect(uuid);
+    if (connected) {
+      setupEventListeners();
+      console.log('SocketService: Starting heartbeat...');
+      startHeartbeat();
+      return true;
+    } else {
+      console.log('SocketService: Connection failed, not starting heartbeat');
+      return false;
+    }
+  } catch (error) {
+    console.error('SocketService: Connection error:', error);
+    return false;
   }
+};
 
-  startHeartbeat() {
-    console.log('SocketService: Setting up heartbeat interval...');
-    this.heartbeatInterval = setInterval(() => {
-      if (socketApi.isConnected()) {
-        console.log('Ping sent');
-        socketApi.emit('heartbeat');
-      } else {
-        console.log('Socket not connected, skipping heartbeat');
-      }
-    }, 30000);
-  }
-
-  startConnectionCheck() {
-    this.connectionCheckInterval = setInterval(() => {
-      if (this.lastPongTime && Date.now() - this.lastPongTime > 60000) { // 60초 동안 pong이 없으면
-        console.log('Connection lost - attempting to reconnect');
-        this.disconnect();
-        this.connect(socketApi.uuid); // 재연결 시도
-      }
-    }, 10000); // 10초마다 체크
-  }
-
-  stopHeartbeat() {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
+const disconnect = async () => {
+  stopHeartbeat();
+  
+  const uuid = socketApi.getUuid();
+  if (uuid) {
+    try {
+      await profileService.updateLastActive(uuid, getCurrentKST());
+    } catch (error) {
+      console.error('Failed to update lastActive:', error);
     }
   }
+  
+  socketApi.disconnect();
+};
 
-  stopConnectionCheck() {
-    if (this.connectionCheckInterval) {
-      clearInterval(this.connectionCheckInterval);
-      this.connectionCheckInterval = null;
+export const socketService = {
+  connect,
+  disconnect,
+  startHeartbeat,
+  stopHeartbeat,
+  isConnected: () => socketApi.isConnected(),
+  getUuid: () => socketApi.getUuid(),
+  on: (event, callback) => socketApi.on(event, callback),
+  off: (event, callback) => socketApi.off(event, callback),
+  emit: (event, data) => {
+    if (socketApi.isConnected()) {
+      socketApi.emit(event, data);
+    } else {
+      console.log(`Socket not connected, skipping ${event} emit`);
     }
   }
-
-  subscribeToUserStatus(uuid, callback) {
-    if (!this.statusListeners.has(uuid)) {
-      this.statusListeners.set(uuid, new Set());
-    }
-    this.statusListeners.get(uuid).add(callback);
-  }
-
-  unsubscribeFromUserStatus(uuid, callback) {
-    const listeners = this.statusListeners.get(uuid);
-    if (listeners) {
-      listeners.delete(callback);
-      if (listeners.size === 0) {
-        this.statusListeners.delete(uuid);
-      }
-    }
-  }
-}
-
-export const socketService = new SocketService(); 
+}; 

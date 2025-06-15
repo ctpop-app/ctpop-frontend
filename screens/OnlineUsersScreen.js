@@ -1,44 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { socketApi } from '../api/socket';
+import { useSocket } from '../hooks/useSocket';
+import useUserStore from '../store/userStore';
 
 export default function OnlineUsersScreen() {
-  const [onlineUsers, setOnlineUsers] = useState([]);
+  const { onlineUsers, connect } = useSocket();
   const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    // onlineUsersList 이벤트 리스너 등록
-    socketApi.on('onlineUsersList', (users) => {
-      console.log('Received online users list:', users);
-      setOnlineUsers(Array.from(users));
-    });
-
-    // 컴포넌트 마운트 시 목록 요청
-    socketApi.emit('getOnlineUsers');
-
-    // 컴포넌트 언마운트 시 이벤트 리스너 제거
-    return () => {
-      socketApi.off('onlineUsersList');
-    };
-  }, []);
+  const { userProfile } = useUserStore();
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    socketApi.emit('getOnlineUsers');
+    connect();
     setRefreshing(false);
-  }, []);
+  }, [connect]);
 
-  const renderItem = ({ item }) => (
-    <View style={styles.userItem}>
-      <Text style={styles.userText}>{item}</Text>
-    </View>
-  );
+  const renderItem = ({ item }) => {
+    // 현재 사용자의 경우 userStore에서 프로필 정보를 가져옴
+    const isCurrentUser = item === userProfile?.uuid;
+    const displayName = isCurrentUser ? userProfile?.nickname : item;
+
+    return (
+      <View style={styles.userItem}>
+        <Text style={styles.userText}>
+          {displayName || '알 수 없음'}
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>현재 접속자: {onlineUsers.length}명</Text>
+      <Text style={styles.header}>현재 접속자: {onlineUsers.size}명</Text>
       <FlatList
-        data={onlineUsers}
+        data={Array.from(onlineUsers)}
         renderItem={renderItem}
         keyExtractor={item => item}
         refreshControl={

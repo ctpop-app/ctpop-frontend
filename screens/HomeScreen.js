@@ -13,18 +13,12 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { getAll, loading } = useProfile();
   const { user } = useAuth();
-  const { isUserOnline, subscribeToUser, unsubscribeFromUser, onlineUsers } = useSocket();
+  const { isUserOnline } = useSocket();
   const { userProfile } = useUserStore();
   const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
-
-  useEffect(() => {
-    if (onlineUsers.size > 0) {
-      console.log('현재 접속자 목록:', Array.from(onlineUsers));
-    }
-  }, [onlineUsers]);
 
   const loadProfiles = useCallback(async (isBackground = false) => {
     if (isBackground) {
@@ -39,8 +33,8 @@ export default function HomeScreen() {
       
       const sortProfiles = (a, b) => {
         // 0. 사용자 자신의 프로필을 최상위로
-        if (a.uuid === user?.uid) return -1;
-        if (b.uuid === user?.uid) return 1;
+        if (a.uuid === user?.uuid) return -1;
+        if (b.uuid === user?.uuid) return 1;
 
         // 1. 접속 중인 사용자를 그 다음으로
         const aIsOnline = isUserOnline(a.uuid);
@@ -76,9 +70,6 @@ export default function HomeScreen() {
         const sortedData = dataWithUserProfile.sort(sortProfiles);
         setProfiles(sortedData);
       }
-      newData.forEach(profile => {
-        subscribeToUser(profile.uuid);
-      });
     } catch (error) {
       console.error('프로필 로드 실패:', error);
     } finally {
@@ -88,16 +79,11 @@ export default function HomeScreen() {
         setIsLoading(false);
       }
     }
-  }, [getAll, subscribeToUser, userProfile, isUserOnline, user]);
+  }, [getAll, userProfile, isUserOnline, user]);
 
   useEffect(() => {
     loadProfiles();
-    return () => {
-      profiles.forEach(profile => {
-        unsubscribeFromUser(profile.uuid);
-      });
-    };
-  }, [loadProfiles, unsubscribeFromUser]);
+  }, [loadProfiles]);
 
   const renderUserCard = ({ item }) => (
     <TouchableOpacity 
@@ -118,8 +104,8 @@ export default function HomeScreen() {
           <View style={styles.statusContainer}>
             {isUserOnline(item.uuid) ? (
               <>
-                <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>접속중</Text>
+                <View style={[styles.onlineDot, { backgroundColor: '#4CAF50' }]} />
+                <Text style={[styles.onlineText, { color: '#4CAF50' }]}>접속중</Text>
               </>
             ) : (
               <Text style={styles.lastActiveText}>{getLastActiveText(item.lastActive)}</Text>
