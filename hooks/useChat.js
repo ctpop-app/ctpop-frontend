@@ -16,38 +16,62 @@ export const useChat = (chatId, uuid) => {
   const [lastMessageId, setLastMessageId] = useState(null);
 
   const { addOperation } = useOfflineQueue();
-  const { data: realtimeMessages, loading: realtimeLoading, error: realtimeError } = useRealtimeCollection(
-    'messages',
-    {
-      where: [['chatId', '==', chatId]],
-      orderBy: ['timestamp', 'desc'],
-      limit: MESSAGES_PER_PAGE
-    }
-  );
+
+  // TODO: 소켓 연결이 완성되면 아래 주석을 해제하고 실시간 메시지 구독을 활성화하세요
+  // const { data: realtimeMessages, loading: realtimeLoading, error: realtimeError } = useRealtimeCollection(
+  //   'messages',
+  //   {
+  //     where: [['chatId', '==', chatId]],
+  //     orderBy: ['timestamp', 'desc'],
+  //     limit: MESSAGES_PER_PAGE
+  //   }
+  // );
 
   // 실시간 메시지 구독
   useEffect(() => {
     if (!chatId) return;
 
-    if (realtimeMessages) {
-      setMessages(realtimeMessages);
+    // TODO: 소켓 연결이 완성되면 아래 주석을 해제하고 실시간 메시지 구독을 활성화하세요
+    // if (realtimeMessages) {
+    //   setMessages(realtimeMessages);
+    //   setLoading(false);
+    //   if (realtimeMessages.length < MESSAGES_PER_PAGE) {
+    //     setHasMore(false);
+    //   }
+    //   if (realtimeMessages.length > 0) {
+    //     setLastMessageId(realtimeMessages[realtimeMessages.length - 1].id);
+    //   }
+    // }
+
+    // 임시: Firestore에서 직접 메시지 가져오기
+    const messagesQuery = query(
+      collection(db, 'messages'),
+      where('chatId', '==', chatId),
+      orderBy('timestamp', 'desc'),
+      limit(MESSAGES_PER_PAGE)
+    );
+
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+      const newMessages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setMessages(newMessages);
       setLoading(false);
-      if (realtimeMessages.length < MESSAGES_PER_PAGE) {
+      if (newMessages.length < MESSAGES_PER_PAGE) {
         setHasMore(false);
       }
-      if (realtimeMessages.length > 0) {
-        setLastMessageId(realtimeMessages[realtimeMessages.length - 1].id);
+      if (newMessages.length > 0) {
+        setLastMessageId(newMessages[newMessages.length - 1].id);
       }
-    }
-  }, [chatId, realtimeMessages]);
-
-  // 에러 처리
-  useEffect(() => {
-    if (realtimeError) {
-      setError(realtimeError);
+    }, (error) => {
+      console.error('메시지 구독 오류:', error);
+      setError(error);
       setLoading(false);
-    }
-  }, [realtimeError]);
+    });
+
+    return () => unsubscribe();
+  }, [chatId]);
 
   // 메시지 전송
   const sendMessage = useCallback(async (content, type = 'text', metadata = {}) => {

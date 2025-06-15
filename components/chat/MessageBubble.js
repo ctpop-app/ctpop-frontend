@@ -1,22 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { formatMessageTime } from '../../utils/dateUtils';
+import { getMessageStatusText } from '../../constants/messageStatus';
 
 const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
-  const { text, timestamp, status } = message;
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'sending': return '전송 중';
-      case 'sent': return '전송됨';
-      case 'delivered': return '전달됨';
-      case 'read': return '읽음';
-      default: return '';
-    }
-  };
+  const { text, timestamp, status, error } = message;
 
   return (
-    <View style={[styles.messageRow, isOwnMessage ? styles.messageRowMe : styles.messageRowOther]}>
+    <View style={[
+      styles.container,
+      isOwnMessage ? styles.ownMessage : styles.otherMessage
+    ]}>
       {!isOwnMessage && (
         <Image
           source={otherUserPhotoURL ? { uri: otherUserPhotoURL } : require('../../assets/default-profile.png')}
@@ -33,7 +27,7 @@ const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
           <Text style={styles.messageTime}>
             {formatMessageTime(timestamp)}
             {isOwnMessage && status && (
-              <Text style={styles.status}> · {getStatusText(status)}</Text>
+              <Text style={styles.status}> · {getMessageStatusText(status, error)}</Text>
             )}
           </Text>
         </View>
@@ -43,16 +37,17 @@ const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
 };
 
 const styles = StyleSheet.create({
-  messageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 8,
+  container: {
+    maxWidth: '80%',
+    padding: 12,
+    borderRadius: 16,
+    marginVertical: 4,
   },
-  messageRowMe: {
-    flexDirection: 'row-reverse',
+  ownMessage: {
+    alignSelf: 'flex-end',
   },
-  messageRowOther: {
-    flexDirection: 'row',
+  otherMessage: {
+    alignSelf: 'flex-start',
   },
   avatar: {
     width: 32,
@@ -61,7 +56,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   messageContainer: {
-    maxWidth: '70%',
+    maxWidth: '100%',
     alignItems: 'flex-end',
   },
   messageBubble: {
@@ -77,8 +72,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   messageText: {
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 16,
+    color: '#000',
   },
   messageTextMe: {
     color: '#fff',

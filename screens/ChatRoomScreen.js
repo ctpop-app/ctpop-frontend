@@ -8,6 +8,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -15,6 +16,8 @@ import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import MessageBubble from '../components/chat/MessageBubble';
 import MessageInput from '../components/chat/MessageInput';
+import { sendChatMessage } from '../api/chat';
+import { MESSAGE_STATUS } from '../constants/messageStatus';
 
 // 더미 메시지 데이터
 const dummyMessages = {
@@ -81,38 +84,74 @@ export default function ChatRoomScreen() {
     setMessages(chatMessages);
   }, [chatRoomId]);
 
-  const handleSend = (text) => {
+  const handleSend = async (text) => {
     const newMessage = {
       id: Date.now().toString(),
       text: text,
-      senderId: 'current-user',
+      senderId: user.uuid,
       timestamp: new Date().toISOString(),
-      status: 'sending' // 초기 상태는 'sending'
+      status: MESSAGE_STATUS.SENDING
     };
     
     setMessages(prev => [...prev, newMessage]);
 
-    // 메시지 전송 시뮬레이션 (실제 구현 시에는 소켓 이벤트로 대체)
-    setTimeout(() => {
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === newMessage.id 
-            ? { ...msg, status: 'sent' }
-            : msg
-        )
-      );
-    }, 1000);
+    try {
+      const result = await sendChatMessage(chatRoomId, {
+        type: 'text',
+        uuid: user.uuid,
+        content: text
+      });
 
-    // 전달 상태 시뮬레이션
-    setTimeout(() => {
+      if (!result) {
+        throw new Error('서버 응답이 없습니다.');
+      }
+
+      if (result.success) {
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === newMessage.id 
+              ? { ...msg, id: result.data.id, status: MESSAGE_STATUS.SENT }
+              : msg
+          )
+        );
+      } else {
+        throw new Error(result.error || '메시지 전송에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('메시지 전송 오류:', error);
+      
+      // 에러 메시지 설정
+      const errorMessage = error.message || '알 수 없는 오류가 발생했습니다.';
+      
+      // 메시지 상태 업데이트
       setMessages(prev => 
         prev.map(msg => 
           msg.id === newMessage.id 
-            ? { ...msg, status: 'delivered' }
+            ? { 
+                ...msg, 
+                status: MESSAGE_STATUS.ERROR,
+                error: errorMessage
+              }
             : msg
         )
       );
-    }, 2000);
+
+      // 사용자에게 알림
+      Alert.alert(
+        '메시지 전송 실패',
+        errorMessage,
+        [
+          {
+            text: '다시 시도',
+            onPress: () => handleSend(text)
+          },
+          {
+            text: '취소',
+            style: 'cancel'
+          }
+        ]
+      );
+    }
   };
 
   const renderMessage = ({ item }) => {
@@ -130,8 +169,9 @@ export default function ChatRoomScreen() {
   return (
     <KeyboardAvoidingView 
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      enabled
     >
       {/* 헤더 */}
       <View style={styles.header}>
