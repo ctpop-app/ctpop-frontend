@@ -17,6 +17,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ChatModal } from '../components/chat/ChatModal';
+import { createChatRoom } from '../api/chat';
+import useUserStore from '../store/userStore';
 
 const { width } = Dimensions.get('window');
 
@@ -35,6 +37,7 @@ const DUMMY_POSTS = [
     images: ['https://picsum.photos/400/300?random=1'],
     distance: 2.5,
     author: {
+      uuid: 'user1',
       nickname: '서울맛집탐험가',
       profileImage: 'https://picsum.photos/100/100?random=1'
     },
@@ -46,6 +49,7 @@ const DUMMY_POSTS = [
     images: ['https://picsum.photos/400/300?random=2'],
     distance: 5.8,
     author: {
+      uuid: 'user2',
       nickname: '맛있는하루',
       profileImage: 'https://picsum.photos/100/100?random=2'
     },
@@ -57,6 +61,7 @@ const DUMMY_POSTS = [
     images: ['https://picsum.photos/400/300?random=3'],
     distance: 1.2,
     author: {
+      uuid: 'user3',
       nickname: '행복한하루',
       profileImage: 'https://picsum.photos/100/100?random=3'
     },
@@ -68,6 +73,7 @@ const DUMMY_POSTS = [
     images: ['https://picsum.photos/400/300?random=4'],
     distance: 3.7,
     author: {
+      uuid: 'user4',
       nickname: '주말여행러',
       profileImage: 'https://picsum.photos/100/100?random=4'
     },
@@ -108,21 +114,57 @@ const TalkItem = ({ post, onMessage, onMore }) => {
 
 export default function BoardScreen() {
   const navigation = useNavigation();
+  const { user } = useUserStore();
   const [selectedTab, setSelectedTab] = useState('all');
   const [posts] = useState(DUMMY_POSTS);
   const [chatModalVisible, setChatModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
 
   const handleMessage = (post) => {
-    console.log('채팅 버튼이 눌렸습니다!');
     setSelectedUser(post.author);
     setChatModalVisible(true);
   };
 
-  const handleChatConfirm = () => {
-    setChatModalVisible(false);
-    // TODO: 채팅방 생성 및 이동 로직 구현
-    console.log('채팅 시작하기 버튼이 눌렸습니다!');
+  const handleChatConfirm = async () => {
+    try {
+      const currentUserUuid = user?.uuid;
+      console.log('현재 사용자 UUID:', currentUserUuid);
+      console.log('선택된 사용자:', selectedUser);
+      
+      // 필수 데이터 확인
+      if (!currentUserUuid || !selectedUser?.uuid) {
+        Alert.alert('오류', '사용자 정보가 올바르지 않습니다.');
+        return;
+      }
+
+      const chatRoomData = {
+        participants: [currentUserUuid, selectedUser.uuid],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastMessage: null,
+        lastMessageTimestamp: null
+      };
+
+      console.log('채팅방 생성 요청 데이터:', chatRoomData);
+
+      const result = await createChatRoom(chatRoomData);
+
+      console.log('채팅방 생성 결과:', result);
+
+      if (result?.success) {
+        setChatModalVisible(false);
+        // 채팅방으로 이동
+        navigation.navigate('ChatRoom', { 
+          roomId: result.data.id,
+          otherUser: selectedUser 
+        });
+      } else {
+        Alert.alert('오류', '채팅방 생성에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('채팅방 생성 오류:', error);
+      Alert.alert('오류', '채팅방 생성 중 문제가 발생했습니다.');
+    }
   };
 
   const handleMore = (post) => {
