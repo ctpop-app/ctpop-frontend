@@ -57,15 +57,25 @@ export default function ChatRoomScreen() {
   // 채팅방 ID에 해당하는 더미 메시지 로드
   useEffect(() => {
     const chatMessages = dummyMessages[chatRoomId] || [];
-    setMessages(chatMessages);
-  }, [chatRoomId]);
+    // 더미 데이터를 실제 메시지 형식으로 변환
+    const formattedMessages = chatMessages.map(msg => ({
+      id: msg.id,
+      content: msg.text,
+      uuid: msg.senderId === 'current-user' ? user.uuid : otherUser.uuid,
+      timestamp: msg.timestamp,
+      type: 'text',
+      status: msg.status
+    }));
+    setMessages(formattedMessages);
+  }, [chatRoomId, user.uuid, otherUser.uuid]);
 
   const handleSend = async (text) => {
     const newMessage = {
       id: Date.now().toString(),
-      text: text,
-      senderId: user.uuid,
+      content: text,
+      uuid: user.uuid,
       timestamp: new Date().toISOString(),
+      type: 'text',
       status: MESSAGE_STATUS.SENDING
     };
     
@@ -131,13 +141,13 @@ export default function ChatRoomScreen() {
   };
 
   const renderMessage = ({ item }) => {
-    const isMe = item.senderId === 'current-user';
+    const isMe = item.uuid === user.uuid;
     
     return (
       <MessageBubble
         message={item}
         isOwnMessage={isMe}
-        otherUserPhotoURL={otherUser.mainPhotoURL}
+        otherUserPhotoURL={otherUser?.profileImage}
       />
     );
   };

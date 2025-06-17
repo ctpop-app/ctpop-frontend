@@ -78,6 +78,18 @@ const DUMMY_POSTS = [
       profileImage: 'https://picsum.photos/100/100?random=4'
     },
     timestamp: '1시간 전'
+  },
+  {
+    id: 5,
+    content: '안녕하세요! 새로운 친구를 만나고 싶어요.',
+    images: ['https://firebasestorage.googleapis.com/v0/b/ctpop-6bffb.firebasestorage.app/o/profiles%2Fsuperpass-1750153144346%2F2025-06-17%2018-39_photo.jpg.jpg?alt=media&token=08db1c8c-abbc-43bf-8697-10b37379e8af'],
+    distance: 3.7,
+    author: {
+      uuid: 'superpass-1750153144346',
+      nickname: '17일의 남자',
+      profileImage: 'https://firebasestorage.googleapis.com/v0/b/ctpop-6bffb.firebasestorage.app/o/profiles%2Fsuperpass-1750153144346%2F2025-06-17%2018-39_photo.jpg.jpg?alt=media&token=08db1c8c-abbc-43bf-8697-10b37379e8af'
+    },
+    timestamp: '1시간 전'
   }
 ];
 
@@ -155,7 +167,7 @@ export default function BoardScreen() {
         setChatModalVisible(false);
         // 채팅방으로 이동
         navigation.navigate('ChatRoom', { 
-          roomId: result.data.id,
+          chatRoomId: result.data.id,
           otherUser: selectedUser 
         });
       } else {
