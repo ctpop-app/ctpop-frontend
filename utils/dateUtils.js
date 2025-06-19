@@ -53,3 +53,26 @@ export const getLastActiveText = (lastActive) => {
   return `${Math.floor(diffMinutes / 1440)}일 전`;
 };
 
+/**
+ * 채팅 메시지용 시간 포맷 (오전/오후 HH:mm)
+ * @param {Date|string|Timestamp} date - 변환할 날짜/시간
+ * @returns {string} '오전/오후 HH:mm' 형식의 시간 문자열
+ */
+export const formatMessageTime = (date) => {
+  try {
+    const d = toKST(date);
+    if (!d) return '';
+    
+    const hours = d.getHours();
+    const minutes = d.getMinutes();
+    const ampm = hours < 12 ? '오전' : '오후';
+    const formattedHours = hours % 12 || 12;
+    const formattedMinutes = String(minutes).padStart(2, '0');
+    
+    return `${ampm} ${formattedHours}:${formattedMinutes}`;
+  } catch (error) {
+    console.error('formatMessageTime 실패:', error);
+    return '';
+  }
+};
+

@@ -1,16 +1,47 @@
-import React, { useState } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, TextInput, TouchableOpacity, StyleSheet, Platform, AppState, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../../services/imageService';
 
 const MessageInput = ({ onSend, onSendImage, uuid }) => {
   const [message, setMessage] = useState('');
+  const [appState, setAppState] = useState(AppState.currentState);
+  const keyboardTimeoutRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (appState.match(/inactive|background/) && nextAppState === 'active') {
+        // 키보드 상태 변경을 지연시켜 처리
+        if (keyboardTimeoutRef.current) {
+          clearTimeout(keyboardTimeoutRef.current);
+        }
+        keyboardTimeoutRef.current = setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.blur();
+          }
+        }, 100);
+      }
+      setAppState(nextAppState);
+    });
+
+    return () => {
+      if (keyboardTimeoutRef.current) {
+        clearTimeout(keyboardTimeoutRef.current);
+      }
+      subscription.remove();
+    };
+  }, [appState]);
 
   const handleSend = async () => {
     if (message.trim()) {
       await onSend(message.trim());
       setMessage('');
+      // 메시지 전송 후 키보드 포커스 유지
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }
   };
 
@@ -45,6 +76,7 @@ const MessageInput = ({ onSend, onSendImage, uuid }) => {
         <Ionicons name="image-outline" size={24} color="#007AFF" />
       </TouchableOpacity>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         value={message}
         onChangeText={setMessage}
@@ -54,6 +86,9 @@ const MessageInput = ({ onSend, onSendImage, uuid }) => {
         returnKeyType="send"
         onSubmitEditing={handleSend}
         blurOnSubmit={false}
+        keyboardType="default"
+        autoCapitalize="none"
+        autoCorrect={false}
       />
       <TouchableOpacity 
         onPress={handleSend}

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { ChatModal } from '../components/chat/ChatModal';
 
 const { width } = Dimensions.get('window');
 
@@ -109,9 +110,19 @@ export default function BoardScreen() {
   const navigation = useNavigation();
   const [selectedTab, setSelectedTab] = useState('all');
   const [posts] = useState(DUMMY_POSTS);
+  const [chatModalVisible, setChatModalVisible] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   const handleMessage = (post) => {
-    Alert.alert('알림', `${post.author.nickname}님에게 메시지를 보내시겠습니까?`);
+    console.log('채팅 버튼이 눌렸습니다!');
+    setSelectedUser(post.author);
+    setChatModalVisible(true);
+  };
+
+  const handleChatConfirm = () => {
+    setChatModalVisible(false);
+    // TODO: 채팅방 생성 및 이동 로직 구현
+    console.log('채팅 시작하기 버튼이 눌렸습니다!');
   };
 
   const handleMore = (post) => {
@@ -187,6 +198,12 @@ export default function BoardScreen() {
           <Ionicons name="create-outline" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
+      <ChatModal
+        visible={chatModalVisible}
+        onClose={() => setChatModalVisible(false)}
+        onConfirm={handleChatConfirm}
+        otherUser={selectedUser}
+      />
     </SafeAreaView>
   );
 }
