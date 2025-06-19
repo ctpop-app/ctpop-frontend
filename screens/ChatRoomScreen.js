@@ -16,35 +16,10 @@ import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import MessageBubble from '../components/chat/MessageBubble';
 import MessageInput from '../components/chat/MessageInput';
-import { sendChatMessage } from '../api/chat';
+import { sendChatMessage, getChatMessages } from '../api/chat';
 import { MESSAGE_STATUS } from '../constants/messageStatus';
-
-// 더미 메시지 데이터
-const dummyMessages = {
-  '1': [
-    {
-      id: '1-1',
-      text: '안녕하세요! 반갑습니다.',
-      senderId: '1',
-      timestamp: new Date(Date.now() - 3600000).toISOString(), // 1시간 전
-      status: 'read'
-    },
-    {
-      id: '1-2',
-      text: '네, 반갑습니다!',
-      senderId: 'current-user',
-      timestamp: new Date(Date.now() - 3500000).toISOString(),
-      status: 'delivered'
-    },
-    {
-      id: '1-3',
-      text: '오늘 날씨가 정말 좋네요.',
-      senderId: '1',
-      timestamp: new Date(Date.now() - 3400000).toISOString(),
-      status: 'read'
-    }
-  ]
-};
+import { db } from '../firebase';
+import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
 
 export default function ChatRoomScreen() {
   const route = useRoute();
@@ -53,21 +28,52 @@ export default function ChatRoomScreen() {
   const { user } = useAuth();
   const { isUserOnline } = useSocket();
   const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // 채팅방 ID에 해당하는 더미 메시지 로드
+  // 실시간 메시지 구독
   useEffect(() => {
-    const chatMessages = dummyMessages[chatRoomId] || [];
-    // 더미 데이터를 실제 메시지 형식으로 변환
-    const formattedMessages = chatMessages.map(msg => ({
-      id: msg.id,
-      content: msg.text,
-      uuid: msg.senderId === 'current-user' ? user.uuid : otherUser.uuid,
-      timestamp: msg.timestamp,
-      type: 'text',
-      status: msg.status
-    }));
-    setMessages(formattedMessages);
-  }, [chatRoomId, user.uuid, otherUser.uuid]);
+    if (!chatRoomId) return;
+
+    console.log('채팅방 메시지 구독 시작:', chatRoomId);
+    
+    const messagesQuery = query(
+      collection(db, 'messages'),
+      where('chatId', '==', chatRoomId),
+      orderBy('timestamp', 'desc'),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+      const newMessages = [];
+      snapshot.forEach((doc) => {
+        const messageData = doc.data();
+        newMessages.push({
+          id: doc.id,
+          content: messageData.content,
+          uuid: messageData.uuid,
+          timestamp: messageData.timestamp,
+          type: messageData.type,
+          status: messageData.status || 'sent',
+          isRead: messageData.isRead || false
+        });
+      });
+      
+      // 최신 메시지가 아래에 오도록 배열을 뒤집기
+      const sortedMessages = newMessages.reverse();
+      
+      console.log('실시간 메시지 업데이트:', sortedMessages.length, '개');
+      setMessages(sortedMessages);
+      setLoading(false);
+    }, (error) => {
+      console.error('메시지 구독 오류:', error);
+      setLoading(false);
+    });
+
+    return () => {
+      console.log('메시지 구독 해제');
+      unsubscribe();
+    };
+  }, [chatRoomId]);
 
   const handleSend = async (text) => {
     const newMessage = {
@@ -79,6 +85,7 @@ export default function ChatRoomScreen() {
       status: MESSAGE_STATUS.SENDING
     };
     
+    // 로컬에 즉시 추가 (낙관적 업데이트)
     setMessages(prev => [...prev, newMessage]);
 
     try {
@@ -93,6 +100,7 @@ export default function ChatRoomScreen() {
       }
 
       if (result.success) {
+        // 성공 시 로컬 메시지 업데이트
         setMessages(prev => 
           prev.map(msg => 
             msg.id === newMessage.id 
@@ -183,6 +191,8 @@ export default function ChatRoomScreen() {
         keyExtractor={item => item.id}
         style={styles.messageList}
         contentContainerStyle={styles.messageListContent}
+        inverted={true}
+        showsVerticalScrollIndicator={false}
       />
 
       {/* 입력 영역 */}

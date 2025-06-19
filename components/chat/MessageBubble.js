@@ -4,7 +4,7 @@ import { formatMessageTime } from '../../utils/dateUtils';
 import { getMessageStatusText } from '../../constants/messageStatus';
 
 const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
-  const { text, timestamp, status, error } = message;
+  const { content, timestamp, status, error } = message;
 
   return (
     <View style={[
@@ -20,7 +20,7 @@ const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
       <View style={styles.messageContainer}>
         <View style={[styles.messageBubble, isOwnMessage ? styles.messageBubbleMe : styles.messageBubbleOther]}>
           <Text style={[styles.messageText, isOwnMessage ? styles.messageTextMe : styles.messageTextOther]}>
-            {text}
+            {content}
           </Text>
         </View>
         <View style={styles.messageFooter}>
