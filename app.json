@@ -47,6 +47,9 @@
         "projectId": "188021df-21e9-47be-8d76-53035ad41d65"
       }
     },
-    "owner": "ktw1398"
+    "owner": "ktw1398",
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

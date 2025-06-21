@@ -55,6 +55,14 @@ export const useProfileForm = (uuid, initialData = null) => {
   const updateField = useCallback((field, value) => {
     if (!isValid) return;
 
+    // 숫자 필드에 대한 실시간 유효성 검사
+    if (['height', 'weight', 'age'].includes(field)) {
+      // 숫자가 아닌 문자가 포함되어 있으면 입력 차단
+      if (value && !/^\d*$/.test(value)) {
+        return; // 숫자가 아닌 문자가 있으면 업데이트하지 않음
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       [field]: value
