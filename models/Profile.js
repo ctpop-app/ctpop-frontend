@@ -92,14 +92,23 @@ export class Profile {
     }
 
     // 선택적 필드의 유효성 검사 (값이 있는 경우에만 검사)
-    if (this.age && (this.age < 18 || this.age > 100)) {
-      errors.age = '나이는 18세 이상 100세 이하여야 합니다.';
+    if (this.age) {
+      const ageNum = Number(this.age);
+      if (isNaN(ageNum) || ageNum < 18 || ageNum > 100) {
+        errors.age = '나이는 18세 이상 100세 이하여야 합니다.';
+      }
     }
-    if (this.height && (this.height < 140 || this.height > 220)) {
-      errors.height = '키는 140cm 이상 220cm 이하여야 합니다.';
+    if (this.height) {
+      const heightNum = Number(this.height);
+      if (isNaN(heightNum) || heightNum < 140 || heightNum > 220) {
+        errors.height = '키는 140cm 이상 220cm 이하여야 합니다.';
+      }
     }
-    if (this.weight && (this.weight < 30 || this.weight > 200)) {
-      errors.weight = '체중은 30kg 이상 200kg 이하여야 합니다.';
+    if (this.weight) {
+      const weightNum = Number(this.weight);
+      if (isNaN(weightNum) || weightNum < 30 || weightNum > 200) {
+        errors.weight = '체중은 30kg 이상 200kg 이하여야 합니다.';
+      }
     }
 
     // 사진 URL 개수 검사 (null 체크 추가)

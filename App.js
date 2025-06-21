@@ -41,14 +41,20 @@ const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, cle
     await initializeConfig();
     console.log('서버 설정 초기화 완료');
     
-    // 2. 서버 디스커버리
-    console.log('서버 디스커버리 시작');
-    const apiUrl = await discoverServer();
-    if (!apiUrl) {
-      throw new Error('서버를 찾을 수 없습니다.');
-    }
+    // 2. AWS EC2 서버로 직접 연결 (서버 디스커리 건너뛰기)
+    console.log('AWS EC2 서버로 직접 연결');
+    const apiUrl = 'http://3.35.11.208:8080';
     updateApiUrl(apiUrl);
-    console.log('서버 디스커버리 완료:', apiUrl);
+    console.log('AWS EC2 서버 연결 완료:', apiUrl);
+    
+    // 2. 서버 디스커버리 (주석처리 - AWS EC2 사용 시)
+    // console.log('서버 디스커버리 시작');
+    // const apiUrl = await discoverServer();
+    // if (!apiUrl) {
+    //   throw new Error('서버를 찾을 수 없습니다.');
+    // }
+    // updateApiUrl(apiUrl);
+    // console.log('서버 디스커버리 완료:', apiUrl);
     
     // 3. 인증 상태 확인
     console.log('인증 상태 확인 시작');
@@ -82,7 +88,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const { checkAuth } = useAuth();
-  const { connect } = useSocket();
+  const { connect, disconnect } = useSocket();
   
   // Zustand store 사용
   const userStore = useUserStore();
@@ -104,6 +110,15 @@ export default function App() {
     
     init();
   }, []);
+
+  // 앱 종료 시 소켓 연결 해제
+  useEffect(() => {
+    return () => {
+      if (isAuthenticated) {
+        disconnect();
+      }
+    };
+  }, [isAuthenticated, disconnect]);
 
   // 재시도 핸들러
   const handleRetry = useCallback(() => {
