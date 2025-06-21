@@ -55,6 +55,12 @@ const getSavedServerIp = async () => {
  */
 export const initializeConfig = async () => {
   try {
+    // TEST 환경에서는 저장된 IP를 무시하고 AWS EC2 사용
+    if (currentEnv === TEST) {
+      console.log('TEST 환경: AWS EC2 서버 사용');
+      return;
+    }
+    
     const savedIp = await getSavedServerIp();
     if (savedIp && savedIp !== DEFAULT_IP) {
       updateApiUrl(`http://${savedIp}:${SERVER_PORT}`);
