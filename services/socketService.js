@@ -8,12 +8,8 @@ let heartbeatInterval = null;
 const startHeartbeat = () => {
   console.log('SocketService: Setting up heartbeat interval...');
   heartbeatInterval = setInterval(() => {
-    if (socketApi.isConnected()) {
-      console.log('Ping sent');
-      socketApi.emit('heartbeat');
-    } else {
-      console.log('Socket not connected, skipping heartbeat');
-    }
+    console.log('Ping sent');
+    socketApi.emit('heartbeat');
   }, 30000);
 };
 
@@ -27,13 +23,11 @@ const stopHeartbeat = () => {
 const setupEventListeners = () => {
   socketApi.on('connect', () => {
     console.log('Socket connected');
-    userStore.setOnlineStatus(true);
   });
 
   socketApi.on('disconnect', async () => {
     console.log('Socket disconnected');
     stopHeartbeat();
-    userStore.setOnlineStatus(false);
     
     const uuid = socketApi.getUuid();
     if (uuid) {
@@ -54,14 +48,9 @@ const setupEventListeners = () => {
     console.log('Connection alive');
   });
 
+  // 서버에서 직접 받은 사용자 상태 업데이트
   socketApi.on('userStatus', ({ uuid, isOnline }) => {
-    console.log('User status update:', { uuid, isOnline });
-    // 소켓이 연결된 상태에서만 이벤트 emit
-    if (socketApi.isConnected()) {
-      socketApi.emit('userStatusUpdate', { uuid, isOnline });
-    } else {
-      console.log('Socket not connected, skipping userStatusUpdate emit');
-    }
+    console.log('User status update from server:', { uuid, isOnline });
   });
 
   // 소켓이 연결된 상태에서만 온라인 사용자 목록 요청
@@ -71,16 +60,14 @@ const setupEventListeners = () => {
 };
 
 const connect = async (uuid) => {
-  console.log('SocketService: Starting connection...');
   try {
     const connected = await socketApi.connect(uuid);
+    
     if (connected) {
       setupEventListeners();
-      console.log('SocketService: Starting heartbeat...');
       startHeartbeat();
       return true;
     } else {
-      console.log('SocketService: Connection failed, not starting heartbeat');
       return false;
     }
   } catch (error) {
@@ -113,11 +100,5 @@ export const socketService = {
   getUuid: () => socketApi.getUuid(),
   on: (event, callback) => socketApi.on(event, callback),
   off: (event, callback) => socketApi.off(event, callback),
-  emit: (event, data) => {
-    if (socketApi.isConnected()) {
-      socketApi.emit(event, data);
-    } else {
-      console.log(`Socket not connected, skipping ${event} emit`);
-    }
-  }
+  emit: (event, data) => socketApi.emit(event, data)
 }; 
