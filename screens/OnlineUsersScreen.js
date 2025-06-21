@@ -30,9 +30,9 @@ export default function OnlineUsersScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>현재 접속자: {onlineUsers.size}명</Text>
+      <Text style={styles.header}>현재 접속자: {onlineUsers.length}명</Text>
       <FlatList
-        data={Array.from(onlineUsers)}
+        data={onlineUsers}
         renderItem={renderItem}
         keyExtractor={item => item}
         refreshControl={

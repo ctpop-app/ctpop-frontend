@@ -82,7 +82,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const { checkAuth } = useAuth();
-  const { connect } = useSocket();
+  const { connect, disconnect } = useSocket();
   
   // Zustand store 사용
   const userStore = useUserStore();
@@ -104,6 +104,15 @@ export default function App() {
     
     init();
   }, []);
+
+  // 앱 종료 시 소켓 연결 해제
+  useEffect(() => {
+    return () => {
+      if (isAuthenticated) {
+        disconnect();
+      }
+    };
+  }, [isAuthenticated, disconnect]);
 
   // 재시도 핸들러
   const handleRetry = useCallback(() => {
