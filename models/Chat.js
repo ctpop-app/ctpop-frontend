@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Timestamp } from 'firebase/firestore';
+import { getCurrentKST } from '../utils/dateUtils';
 
 class Chat {
   constructor(data = {}) {
@@ -7,8 +8,8 @@ class Chat {
     this.participants = data.participants || [];
     this.lastMessage = data.lastMessage || null;
     this.unreadCount = data.unreadCount || {};
-    this.createdAt = data.createdAt || Timestamp.now();
-    this.updatedAt = data.updatedAt || Timestamp.now();
+    this.createdAt = data.createdAt || getCurrentKST();
+    this.updatedAt = data.updatedAt || getCurrentKST();
   }
 
   // 채팅방 생성
@@ -34,7 +35,7 @@ class Chat {
       timestamp: message.timestamp,
       type: message.type
     };
-    this.updatedAt = Timestamp.now();
+    this.updatedAt = getCurrentKST();
   }
 
   // 읽지 않은 메시지 수 업데이트
@@ -52,7 +53,7 @@ class Chat {
     }
     this.participants.push(uuid);
     this.unreadCount[uuid] = 0;
-    this.updatedAt = Timestamp.now();
+    this.updatedAt = getCurrentKST();
   }
 
   // 채팅방 참여자 제거
@@ -63,7 +64,7 @@ class Chat {
     }
     this.participants.splice(index, 1);
     delete this.unreadCount[uuid];
-    this.updatedAt = Timestamp.now();
+    this.updatedAt = getCurrentKST();
   }
 
   // Firestore 데이터로 변환

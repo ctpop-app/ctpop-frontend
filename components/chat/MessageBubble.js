@@ -1,45 +1,47 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { getCurrentKST } from '../../utils/dateUtils';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import { formatMessageTime } from '../../utils/dateUtils';
+import { getMessageStatusText } from '../../constants/messageStatus';
 
-const MessageBubble = ({ message, isOwnMessage }) => {
-  const { content, timestamp, status } = message;
+const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
+  const { text, timestamp, status, error } = message;
 
   return (
     <View style={[
       styles.container,
       isOwnMessage ? styles.ownMessage : styles.otherMessage
     ]}>
-      <View style={[
-        styles.bubble,
-        isOwnMessage ? styles.ownBubble : styles.otherBubble
-      ]}>
-        <Text style={[
-          styles.text,
-          isOwnMessage ? styles.ownText : styles.otherText
-        ]}>
-          {content}
-        </Text>
-      </View>
-      <Text style={styles.timestamp}>
-        {getCurrentKST(timestamp.toDate())}
-      </Text>
-      {isOwnMessage && (
-        <Text style={styles.status}>
-          {status === 'sending' ? '전송 중' : 
-           status === 'sent' ? '전송됨' :
-           status === 'delivered' ? '전달됨' :
-           status === 'read' ? '읽음' : ''}
-        </Text>
+      {!isOwnMessage && (
+        <Image
+          source={otherUserPhotoURL ? { uri: otherUserPhotoURL } : require('../../assets/default-profile.png')}
+          style={styles.avatar}
+        />
       )}
+      <View style={styles.messageContainer}>
+        <View style={[styles.messageBubble, isOwnMessage ? styles.messageBubbleMe : styles.messageBubbleOther]}>
+          <Text style={[styles.messageText, isOwnMessage ? styles.messageTextMe : styles.messageTextOther]}>
+            {text}
+          </Text>
+        </View>
+        <View style={styles.messageFooter}>
+          <Text style={styles.messageTime}>
+            {formatMessageTime(timestamp)}
+            {isOwnMessage && status && (
+              <Text style={styles.status}> · {getMessageStatusText(status, error)}</Text>
+            )}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 4,
     maxWidth: '80%',
+    padding: 12,
+    borderRadius: 16,
+    marginVertical: 4,
   },
   ownMessage: {
     alignSelf: 'flex-end',
@@ -47,40 +49,51 @@ const styles = StyleSheet.create({
   otherMessage: {
     alignSelf: 'flex-start',
   },
-  bubble: {
-    padding: 12,
-    borderRadius: 20,
-    maxWidth: '100%',
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 6,
   },
-  ownBubble: {
-    backgroundColor: '#007AFF',
+  messageContainer: {
+    maxWidth: '100%',
+    alignItems: 'flex-end',
+  },
+  messageBubble: {
+    padding: 10,
+    borderRadius: 16,
+  },
+  messageBubbleMe: {
+    backgroundColor: '#FF6B6B',
     borderBottomRightRadius: 4,
   },
-  otherBubble: {
-    backgroundColor: '#E5E5EA',
+  messageBubbleOther: {
+    backgroundColor: '#fff',
     borderBottomLeftRadius: 4,
   },
-  text: {
+  messageText: {
     fontSize: 16,
-    lineHeight: 20,
+    color: '#000',
   },
-  ownText: {
-    color: '#FFFFFF',
+  messageTextMe: {
+    color: '#fff',
   },
-  otherText: {
-    color: '#000000',
+  messageTextOther: {
+    color: '#222',
   },
-  timestamp: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 4,
-    alignSelf: 'flex-end',
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    marginHorizontal: 4,
+  },
+  messageTime: {
+    fontSize: 11,
+    color: '#aaa',
   },
   status: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 2,
-    alignSelf: 'flex-end',
+    fontSize: 11,
+    color: '#aaa',
   },
 });
 

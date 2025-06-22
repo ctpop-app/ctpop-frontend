@@ -49,7 +49,8 @@ export const ROUTES = {
   CHAT: {
     LIST: 'ChatList',
     ROOM: 'ChatRoom',
-    CREATE: 'ChatCreate'
+    CREATE: 'ChatCreate',
+    CHAT_DETAIL: 'ChatDetail'
   },
   
   // 공통

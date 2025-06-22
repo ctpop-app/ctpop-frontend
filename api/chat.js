@@ -1,5 +1,5 @@
 import { db } from '../firebase';
-import { collection, addDoc, query, where, orderBy, limit, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, limit, getDocs, updateDoc, doc, deleteDoc, getDoc } from 'firebase/firestore';
 import Chat from '../models/Chat';
 import Message from '../models/Message';
 import { handleError, withNetworkRetry } from '../utils/errorHandler';
@@ -81,27 +81,42 @@ export const getChatMessages = async (roomId, params = {}) => {
 export const sendChatMessage = async (roomId, messageData) => {
   return withNetworkRetry(async () => {
     try {
+      console.log('메시지 전송 시작:', { roomId, messageData });
+
       const message = messageData.type === 'text' 
-        ? Message.createText(roomId, messageData.senderId, messageData.content)
-        : Message.createImage(roomId, messageData.senderId, messageData.content, 
+        ? Message.createText(roomId, messageData.uuid, messageData.content)
+        : Message.createImage(roomId, messageData.uuid, messageData.content, 
             messageData.metadata?.imageSize, 
             messageData.metadata?.imageWidth, 
             messageData.metadata?.imageHeight);
 
       message.validate();
+      console.log('메시지 객체 생성 완료:', message);
+
       const messageRef = await addDoc(collection(db, 'messages'), message.toFirestore());
+      console.log('Firestore에 메시지 저장 성공:', { 
+        messageId: messageRef.id,
+        path: messageRef.path 
+      });
 
       // 채팅방 업데이트
       const chatRef = doc(db, 'chats', roomId);
-      const chatDoc = await getDocs(chatRef);
-      if (!chatDoc.empty) {
+      const chatDoc = await getDoc(chatRef);
+      if (chatDoc.exists()) {
         const chat = Chat.fromFirestore(chatDoc.id, chatDoc.data());
         chat.updateLastMessage(message);
         await updateDoc(chatRef, chat.toFirestore());
+        console.log('채팅방 마지막 메시지 업데이트 완료:', {
+          chatId: roomId,
+          lastMessage: chat.lastMessage
+        });
+      } else {
+        console.warn('채팅방을 찾을 수 없음:', roomId);
       }
 
       return { success: true, data: { id: messageRef.id } };
     } catch (error) {
+      console.error('메시지 전송 중 오류 발생:', error);
       return handleError(error, '메시지 전송 오류');
     }
   });
