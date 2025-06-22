@@ -1,6 +1,5 @@
 import io from 'socket.io-client/dist/socket.io.js';
 import apiClient from './client';
-import config from '../utils/config';
 
 class SocketApi {
   constructor() {
@@ -81,7 +80,9 @@ class SocketApi {
 
           this.socket.io.on('reconnect_attempt', () => {
             console.log('SocketApi: reconnection attempt');
-            this.socket.io.opts.query = { uuid };
+            if (this.socket) {
+              this.socket.io.opts.query = { uuid };
+            }
           });
 
           this.socket.io.on('reconnect_error', (error) => {

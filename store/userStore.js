@@ -15,6 +15,8 @@ const useUserStore = create(
       userProfile: null,
       isAuthenticated: false,
       hasProfile: false,
+      isOnline: false,
+      nearbyDistances: {}, // 실시간 거리 정보 저장
 
       // 액션
       setUser: (user) => {
@@ -99,7 +101,33 @@ const useUserStore = create(
         } catch (error) {
           console.error('Storage 로드 실패:', error);
         }
-      }
+      },
+
+      setOnlineStatus: (status) => set({ isOnline: status }),
+      
+      // 실시간 거리 정보 업데이트
+      setNearbyDistances: (distances) => {
+        console.log('Setting nearby distances:', distances);
+        set({ nearbyDistances: distances });
+      },
+      
+      // 특정 사용자와의 거리 가져오기
+      getDistanceToUser: (uuid) => {
+        const { nearbyDistances } = get();
+        const distance = nearbyDistances[uuid] || null;
+        console.log(`Getting distance for ${uuid}:`, distance);
+        return distance;
+      },
+
+      // 모든 거리 정보 초기화
+      clearNearbyDistances: () => set({ nearbyDistances: {} }),
+
+      // 디버깅용: 현재 거리 정보 상태 확인
+      debugNearbyDistances: () => {
+        const { nearbyDistances } = get();
+        console.log('Current nearbyDistances state:', nearbyDistances);
+        return nearbyDistances;
+      },
     }),
     {
       name: 'user-storage',

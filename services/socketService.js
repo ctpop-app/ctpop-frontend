@@ -1,7 +1,7 @@
 import { socketApi } from '../api/socket';
 import { profileService } from './profileService';
 import { getCurrentKST } from '../utils/dateUtils';
-import { userStore } from '../store/userStore';
+import useUserStore from '../store/userStore';
 
 let heartbeatInterval = null;
 
@@ -27,13 +27,13 @@ const stopHeartbeat = () => {
 const setupEventListeners = () => {
   socketApi.on('connect', () => {
     console.log('Socket connected');
-    userStore.setOnlineStatus(true);
+    useUserStore.getState().setOnlineStatus(true);
   });
 
   socketApi.on('disconnect', async () => {
     console.log('Socket disconnected');
     stopHeartbeat();
-    userStore.setOnlineStatus(false);
+    useUserStore.getState().setOnlineStatus(false);
     
     const uuid = socketApi.getUuid();
     if (uuid) {
@@ -62,6 +62,14 @@ const setupEventListeners = () => {
     } else {
       console.log('Socket not connected, skipping userStatusUpdate emit');
     }
+  });
+
+  // 실시간 거리 정보 수신 - 직접 userStore에 저장
+  socketApi.on('nearbyDistances', (distances) => {
+    console.log('🎯 Received nearby distances from backend:', distances);
+    console.log('📊 Distance data type:', typeof distances);
+    console.log('📊 Distance data keys:', Object.keys(distances || {}));
+    useUserStore.getState().setNearbyDistances(distances);
   });
 
   // 소켓이 연결된 상태에서만 온라인 사용자 목록 요청
@@ -104,11 +112,27 @@ const disconnect = async () => {
   socketApi.disconnect();
 };
 
+// 위치 업데이트 전송
+const updateLocation = (latitude, longitude) => {
+  if (socketApi.isConnected()) {
+    const locationData = {
+      latitude,
+      longitude,
+      timestamp: Date.now()
+    };
+    console.log('Sending location update:', locationData);
+    socketApi.emit('updateLocation', locationData);
+  } else {
+    console.log('Socket not connected, cannot send location update');
+  }
+};
+
 export const socketService = {
   connect,
   disconnect,
   startHeartbeat,
   stopHeartbeat,
+  updateLocation,
   isConnected: () => socketApi.isConnected(),
   getUuid: () => socketApi.getUuid(),
   on: (event, callback) => socketApi.on(event, callback),

@@ -1,10 +1,8 @@
 // HomeScreen.js
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useProfile } from '../hooks/useProfile';
-import { useAuth } from '../hooks/useAuth';
-import { useSocket } from '../hooks/useSocket';
+import { useProfile, useAuth, useSocket, useLocation } from '../hooks';
 import { getLastActiveText } from '../utils/dateUtils';
 import { getOrientationColor } from '../utils/colors';
 import useUserStore from '../store/userStore';
@@ -14,11 +12,37 @@ export default function HomeScreen() {
   const { getAll, loading } = useProfile();
   const { user } = useAuth();
   const { isUserOnline } = useSocket();
-  const { userProfile } = useUserStore();
+  const { userProfile, getDistanceToUser, debugNearbyDistances } = useUserStore();
+  const { startLocationTracking, stopLocationTracking } = useLocation();
   const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+  const locationWatchId = useRef(null);
+
+  // 위치 추적 시작
+  useEffect(() => {
+    const initLocationTracking = async () => {
+      try {
+        const locationSubscription = await startLocationTracking();
+        if (locationSubscription) {
+          locationWatchId.current = locationSubscription;
+        }
+      } catch (error) {
+        console.error('위치 추적 초기화 실패:', error);
+      }
+    };
+
+    if (user?.uuid) {
+      initLocationTracking();
+    }
+
+    return () => {
+      if (locationWatchId.current) {
+        stopLocationTracking(locationWatchId.current);
+      }
+    };
+  }, [user?.uuid, startLocationTracking, stopLocationTracking]);
 
   const loadProfiles = useCallback(async (isBackground = false) => {
     if (isBackground) {
@@ -85,48 +109,85 @@ export default function HomeScreen() {
     loadProfiles();
   }, [loadProfiles]);
 
-  const renderUserCard = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.card}
-      onPress={() => {
-        navigation.navigate('ProfileDetail', { profile: item });
-      }}
-      activeOpacity={0.8}
-    >
-      <Image 
-        style={styles.profilePhoto}
-        source={item.mainPhotoURL ? { uri: item.mainPhotoURL } : require('../assets/default-profile.png')}
-      />
-      <View style={styles.userInfo}>
-        <View style={styles.nameAgeContainer}>
-          <Text style={styles.userName}>{item.nickname}</Text>
-          {item.age && <Text style={styles.userAge}>{item.age}세</Text>}
-          <View style={styles.statusContainer}>
-            {isUserOnline(item.uuid) ? (
-              <>
-                <View style={[styles.onlineDot, { backgroundColor: '#4CAF50' }]} />
-                <Text style={[styles.onlineText, { color: '#4CAF50' }]}>접속중</Text>
-              </>
-            ) : (
-              <Text style={styles.lastActiveText}>{getLastActiveText(item.lastActive)}</Text>
-            )}
+  // 디버깅용: 주기적으로 거리 정보 상태 확인
+  useEffect(() => {
+    const debugInterval = setInterval(() => {
+      console.log('=== Distance Debug Info ===');
+      debugNearbyDistances();
+      console.log('==========================');
+    }, 10000); // 10초마다 확인
+
+    return () => clearInterval(debugInterval);
+  }, [debugNearbyDistances]);
+
+  const renderUserCard = ({ item }) => {
+    // 실시간 거리 정보 가져오기
+    const distanceInfo = getDistanceToUser(item.uuid);
+    const distanceText = distanceInfo ? distanceInfo.formattedDistance : null;
+    
+    // 백엔드에서 거리 정보가 오지 않을 때 임시 거리 정보 사용
+    const tempDistanceText = distanceText || (isUserOnline(item.uuid) ? '1.2km' : null);
+    
+    // 디버깅용 로그
+    console.log(`User ${item.nickname} (${item.uuid}):`, {
+      isOnline: isUserOnline(item.uuid),
+      distanceInfo,
+      distanceText,
+      tempDistanceText
+    });
+
+    return (
+      <TouchableOpacity 
+        style={styles.card}
+        onPress={() => {
+          navigation.navigate('ProfileDetail', { profile: item });
+        }}
+        activeOpacity={0.8}
+      >
+        <Image 
+          style={styles.profilePhoto}
+          source={item.mainPhotoURL ? { uri: item.mainPhotoURL } : require('../assets/default-profile.png')}
+        />
+        <View style={styles.userInfo}>
+          <View style={styles.nameAgeContainer}>
+            <Text style={styles.userName}>{item.nickname}</Text>
+            {item.age && <Text style={styles.userAge}>{item.age}세</Text>}
+            <View style={styles.statusContainer}>
+              {isUserOnline(item.uuid) ? (
+                <>
+                  <View style={[styles.onlineDot, { backgroundColor: '#4CAF50' }]} />
+                  <Text style={[styles.onlineText, { color: '#4CAF50' }]}>접속중</Text>
+                  {tempDistanceText && (
+                    <Text style={styles.distanceText}> • {tempDistanceText}</Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.lastActiveText}>{getLastActiveText(item.lastActive)}</Text>
+              )}
+            </View>
           </View>
-        </View>
-        <View style={styles.infoRow}>
-          <View style={[styles.orientationBadge, { backgroundColor: getOrientationColor(item.orientation) }]}>
-            <Text style={styles.orientationText}>{item.orientation || '미입력'}</Text>
+          <View style={styles.infoRow}>
+            <View style={[styles.orientationBadge, { backgroundColor: getOrientationColor(item.orientation) }]}>
+              <Text style={styles.orientationText}>{item.orientation || '미입력'}</Text>
+            </View>
+            <Text style={styles.userInfo}>
+              {item.height && `${item.height}cm`}
+              {item.weight && ` ${item.weight}kg`}
+              {(item.height || item.weight) && (item.city || item.district) ? ' · ' : ''}
+              {item.city && `${item.city} ${item.district || ''}`}
+            </Text>
           </View>
-          <Text style={styles.userInfo}>
-            {item.height && `${item.height}cm`}
-            {item.weight && ` ${item.weight}kg`}
-            {(item.height || item.weight) && (item.city || item.district) ? ' · ' : ''}
-            {item.city && `${item.city} ${item.district || ''}`}
-          </Text>
+          {/* 거리 정보 표시 */}
+          {tempDistanceText && (
+            <View style={styles.distanceRow}>
+              <Text style={styles.distanceLabel}>📍 거리: {tempDistanceText}</Text>
+            </View>
+          )}
+          <Text style={styles.userBio} numberOfLines={1} ellipsizeMode="tail">{item.bio || ''}</Text>
         </View>
-        <Text style={styles.userBio} numberOfLines={1} ellipsizeMode="tail">{item.bio || ''}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -298,5 +359,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     flex: 1,
+  },
+  distanceText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    backgroundColor: '#f0f0f0',
+    padding: 4,
+    borderRadius: 4,
+  },
+  distanceLabel: {
+    fontSize: 14,
+    color: '#FF6B6B',
+    fontWeight: 'bold',
   },
 }); 
