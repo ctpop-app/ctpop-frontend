@@ -49,11 +49,11 @@ const useUserStore = create(
         }));
         console.log('New state:', get());
       },
-      
+    
       clearUser: () => {
         console.log('clearUser called');
         set((state) => ({ 
-          ...state,
+          ...state,      
           user: null, 
           userProfile: null, 
           isAuthenticated: false,

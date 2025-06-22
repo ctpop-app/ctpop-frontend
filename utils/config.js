@@ -1,24 +1,25 @@
 // API 주소 설정 파일
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 // 서버 IP 저장용 키
 const SERVER_IP_KEY = 'server_ip_address';
 const SERVER_PORT = '8080';
 
-// 기본 설정값 (서버를 찾지 못했을 때 폴백으로 사용)
-const DEFAULT_IP = '172.30.1.1';
+// 기본 설정값 (AWS EC2 인스턴스)
+const DEFAULT_IP = '3.35.11.208';
 const DEFAULT_PORT = SERVER_PORT;
 
 // 개발 환경
 const DEV = {
-  // 기본 API URL (디스커버리 서비스로 업데이트될 예정)
+  // AWS EC2 인스턴스로 기본 API URL 설정
   API_URL: `http://${DEFAULT_IP}:${DEFAULT_PORT}`,
 };
 
 // 테스트 환경
 const TEST = {
-  API_URL: 'https://test-api.ctpop.com',
+  API_URL: 'http://3.35.11.208:8080',
 };
 
 // 배포 환경
@@ -27,7 +28,7 @@ const PROD = {
 };
 
 // 현재 사용할 환경 설정 (DEV, TEST, PROD 중 선택)
-const currentEnv = DEV;
+const currentEnv = TEST;
 
 // 설정 객체
 const config = {
@@ -55,6 +56,12 @@ const getSavedServerIp = async () => {
  */
 export const initializeConfig = async () => {
   try {
+    // TEST 환경에서는 저장된 IP를 무시하고 AWS EC2 사용
+    if (currentEnv === TEST) {
+      console.log('TEST 환경: AWS EC2 서버 사용');
+      return;
+    }
+    
     const savedIp = await getSavedServerIp();
     if (savedIp && savedIp !== DEFAULT_IP) {
       updateApiUrl(`http://${savedIp}:${SERVER_PORT}`);
@@ -89,6 +96,34 @@ export const updateApiUrl = (apiUrl) => {
       console.error('apiClient baseURL 업데이트 실패:', err);
     }
   }, 0);
+};
+
+/**
+ * 현재 설정된 API URL로 서버 연결을 테스트합니다.
+ * @returns {Promise<boolean>} 서버 응답 여부
+ */
+export const testServerConnection = async () => {
+  try {
+    const testUrl = `${config.API_URL}/test/echo?message=test`;
+    console.log(`서버 연결 테스트 중: ${testUrl}`);
+    
+    // Echo API 테스트
+    const response = await axios.get(testUrl, {
+      timeout: 5000 // 5초 타임아웃
+    });
+    
+    console.log('서버 응답:', response.data);
+    // 서버가 올바르게 응답하는지 확인
+    return response.status === 200 && response.data === 'test';
+  } catch (error) {
+    // 오류 발생 시 연결 실패로 처리
+    console.error('서버 연결 테스트 실패:', error.message);
+    if (error.response) {
+      console.error('응답 데이터:', error.response.data);
+      console.error('응답 상태:', error.response.status);
+    }
+    return false;
+  }
 };
 
 export default config; 
