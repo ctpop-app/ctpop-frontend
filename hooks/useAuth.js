@@ -189,14 +189,31 @@ export const useAuth = () => {
         return false;
       }
 
+      // 🚨 서버 검증
+      let serverValidation = await authService.validateAndRefreshToken();
+      
+      if (!serverValidation.success) {
+        console.log('서버 검증 실패, 잠시 후 재시도...');
+        setIsLoading(true);
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        
+        // 1회 재시도
+        serverValidation = await authService.validateAndRefreshToken();
+        
+        if (!serverValidation.success) {
+          console.log('서버 검증 최종 실패, 오류 화면 표시');
+          await authService.clearTokens(); // 토큰만 삭제
+          throw new Error('서버 연결에 실패했습니다. 네트워크 연결을 확인해주세요.');
+        }
+      }
+
       setUser(user);
       const hasProfile = await checkProfileExists();
       setHasProfile(hasProfile);
       return true;
     } catch (error) {
       console.error('인증 상태 확인 실패:', error);
-      clearUser();
-      return false;
+      throw error; // App.js에서 ErrorScreen으로 처리
     }
   }, [setUser, setHasProfile, clearUser, checkProfileExists]);
 

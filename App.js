@@ -13,7 +13,7 @@ import { useSocket } from './hooks/useSocket';
 
 // 서버 설정
 import { discoverServer } from './utils/discovery';
-import { updateApiUrl, initializeConfig } from './utils/config';
+import { updateApiUrl, initializeConfig, testServerConnection } from './utils/config';
 
 // 네비게이션
 import MainNavigator from './navigation/MainNavigator';
@@ -31,7 +31,7 @@ import ErrorScreen from './components/ErrorScreen';
 const Stack = createStackNavigator();
 
 // 앱 초기화 함수
-const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, clearUser, connect) => {
+const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, connect) => {
   try {
     console.log('앱 초기화 시작');
     setIsLoading(true);
@@ -41,28 +41,26 @@ const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, cle
     await initializeConfig();
     console.log('서버 설정 초기화 완료');
     
-    // 2. 서버 디스커버리 (주석처리 - AWS EC2 사용 시)
-    // console.log('서버 디스커버리 시작');
-    // const apiUrl = await discoverServer();
-    // if (!apiUrl) {
-    //   throw new Error('서버를 찾을 수 없습니다.');
-    // }
-    // updateApiUrl(apiUrl);
-    // console.log('서버 디스커버리 완료:', apiUrl);
+    // 2. 서버 연결 테스트 (현재 설정된 URL 사용)
+    console.log('서버 연결 테스트 시작');
+    const isServerAvailable = await testServerConnection();
+    if (!isServerAvailable) {
+      throw new Error('서버에 연결할 수 없습니다.');
+    }
+    console.log('서버 연결 테스트 완료');
     
     // 3. 인증 상태 확인
     console.log('인증 상태 확인 시작');
     const isAuth = await checkAuth();
     if (!isAuth) {
-      console.log('인증 실패, 사용자 정보 및 토큰 삭제');
-      await clearUser();
+      console.log('인증 실패, 토큰만 삭제');
       await clearTokens();
     }
-    console.log('인증 상태 확인 완료:', isAuth);
+    console.log('인증 상태 확인 완료:', isAuth); 
 
     // 4. 소켓 연결
     if (isAuth) {
-      console.log('소켓 연결 시작');
+      console.log('소켓 연결 시작'); 
       connect();
       console.log('소켓 연결 완료');
     }
@@ -70,8 +68,6 @@ const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, cle
   } catch (err) {
     console.error('앱 초기화 실패:', err);
     setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
-    await clearUser();
-    await clearTokens();
   } finally {
     setIsLoading(false);
   }

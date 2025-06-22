@@ -356,7 +356,7 @@ export const clearTokens = async () => {
     ]);
     return true;
   } catch (error) {
-    console.error('토큰 삭제 실패:', error);
+    console.error('토큰 삭제 실패:', error);   
     return false;
   }
 };

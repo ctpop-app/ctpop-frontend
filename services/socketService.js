@@ -9,9 +9,8 @@ const startConnectionCheck = () => {
   console.log('Starting connection check...');
   connectionCheckInterval = setInterval(() => {
     if (!socketApi.isConnected()) {
-      console.log('Connection lost, triggering reconnection...');
-      // Socket.IO 자체 재연결 트리거
-      socketApi.socket?.connect();
+      console.log('Connection lost, triggering reconnection');    // Socket.IO 자체 재연결 트리거
+      socketApi.connect();
     }
   }, 10000); // 10초마다 체크
 };
@@ -24,8 +23,19 @@ const stopConnectionCheck = () => {
 };
 
 const setupEventListeners = () => {
-  socketApi.on('connect', () => {
+  socketApi.on('connect', async () => {
     console.log('Socket connected');
+    
+    // 소켓 연결 시 lastActive 업데이트
+    const uuid = socketApi.getUuid();
+    if (uuid) {
+      try {
+        await profileService.updateLastActive(uuid, getCurrentKST());
+        console.log('lastActive 업데이트 완료 (연결 시)');
+      } catch (error) {
+        console.error('Failed to update lastActive (연결 시):', error);
+      }
+    }
   });
 
   socketApi.on('disconnect', async () => {

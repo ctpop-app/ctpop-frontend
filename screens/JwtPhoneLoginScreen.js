@@ -61,13 +61,11 @@ export default function JwtPhoneLoginScreen() {
         } else if (result.shouldLogout) {
           // 토큰이 유효하지 않거나 만료된 경우
           await authService.logout();
-          clearUser();
         }
       } catch (error) {
         console.error('초기 인증 확인 실패:', error);
         // 에러 발생 시 로그아웃 처리
         await authService.logout();
-        clearUser();
       }
     };
 
