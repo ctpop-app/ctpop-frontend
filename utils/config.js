@@ -2,6 +2,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { discoverServer } from './discovery';
 
 // 서버 IP 저장용 키
 const SERVER_IP_KEY = 'server_ip_address';
@@ -28,7 +29,7 @@ const PROD = {
 };
 
 // 현재 사용할 환경 설정 (DEV, TEST, PROD 중 선택)
-const currentEnv = TEST;
+const currentEnv = DEV;
 
 // 설정 객체
 const config = {
@@ -63,11 +64,39 @@ export const initializeConfig = async () => {
     }
     
     const savedIp = await getSavedServerIp();
+    let isConnected = false;
+    
     if (savedIp && savedIp !== DEFAULT_IP) {
+      console.log(`저장된 IP로 연결 시도: ${savedIp}`);
       updateApiUrl(`http://${savedIp}:${SERVER_PORT}`);
+      isConnected = await testServerConnection();
+      
+      if (isConnected) {
+        console.log(`저장된 IP 연결 성공: ${savedIp}`);
+        return;
+      } else {
+        console.log(`저장된 IP 연결 실패: ${savedIp}, discovery 시작`);
+      }
+    }
+    
+    // 저장된 IP로 연결이 안 되면 discovery로 탐색
+    if (!isConnected) {
+      console.log('discovery 서비스로 서버 검색 시작');
+      const discoveredUrl = await discoverServer();
+      
+      if (discoveredUrl) {
+        console.log(`discovery로 서버 발견: ${discoveredUrl}`);
+        updateApiUrl(discoveredUrl);
+      } else {
+        console.log('discovery로도 서버를 찾을 수 없음');
+        // 기본 IP로 fallback
+        updateApiUrl(`http://${DEFAULT_IP}:${SERVER_PORT}`);
+      }
     }
   } catch (error) {
     console.error('설정 초기화 실패:', error);
+    // 에러 발생 시 기본 IP로 fallback
+    updateApiUrl(`http://${DEFAULT_IP}:${SERVER_PORT}`);
   }
 };
 
