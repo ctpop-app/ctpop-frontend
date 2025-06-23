@@ -60,7 +60,7 @@ const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, con
 
     // 4. 소켓 연결
     if (isAuth) {
-      console.log('소켓 연결 시작'); 
+      console.log('소켓 연결 시작');
       connect();
       console.log('소켓 연결 완료');
     }
@@ -84,13 +84,12 @@ export default function App() {
   const userStore = useUserStore();
   const isAuthenticated = userStore.isAuthenticated;
   const hasProfile = userStore.hasProfile;
-  const clearUser = userStore.clearUser;
 
   // 앱 초기화
   useEffect(() => {
     const init = async () => {
       try {
-        await initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser, connect);
+        await initializeApp(setIsLoading, setError, checkAuth, clearTokens, connect);
       } catch (err) {
         console.error('앱 초기화 실패:', err);
         setError(err.message || '앱 초기화 중 오류가 발생했습니다.');
@@ -114,8 +113,8 @@ export default function App() {
   const handleRetry = useCallback(() => {
     setError(null);
     setIsLoading(true);
-    initializeApp(setIsLoading, setError, checkAuth, clearTokens, clearUser, connect);
-  }, [checkAuth, clearTokens, clearUser, connect]);
+    initializeApp(setIsLoading, setError, checkAuth, clearTokens, connect);
+  }, [checkAuth, clearTokens, connect]);
 
   // 디버그 로그
   console.log('=== 렌더링 상태 ===');

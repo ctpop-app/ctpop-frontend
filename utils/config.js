@@ -9,7 +9,7 @@ const SERVER_IP_KEY = 'server_ip_address';
 const SERVER_PORT = '8080';
 
 // 기본 설정값 (AWS EC2 인스턴스)
-const DEFAULT_IP = '3.35.11.208';
+const DEFAULT_IP = '192.168.219.206';
 const DEFAULT_PORT = SERVER_PORT;
 
 // 개발 환경
