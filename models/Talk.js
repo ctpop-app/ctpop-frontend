@@ -9,10 +9,9 @@ export class Talk {
     this.createdAt = data.createdAt || getCurrentKST();
   }
 
-  // Firestore 문서로 변환
+  // Firestore 문서로 변환 (id 필드 제외)
   toFirestore() {
     return {
-      id: this.id,
       content: this.content,
       imageUrl: this.imageUrl,
       isActive: this.isActive,
@@ -24,7 +23,7 @@ export class Talk {
   static fromFirestore(doc) {
     const data = doc.data();
     return new Talk({
-      id: doc.id,
+      id: doc.id,  // Firestore의 doc.id 사용
       content: data.content,
       imageUrl: data.imageUrl,
       isActive: data.isActive,
