@@ -3,31 +3,44 @@ import { profileService } from './profileService';
 import { getCurrentKST } from '../utils/dateUtils';
 import { userStore } from '../store/userStore';
 
-let heartbeatInterval = null;
+let connectionCheckInterval = null;
 
-const startHeartbeat = () => {
-  console.log('SocketService: Setting up heartbeat interval...');
-  heartbeatInterval = setInterval(() => {
-    console.log('Ping sent');
-    socketApi.emit('heartbeat');
-  }, 30000);
+const startConnectionCheck = () => {
+  console.log('Starting connection check...');
+  connectionCheckInterval = setInterval(() => {
+    if (!socketApi.isConnected()) {
+      console.log('Connection lost, triggering reconnection');    // Socket.IO 자체 재연결 트리거
+      socketApi.connect();
+    }
+  }, 10000); // 10초마다 체크
 };
 
-const stopHeartbeat = () => {
-  if (heartbeatInterval) {
-    clearInterval(heartbeatInterval);
-    heartbeatInterval = null;
+const stopConnectionCheck = () => {
+  if (connectionCheckInterval) {
+    clearInterval(connectionCheckInterval);
+    connectionCheckInterval = null;
   }
 };
 
 const setupEventListeners = () => {
-  socketApi.on('connect', () => {
+  socketApi.on('connect', async () => {
     console.log('Socket connected');
+    
+    // 소켓 연결 시 lastActive 업데이트
+    const uuid = socketApi.getUuid();
+    if (uuid) {
+      try {
+        await profileService.updateLastActive(uuid, getCurrentKST());
+        console.log('lastActive 업데이트 완료 (연결 시)');
+      } catch (error) {
+        console.error('Failed to update lastActive (연결 시):', error);
+      }
+    }
   });
 
   socketApi.on('disconnect', async () => {
     console.log('Socket disconnected');
-    stopHeartbeat();
+    stopConnectionCheck();
     
     const uuid = socketApi.getUuid();
     if (uuid) {
@@ -41,11 +54,6 @@ const setupEventListeners = () => {
 
   socketApi.on('error', (error) => {
     console.error('Socket error:', error);
-  });
-
-  socketApi.on('pong', () => {
-    console.log('Pong received');
-    console.log('Connection alive');
   });
 
   // 서버에서 직접 받은 사용자 상태 업데이트
@@ -65,7 +73,7 @@ const connect = async (uuid) => {
     
     if (connected) {
       setupEventListeners();
-      startHeartbeat();
+      startConnectionCheck();
       return true;
     } else {
       return false;
@@ -77,7 +85,7 @@ const connect = async (uuid) => {
 };
 
 const disconnect = async () => {
-  stopHeartbeat();
+  stopConnectionCheck();
   
   const uuid = socketApi.getUuid();
   if (uuid) {
@@ -94,8 +102,6 @@ const disconnect = async () => {
 export const socketService = {
   connect,
   disconnect,
-  startHeartbeat,
-  stopHeartbeat,
   isConnected: () => socketApi.isConnected(),
   getUuid: () => socketApi.getUuid(),
   on: (event, callback) => socketApi.on(event, callback),
