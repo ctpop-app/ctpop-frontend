@@ -39,7 +39,6 @@ export const testConnection = async () => {
  * @returns {Promise<Object>} - 상태와 메시지가 포함된 응답
  */
 export const sendOtp = async (phoneNumber) => {
-  console.log('authService.js - sendOtp 시작');
   try {
     // 전화번호 유효성 검사
     if (!isValidPhoneNumber(phoneNumber)) {
@@ -51,7 +50,6 @@ export const sendOtp = async (phoneNumber) => {
 
     const formattedPhone = toE164Format(phoneNumber);
     const response = await authApi.sendOtp(formattedPhone);
-    console.log('authService.js - sendOtp 응답:', response);
     
     if (!response.success) {
       return {
@@ -98,7 +96,6 @@ export const verifyOtp = async (phoneNumber, code) => {
   try {
     const formattedPhone = toE164Format(phoneNumber);
     const accessToken = await AsyncStorage.getItem(AUTH_KEYS.ACCESS_TOKEN);
-    console.log('authService.js - 저장된 액세스 토큰:', accessToken);
     
     if (!accessToken) {
       console.log('authService.js - 액세스 토큰 없음');

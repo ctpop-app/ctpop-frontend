@@ -53,10 +53,9 @@ const initializeApp = async (setIsLoading, setError, checkAuth, clearTokens, con
     console.log('인증 상태 확인 시작');
     const isAuth = await checkAuth();
     if (!isAuth) {
-      console.log('인증 실패, 토큰만 삭제');
-      await clearTokens();
+      console.log('인증 실패, 토큰 유지');
     }
-    console.log('인증 상태 확인 완료:', isAuth); 
+    console.log('인증 상태 확인 완료:', isAuth);
 
     // 4. 소켓 연결
     if (isAuth) {
@@ -98,7 +97,7 @@ export default function App() {
     };
     
     init();
-  }, []);
+  }, [checkAuth, clearTokens, connect]);
 
   // 앱 종료 시 소켓 연결 해제
   useEffect(() => {
@@ -115,13 +114,6 @@ export default function App() {
     setIsLoading(true);
     initializeApp(setIsLoading, setError, checkAuth, clearTokens, connect);
   }, [checkAuth, clearTokens, connect]);
-
-  // 디버그 로그
-  console.log('=== 렌더링 상태 ===');
-  console.log('isLoading:', isLoading);
-  console.log('error:', error);
-  console.log('isAuthenticated:', isAuthenticated);
-  console.log('hasProfile:', hasProfile);
 
   return (
     <NavigationContainer>
