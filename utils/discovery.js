@@ -8,7 +8,16 @@ const SERVER_PORT = '8080';
 
 // 기본 IP 목록
 const DEFAULT_IPS = [
-  '192.168.0.84'
+  '192.168.0.84',
+  '10.0.2.2',      // 안드로이드 에뮬레이터용
+  'localhost',     // 로컬 개발용
+  '127.0.0.1',      // 로컬호스트 대체
+  '192.168.0.86',
+  '172.30.1.16',
+  '192.168.219.66',
+  '192.168.100.20',
+  '192.168.1.151',
+  '192.168.251.129'
 ];
 
 // IP 목록 저장용 키
@@ -84,9 +93,11 @@ export const discoverServer = async () => {
     const isValid = await testServerConnection(ip);
     if (isValid) {
       console.log(`서버 발견: ${ip}`);
+
       // 발견된 IP를 AsyncStorage에 저장 (성공한 IP로 업데이트)
       await AsyncStorage.setItem(SERVER_IP_KEY, ip);
       console.log(`성공한 IP 저장됨: ${ip}`);
+
       return `http://${ip}:${SERVER_PORT}`;
     }
   }
@@ -141,3 +152,4 @@ export const resetServerIp = async () => {
   await AsyncStorage.removeItem(SERVER_IP_KEY);
   console.log('서버 IP 설정이 초기화됨');
 }; 
+
