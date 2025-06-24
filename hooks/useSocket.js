@@ -4,12 +4,28 @@ import { useAuth } from './useAuth';
 
 // 전역 소켓 연결 상태 관리
 let globalSocketConnected = false;
+let isConnecting = false; // 연결 중인지 확인하는 플래그
+
+// Hot Reload 시 전역 상태 초기화
+if (__DEV__) {
+  // 개발 모드에서만 전역 상태 초기화
+  const resetGlobalState = () => {
+    globalSocketConnected = false;
+    isConnecting = false;
+    console.log('Hot Reload: 전역 소켓 상태 초기화됨');
+  };
+  
+  // 앱이 다시 로드될 때마다 호출
+  if (global.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
+    resetGlobalState();
+  }
+}
 
 export const useSocket = () => {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState([]);
 
-  // 사용자 상태 변경 핸들러
+  // 사용자 상태 변경 핸들러 (불변 함수)
   const handleUserStatus = useCallback(({ uuid, isOnline }) => {
     console.log('Handling user status:', { uuid, isOnline });
     setOnlineUsers(prev => {
@@ -23,15 +39,16 @@ export const useSocket = () => {
     });
   }, []);
 
-  // 온라인 사용자 목록 핸들러 (서버에서 받은 실제 연결된 사용자 목록)
+  // 온라인 사용자 목록 핸들러 (불변 함수)
   const handleOnlineUsersList = useCallback((users) => {
     console.log('Received online users list from server:', users);
     setOnlineUsers(users);
   }, []);
 
-  // 소켓 연결
+  // 소켓 연결 (불변 함수)
   const connect = useCallback(async () => {
-    if (!user?.uuid) return;
+    const currentUser = useAuth().user; // 현재 user 상태를 직접 가져옴
+    if (!currentUser?.uuid) return;
     
     // 이미 연결되어 있으면 이벤트 리스너만 설정
     if (globalSocketConnected) {
@@ -42,15 +59,20 @@ export const useSocket = () => {
       return;
     }
     
+    // 이미 연결 중이면 중복 연결 방지
+    if (isConnecting) {
+      console.log('이미 연결 중입니다. 중복 연결 시도 무시');
+      return;
+    }
+    
     // 새로운 연결 시도
     try {
-      const connected = await socketService.connect(user.uuid);
-      
+      isConnecting = true;
+      const connected = await socketService.connect(currentUser.uuid);
       if (connected) {
         globalSocketConnected = true;
         socketService.on('userStatus', handleUserStatus);
         socketService.on('onlineUsersList', handleOnlineUsersList);
-        
         // 서버에서 현재 온라인 사용자 목록 요청
         socketService.emit('getOnlineUsers');
       } else {
@@ -58,14 +80,15 @@ export const useSocket = () => {
       }
     } catch (error) {
       globalSocketConnected = false;
+    } finally {
+      isConnecting = false;
     }
-  }, [user?.uuid, handleUserStatus, handleOnlineUsersList]);
+  }, [handleUserStatus, handleOnlineUsersList]);
 
   // 소켓 연결 해제 (전역에서만 호출)
   const disconnect = useCallback(async () => {
     socketService.off('userStatus', handleUserStatus);
     socketService.off('onlineUsersList', handleOnlineUsersList);
-    
     // 전역 연결 해제는 App.js에서만 수행
     if (globalSocketConnected) {
       await socketService.disconnect();
@@ -83,12 +106,11 @@ export const useSocket = () => {
     if (user?.uuid) {
       connect();
     }
-    // 컴포넌트 언마운트 시 이벤트 리스너만 제거 (소켓 연결은 유지)
     return () => {
       socketService.off('userStatus', handleUserStatus);
       socketService.off('onlineUsersList', handleOnlineUsersList);
     };
-  }, [user?.uuid, connect, handleUserStatus, handleOnlineUsersList]);
+  }, [user?.uuid]);
 
   return {
     isUserOnline,

@@ -86,7 +86,6 @@ class SocketApi {
   }
 
   disconnect() {
-    console.log('SocketApi: disconnect called');
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -96,7 +95,6 @@ class SocketApi {
 
   // 이벤트 리스너 등록
   on(event, callback) {
-    console.log('SocketApi: registering listener for event:', event);
     this.socket?.on(event, callback);
   }
 
@@ -107,7 +105,6 @@ class SocketApi {
 
   // 이벤트 발생
   emit(event, data) {
-    console.log('SocketApi: emitting event:', event);
     this.socket?.emit(event, data);
   }
 

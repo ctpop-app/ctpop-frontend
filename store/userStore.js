@@ -18,17 +18,14 @@ const useUserStore = create(
 
       // 액션
       setUser: (user) => {
-        console.log('setUser called with:', user);
         set((state) => ({ 
           ...state,
           user, 
           isAuthenticated: !!user 
         }));
-        console.log('New state:', get());
       },
       
       setUserProfile: (profile) => {
-        console.log('setUserProfile called with:', profile);
         if (!profile?.uuid) {
           console.error('Invalid profile: missing uuid field', profile);
           return;
@@ -38,33 +35,30 @@ const useUserStore = create(
           userProfile: profile,
           hasProfile: !!profile 
         }));
-        console.log('New state:', get());
       },
       
       setHasProfile: (hasProfile) => {
-        console.log('setHasProfile called with:', hasProfile);
-        set((state) => ({ 
-          ...state,
-          hasProfile 
-        }));
-        console.log('New state:', get());
+        const currentState = get();
+        if (currentState.hasProfile !== hasProfile) {
+          set((state) => ({ 
+            ...state,
+            hasProfile 
+          }));
+        }
       },
-      
+    
       clearUser: () => {
-        console.log('clearUser called');
         set((state) => ({ 
-          ...state,
+          ...state,      
           user: null, 
           userProfile: null, 
           isAuthenticated: false,
           hasProfile: false
         }));
-        console.log('New state:', get());
       },
 
       // 회원탈퇴
       withdrawUser: async () => {
-        console.log('withdrawUser called');
         try {
           // 1. 상태 초기화
           set((state) => ({ 
@@ -81,11 +75,9 @@ const useUserStore = create(
           await AsyncStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
           await AsyncStorage.removeItem(AUTH_KEYS.PHONE_NUMBER);
           await AsyncStorage.removeItem(AUTH_KEYS.USER);
-          console.log('User data cleared');
         } catch (error) {
           console.error('User data clear failed:', error);
         }
-        console.log('New state:', get());
       },
 
       // 초기화
@@ -104,7 +96,7 @@ const useUserStore = create(
     {
       name: 'user-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      skipHydration: true
+      skipHydration: false
     }
   )
 );
