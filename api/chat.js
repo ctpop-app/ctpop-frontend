@@ -5,7 +5,7 @@ import Message from '../models/Message';
 import { handleError, withNetworkRetry } from '../utils/errorHandler';
 import { auth } from '../firebase';
 import { getCurrentKST } from '../utils/dateUtils';
-import useUserStore from '../store/userStore';
+import { profileApi } from './profile';
 
 /**
  * 사용자의 채팅방 목록을 가져옵니다.
@@ -13,20 +13,19 @@ import useUserStore from '../store/userStore';
  * @param {Object} params - 페이징 등의 파라미터
  * @returns {Promise<Object>} - 성공 여부와 채팅방 목록
  */
-export const getChatRooms = async () => {
+export const getChatRooms = async (uuid) => {
   try {
-    const user = useUserStore.getState().user;
-    if (!user?.uuid) {
-      throw new Error('사용자가 로그인되어 있지 않습니다.');
+    if (!uuid) {
+      throw new Error('사용자 UUID가 필요합니다.');
     }
 
-    console.log('채팅방 조회 시작 - 사용자:', user.uuid);
+    console.log('채팅방 조회 시작 - 사용자:', uuid);
     
     // 채팅방 컬렉션에서 현재 사용자가 참여한 채팅방만 조회
     const chatRoomsRef = collection(db, 'chatRooms');
     const q = query(
       chatRoomsRef,
-      where('participants', 'array-contains', user.uuid)
+      where('participants', 'array-contains', uuid)
     );
     
     const querySnapshot = await getDocs(q);
@@ -274,9 +273,10 @@ export const deleteChat = async (chatId) => {
 /**
  * 특정 채팅방의 상세 정보를 가져옵니다.
  * @param {string} roomId - 채팅방 ID
+ * @param {string} currentUserUuid - 현재 사용자 UUID
  * @returns {Promise<Object>} - 성공 여부와 채팅방 상세 정보
  */
-export const getChatRoomDetails = async (roomId) => {
+export const getChatRoomDetails = async (roomId, currentUserUuid) => {
   return withNetworkRetry(async () => {
     try {
       const chatRef = doc(db, 'chatRooms', roomId);
@@ -300,20 +300,18 @@ export const getChatRoomDetails = async (roomId) => {
       const lastMessage = messagesSnapshot.empty ? null : messagesSnapshot.docs[0].data();
 
       // 상대방 정보 가져오기
-      const currentUser = useUserStore.getState().user;
-      const otherParticipantId = chatData.participants.find(p => p !== currentUser.uuid);
+      const otherParticipantId = chatData.participants.find(p => p !== currentUserUuid);
       
-      const otherUserRef = doc(db, 'users', otherParticipantId);
-      const otherUserDoc = await getDoc(otherUserRef);
-      const otherUser = otherUserDoc.exists() ? otherUserDoc.data() : null;
+      const otherUserProfile = await profileApi.get(otherParticipantId);
+      const otherUser = otherUserProfile ? otherUserProfile.data() : null;
 
       return {
         ...chatData,
         lastMessage,
         otherUser: otherUser ? {
-          uuid: otherUserDoc.id,
+          uuid: otherUserProfile.id,
           nickname: otherUser.nickname,
-          profileImage: otherUser.profileImage
+          mainPhotoURL: otherUser.mainPhotoURL
         } : null
       };
     } catch (error) {

@@ -1,7 +1,7 @@
 // MessageScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { getChatRooms, getChatRoomDetails } from '../api/chat';
 import useUserStore from '../store/userStore';
 import { getCurrentKST } from '../utils/dateUtils';
@@ -18,10 +18,21 @@ export default function MessageScreen() {
     loadChatRooms();
   }, [user?.uuid]);
 
-  const loadChatRooms = async () => {
+  // 화면이 포커스될 때마다 채팅방 목록 새로고침
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.uuid) {
+        loadChatRooms();
+      }
+    }, [user?.uuid])
+  );
+
+  const loadChatRooms = async (showLoading = true) => {
     try {
       console.log('채팅방 로딩 시작...');
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       setError(null);
 
       // 로그인 상태 확인
@@ -35,7 +46,7 @@ export default function MessageScreen() {
         return;
       }
       
-      const rooms = await getChatRooms();
+      const rooms = await getChatRooms(user.uuid);
       console.log('받아온 채팅방 데이터:', JSON.stringify(rooms, null, 2));
       
       if (!rooms || rooms.length === 0) {
@@ -48,7 +59,7 @@ export default function MessageScreen() {
         rooms.map(async (room) => {
           try {
             console.log(`채팅방 ${room.id} 상세 정보 로딩 중...`);
-            const details = await getChatRoomDetails(room.id);
+            const details = await getChatRoomDetails(room.id, user.uuid);
             console.log(`채팅방 ${room.id} 상세 정보:`, JSON.stringify(details, null, 2));
             return {
               ...room,
@@ -93,7 +104,9 @@ export default function MessageScreen() {
         }
       }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -138,11 +151,22 @@ export default function MessageScreen() {
           otherUser: {
             uuid: otherParticipant,
             nickname: item.otherUser?.nickname || '알 수 없는 사용자',
-            profileImage: item.otherUser?.profileImage
+            mainPhotoURL: item.otherUser?.mainPhotoURL
           }
         })}
       >
         <View style={styles.chatRoomContent}>
+          <View style={styles.profileImageContainer}>
+            {item.otherUser?.mainPhotoURL ? (
+              <Image
+                source={{ uri: item.otherUser.mainPhotoURL }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={styles.defaultProfileImage} />
+            )}
+          </View>
+          
           <View style={styles.chatRoomInfo}>
             <Text style={styles.chatRoomName}>
               {item.otherUser?.nickname || '알 수 없는 사용자'}
@@ -200,39 +224,30 @@ export default function MessageScreen() {
     );
   }
 
-  if (!chatRooms.length) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>메시지</Text>
-        </View>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>아직 대화가 없습니다</Text>
-          <Text style={styles.emptySubtext}>새로운 대화를 시작해보세요</Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>메시지</Text>
       </View>
       
-      {chatRooms.length > 0 ? (
+      {/* 게시물 목록 */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>채팅방을 불러오는 중...</Text>
+        </View>
+      ) : chatRooms.length > 0 ? (
         <FlatList
           data={chatRooms}
           renderItem={renderChatRoom}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           refreshing={loading}
-          onRefresh={loadChatRooms}
+          onRefresh={() => loadChatRooms(false)}
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>아직 메시지가 없습니다.</Text>
-          <Text style={styles.emptySubtext}>홈 화면에서 새로운 대화를 시작해보세요!</Text>
+          <Text style={styles.emptyText}>아직 대화가 없습니다</Text>
+          <Text style={styles.emptySubtext}>새로운 대화를 시작해보세요</Text>
         </View>
       )}
     </View>
@@ -337,5 +352,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  profileImageContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  defaultProfileImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E0E0E0',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
   },
 }); 

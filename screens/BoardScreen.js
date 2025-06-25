@@ -1,5 +1,5 @@
 // BoardScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ChatModal } from '../components/chat/ChatModal';
 import { createChatRoom } from '../api/chat';
+import { profileApi } from '../api/profile';
 import useUserStore from '../store/userStore';
 
 const { width } = Dimensions.get('window');
@@ -27,70 +28,6 @@ const DISTANCE_TABS = [
   { id: '50km', label: '동네' },
   { id: '30km', label: '주변' },
   { id: '10km', label: '근처' }
-];
-
-// 더미 데이터
-const DUMMY_POSTS = [
-  {
-    id: 1,
-    content: '오늘 날씨가 너무 좋네요! 산책하기 딱 좋은 날씨예요.',
-    images: ['https://picsum.photos/400/300?random=1'],
-    distance: 2.5,
-    author: {
-      uuid: 'user1',
-      nickname: '서울맛집탐험가',
-      profileImage: 'https://picsum.photos/100/100?random=1'
-    },
-    timestamp: '5분 전'
-  },
-  {
-    id: 2,
-    content: '강남역 근처 맛집 추천해주세요!',
-    images: ['https://picsum.photos/400/300?random=2'],
-    distance: 5.8,
-    author: {
-      uuid: 'user2',
-      nickname: '맛있는하루',
-      profileImage: 'https://picsum.photos/100/100?random=2'
-    },
-    timestamp: '15분 전'
-  },
-  {
-    id: 3,
-    content: '오늘도 좋은 하루 보내세요~',
-    images: ['https://picsum.photos/400/300?random=3'],
-    distance: 1.2,
-    author: {
-      uuid: 'user3',
-      nickname: '행복한하루',
-      profileImage: 'https://picsum.photos/100/100?random=3'
-    },
-    timestamp: '30분 전'
-  },
-  {
-    id: 4,
-    content: '주말에 뭐하실 계획이신가요?',
-    images: ['https://picsum.photos/400/300?random=4'],
-    distance: 3.7,
-    author: {
-      uuid: 'user4',
-      nickname: '주말여행러',
-      profileImage: 'https://picsum.photos/100/100?random=4'
-    },
-    timestamp: '1시간 전'
-  },
-  {
-    id: 5,
-    content: '안녕하세요! 새로운 친구를 만나고 싶어요.',
-    images: ['https://firebasestorage.googleapis.com/v0/b/ctpop-6bffb.firebasestorage.app/o/profiles%2Fsuperpass-1750153144346%2F2025-06-17%2018-39_photo.jpg.jpg?alt=media&token=08db1c8c-abbc-43bf-8697-10b37379e8af'],
-    distance: 3.7,
-    author: {
-      uuid: 'superpass-1750153144346',
-      nickname: '17일의 남자',
-      profileImage: 'https://firebasestorage.googleapis.com/v0/b/ctpop-6bffb.firebasestorage.app/o/profiles%2Fsuperpass-1750153144346%2F2025-06-17%2018-39_photo.jpg.jpg?alt=media&token=08db1c8c-abbc-43bf-8697-10b37379e8af'
-    },
-    timestamp: '1시간 전'
-  }
 ];
 
 const TalkItem = ({ post, onMessage, onMore }) => {
@@ -104,7 +41,7 @@ const TalkItem = ({ post, onMessage, onMore }) => {
               {post.content}
             </Text>
             <View style={styles.profileSection}>
-              <Image source={{ uri: post.author?.profileImage }} style={styles.profileImage} />
+              <Image source={{ uri: post.author?.mainPhotoURL }} style={styles.profileImage} />
               <TouchableOpacity onPress={() => onMessage(post)} style={styles.messageButton}>
                 <Ionicons name="chatbubble-outline" size={28} color="#007AFF" />
               </TouchableOpacity>
@@ -128,9 +65,48 @@ export default function BoardScreen() {
   const navigation = useNavigation();
   const { user } = useUserStore();
   const [selectedTab, setSelectedTab] = useState('all');
-  const [posts] = useState(DUMMY_POSTS);
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [chatModalVisible, setChatModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // 프로필 데이터 로드
+  useEffect(() => {
+    loadProfiles();
+  }, []);
+
+  const loadProfiles = async () => {
+    try {
+      setLoading(true);
+      console.log('프로필 데이터 로딩 시작...');
+      
+      const profiles = await profileApi.getAll();
+      console.log('받아온 프로필 데이터:', profiles);
+      
+      // 현재 사용자의 프로필은 제외하고 포스트 형태로 변환
+      const postsData = profiles
+        .filter(profile => profile.uuid !== user?.uuid) // 현재 사용자 제외
+        .map((profile, index) => ({
+          id: profile.uuid || `profile-${index}`,
+          content: profile.bio || '안녕하세요! 새로운 친구를 만나고 싶어요.',
+          images: profile.mainPhotoURL ? [profile.mainPhotoURL] : [],
+          distance: Math.random() * 10 + 1, // 임시 거리 데이터
+          author: {
+            uuid: profile.uuid,
+            nickname: profile.nickname || '익명',
+            mainPhotoURL: profile.mainPhotoURL
+          },
+          timestamp: '방금 전' // 임시 시간 데이터
+        }));
+      
+      setPosts(postsData);
+    } catch (error) {
+      console.error('프로필 데이터 로딩 실패:', error);
+      Alert.alert('오류', '프로필 데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleMessage = (post) => {
     setSelectedUser(post.author);
@@ -149,8 +125,18 @@ export default function BoardScreen() {
         return;
       }
 
+      // 선택된 사용자의 완전한 프로필 정보 가져오기
+      const otherUserProfile = await profileApi.get(selectedUser.uuid);
+      const completeUserInfo = otherUserProfile ? {
+        uuid: otherUserProfile.id,
+        nickname: otherUserProfile.data().nickname || selectedUser.nickname,
+        mainPhotoURL: otherUserProfile.data().mainPhotoURL || selectedUser.mainPhotoURL
+      } : selectedUser;
+
+      console.log('완전한 사용자 정보:', completeUserInfo);
+
       const chatRoomData = {
-        participants: [currentUserUuid, selectedUser.uuid],
+        participants: [currentUserUuid, completeUserInfo.uuid],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         lastMessage: null,
@@ -165,10 +151,10 @@ export default function BoardScreen() {
 
       if (result?.success) {
         setChatModalVisible(false);
-        // 채팅방으로 이동
+        // 채팅방으로 이동 (완전한 사용자 정보 전달)
         navigation.navigate('ChatRoom', { 
           chatRoomId: result.data.id,
-          otherUser: selectedUser 
+          otherUser: completeUserInfo 
         });
       } else {
         Alert.alert('오류', '채팅방 생성에 실패했습니다.');
@@ -237,12 +223,25 @@ export default function BoardScreen() {
         </View>
 
         {/* 게시물 목록 */}
-        <FlatList
-          data={posts}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
-        />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>프로필을 불러오는 중...</Text>
+          </View>
+        ) : posts.length > 0 ? (
+          <FlatList
+            data={posts}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContainer}
+            refreshing={loading}
+            onRefresh={loadProfiles}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>표시할 프로필이 없습니다</Text>
+            <Text style={styles.emptySubtext}>새로운 친구를 기다려보세요</Text>
+          </View>
+        )}
 
         {/* 글쓰기 버튼 */}
         <TouchableOpacity
@@ -414,5 +413,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
   },
 }); 

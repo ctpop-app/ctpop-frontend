@@ -155,7 +155,7 @@ export default function ChatRoomScreen() {
       <MessageBubble
         message={item}
         isOwnMessage={isMe}
-        otherUserPhotoURL={otherUser?.profileImage}
+        otherUserPhotoURL={isMe ? null : otherUser?.mainPhotoURL}
       />
     );
   };

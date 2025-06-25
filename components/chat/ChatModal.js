@@ -26,7 +26,7 @@ export const ChatModal = ({ visible, onClose, onConfirm, otherUser }) => {
           <TouchableWithoutFeedback>
             <View style={styles.modalContent}>
               <Image
-                source={otherUser?.profileImage ? { uri: otherUser.profileImage } : require('../../assets/default-profile.png')}
+                source={otherUser?.mainPhotoURL ? { uri: otherUser.mainPhotoURL } : require('../../assets/default-profile.png')}
                 style={styles.profileImage}
               />
               <Text style={styles.modalTitle}>
