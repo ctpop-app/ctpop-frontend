@@ -84,9 +84,11 @@ export const discoverServer = async () => {
     const isValid = await testServerConnection(ip);
     if (isValid) {
       console.log(`서버 발견: ${ip}`);
+
       // 발견된 IP를 AsyncStorage에 저장 (성공한 IP로 업데이트)
       await AsyncStorage.setItem(SERVER_IP_KEY, ip);
       console.log(`성공한 IP 저장됨: ${ip}`);
+
       return `http://${ip}:${SERVER_PORT}`;
     }
   }
@@ -141,3 +143,4 @@ export const resetServerIp = async () => {
   await AsyncStorage.removeItem(SERVER_IP_KEY);
   console.log('서버 IP 설정이 초기화됨');
 }; 
+
