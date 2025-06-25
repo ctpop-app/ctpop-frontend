@@ -53,6 +53,23 @@ export const getLastActiveText = (lastActive) => {
   return `${Math.floor(diffMinutes / 1440)}일 전`;
 };
 
+export const formatTimeAgo = (timestamp) => {
+  try {
+    const now = new Date();
+    const date = new Date(timestamp);
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return '방금 전';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}분 전`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}시간 전`;
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}일 전`;
+    
+    return date.toLocaleDateString('ko-KR');
+  } catch (error) {
+    return '방금 전';
+  }
+};
+
 /**
  * 채팅 메시지용 시간 포맷 (오전/오후 HH:mm)
  * @param {Date|string|Timestamp} date - 변환할 날짜/시간

@@ -1,5 +1,5 @@
 // BoardScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,18 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
-  ScrollView
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ChatModal } from '../components/chat/ChatModal';
+import { ProfileMenuModal } from '../components/ProfileMenuModal';
+import { useTalkFeed, useMyTalk } from '../hooks/useTalk';
+import { useBlock } from '../hooks/useBlock';
+import { useAuth } from '../hooks/useAuth';
+import { formatTimeAgo } from '../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -27,80 +34,42 @@ const DISTANCE_TABS = [
   { id: '10km', label: '근처' }
 ];
 
-// 더미 데이터
-const DUMMY_POSTS = [
-  {
-    id: 1,
-    content: '오늘 날씨가 너무 좋네요! 산책하기 딱 좋은 날씨예요.',
-    images: ['https://picsum.photos/400/300?random=1'],
-    distance: 2.5,
-    author: {
-      nickname: '서울맛집탐험가',
-      profileImage: 'https://picsum.photos/100/100?random=1'
-    },
-    timestamp: '5분 전'
-  },
-  {
-    id: 2,
-    content: '강남역 근처 맛집 추천해주세요!',
-    images: ['https://picsum.photos/400/300?random=2'],
-    distance: 5.8,
-    author: {
-      nickname: '맛있는하루',
-      profileImage: 'https://picsum.photos/100/100?random=2'
-    },
-    timestamp: '15분 전'
-  },
-  {
-    id: 3,
-    content: '오늘도 좋은 하루 보내세요~',
-    images: ['https://picsum.photos/400/300?random=3'],
-    distance: 1.2,
-    author: {
-      nickname: '행복한하루',
-      profileImage: 'https://picsum.photos/100/100?random=3'
-    },
-    timestamp: '30분 전'
-  },
-  {
-    id: 4,
-    content: '주말에 뭐하실 계획이신가요?',
-    images: ['https://picsum.photos/400/300?random=4'],
-    distance: 3.7,
-    author: {
-      nickname: '주말여행러',
-      profileImage: 'https://picsum.photos/100/100?random=4'
-    },
-    timestamp: '1시간 전'
-  }
-];
-
-const TalkItem = ({ post, onMessage, onMore }) => {
+const TalkItem = ({ talk, onMessage, onMore, isMyTalk = false }) => {
   return (
-    <View style={styles.talkItem}>
+    <View style={[styles.talkItem, isMyTalk && styles.myTalkItem]}>
       <View style={styles.talkContent}>
-        <Image source={{ uri: post.images[0] }} style={styles.talkImage} />
+        {talk.imageUrl ? (
+          <Image source={{ uri: talk.imageUrl }} style={styles.talkImage} />
+        ) : (
+          <View style={styles.noImagePlaceholder}>
+            <Ionicons name="image-outline" size={24} color="#ccc" />
+          </View>
+        )}
         <View style={styles.talkTextContainer}>
           <View style={styles.talkRow}>
             <Text style={styles.talkText}>
-              {post.content}
+              {talk.content}
             </Text>
             <View style={styles.profileSection}>
-              <Image source={{ uri: post.author?.profileImage }} style={styles.profileImage} />
-              <TouchableOpacity onPress={() => onMessage(post)} style={styles.messageButton}>
-                <Ionicons name="chatbubble-outline" size={28} color="#007AFF" />
-              </TouchableOpacity>
+              {!isMyTalk && (
+                <TouchableOpacity onPress={() => onMessage(talk)} style={styles.messageButton}>
+                  <Ionicons name="chatbubble-outline" size={28} color="#007AFF" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
           <View style={styles.talkInfo}>
-            <Text style={styles.authorName}>{post.author?.nickname || '익명'}</Text>
-            <Text style={styles.distance}>• {post.distance}km</Text>
-            <Text style={styles.timestamp}>• {post.timestamp}</Text>
+            <Text style={styles.authorName}>
+              {isMyTalk ? '내 토크' : (talk.nickname || '익명')}
+            </Text>
+            <Text style={styles.timestamp}>• {formatTimeAgo(talk.createdAt)}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={() => onMore(post)} style={styles.actionButton}>
-          <Ionicons name="ellipsis-vertical" size={20} color="#666" />
-        </TouchableOpacity>
+        {!isMyTalk && (
+          <TouchableOpacity onPress={() => onMore(talk)} style={styles.actionButton}>
+            <Ionicons name="ellipsis-vertical" size={20} color="#666" />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -108,14 +77,45 @@ const TalkItem = ({ post, onMessage, onMore }) => {
 
 export default function BoardScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
   const [selectedTab, setSelectedTab] = useState('all');
-  const [posts] = useState(DUMMY_POSTS);
+  const [showMyTalk, setShowMyTalk] = useState(false);
   const [chatModalVisible, setChatModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
+  const [selectedTalk, setSelectedTalk] = useState(null);
 
-  const handleMessage = (post) => {
+  // 토크 피드 hook
+  const { 
+    talks, 
+    loading, 
+    refreshing, 
+    loadingMore, 
+    error, 
+    hasMore, 
+    refreshFeed, 
+    loadMore 
+  } = useTalkFeed();
+
+  // 내 토크 hook
+  const { myTalk, loading: myTalkLoading, fetchMyTalk } = useMyTalk(user?.uuid);
+
+  // 차단 hook
+  const { blockUser, unblockUser, isUserBlocked, loading: blockLoading, getBlockedUsers } = useBlock();
+
+  // 화면이 포커스될 때마다 내 토크 새로고침
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.uuid) {
+        fetchMyTalk();
+        refreshFeed(); // 전체 토크 피드도 새로고침
+      }
+    }, [user?.uuid, fetchMyTalk, refreshFeed])
+  );
+
+  const handleMessage = (talk) => {
     console.log('채팅 버튼이 눌렸습니다!');
-    setSelectedUser(post.author);
+    setSelectedUser({ nickname: '익명' }); // 실제로는 사용자 정보 필요
     setChatModalVisible(true);
   };
 
@@ -125,25 +125,86 @@ export default function BoardScreen() {
     console.log('채팅 시작하기 버튼이 눌렸습니다!');
   };
 
-  const handleMore = (post) => {
-    Alert.alert(
-      '토크 옵션',
-      '선택해주세요',
-      [
-        { text: '차단하기', onPress: () => Alert.alert('알림', '차단되었습니다.') },
-        { text: '신고하기', onPress: () => Alert.alert('알림', '신고가 접수되었습니다.') },
-        { text: '취소', style: 'cancel' }
-      ]
-    );
+  const handleMore = (talk) => {
+    setSelectedTalk(talk);
+    setProfileMenuVisible(true);
+  };
+
+  const handleBlock = async () => {
+    if (selectedTalk) {
+      try {
+        await blockUser(selectedTalk.uuid);
+        setProfileMenuVisible(false);
+        setSelectedTalk(null);
+        // 차단 후 피드 새로고침
+        refreshFeed();
+      } catch (error) {
+        console.error('차단 실패:', error);
+      }
+    }
+  };
+
+  const handleReport = () => {
+    if (selectedTalk) {
+      Alert.alert('알림', '신고가 접수되었습니다.');
+      setProfileMenuVisible(false);
+      setSelectedTalk(null);
+    }
+  };
+
+  const handleProfileMenuClose = () => {
+    setProfileMenuVisible(false);
+    setSelectedTalk(null);
+  };
+
+  const handleMyTalkPress = () => {
+    setShowMyTalk(!showMyTalk);
+  };
+
+  const handleRefresh = () => {
+    refreshFeed();
+  };
+
+  const handleLoadMore = () => {
+    if (hasMore && !loadingMore) {
+      loadMore();
+    }
   };
 
   const renderItem = ({ item }) => (
     <TalkItem
-      post={item}
+      talk={item}
       onMessage={handleMessage}
       onMore={handleMore}
     />
   );
+
+  const renderEmptyState = () => {
+    if (loading) return null;
+    
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="chatbubble-outline" size={48} color="#ccc" />
+        <Text style={styles.emptyText}>
+          {showMyTalk ? '내 토크가 없습니다.' : '아직 토크가 없습니다.'}
+        </Text>
+        <Text style={styles.emptySubText}>
+          {showMyTalk ? '첫 번째 토크를 작성해보세요!' : '첫 번째 토크를 작성해보세요!'}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    
+    return (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator color="#FF6B6B" />
+        <Text style={styles.loadingText}>더 많은 토크를 불러오는 중...</Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -154,40 +215,68 @@ export default function BoardScreen() {
             <Text style={styles.filterButtonText}>필터</Text>
           </TouchableOpacity>
         </View>
+        
         <View style={styles.tabContainer}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabScrollContent}
-          >
-            {DISTANCE_TABS.map((tab) => (
-              <TouchableOpacity
-                key={tab.id}
-                style={[
-                  styles.tabButton,
-                  selectedTab === tab.id && styles.selectedTab
-                ]}
-                onPress={() => setSelectedTab(tab.id)}
-              >
-                <Text
+          <View style={styles.tabRow}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabScrollContent}
+            >
+              {DISTANCE_TABS.map((tab) => (
+                <TouchableOpacity
+                  key={tab.id}
                   style={[
-                    styles.tabText,
-                    selectedTab === tab.id && styles.selectedTabText
+                    styles.tabButton,
+                    selectedTab === tab.id && styles.selectedTab
                   ]}
+                  onPress={() => setSelectedTab(tab.id)}
                 >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+                  <Text
+                    style={[
+                      styles.tabText,
+                      selectedTab === tab.id && styles.selectedTabText
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            <TouchableOpacity
+              style={[styles.myTalkButton, showMyTalk && styles.myTalkButtonActive]}
+              onPress={handleMyTalkPress}
+            >
+              <Ionicons 
+                name="person-outline" 
+                size={16} 
+                color={showMyTalk ? '#fff' : '#FF6B6B'} 
+              />
+              <Text style={[styles.myTalkButtonText, showMyTalk && styles.myTalkButtonTextActive]}>
+                내 토크
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* 게시물 목록 */}
         <FlatList
-          data={posts}
+          data={showMyTalk ? (myTalk ? [myTalk] : []) : talks}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={['#FF6B6B']}
+            />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.1}
+          ListEmptyComponent={renderEmptyState}
+          ListFooterComponent={renderFooter}
         />
 
         {/* 글쓰기 버튼 */}
@@ -203,6 +292,13 @@ export default function BoardScreen() {
         onClose={() => setChatModalVisible(false)}
         onConfirm={handleChatConfirm}
         otherUser={selectedUser}
+      />
+      <ProfileMenuModal
+        visible={profileMenuVisible}
+        onClose={handleProfileMenuClose}
+        onBlock={handleBlock}
+        onReport={handleReport}
+        isBlocked={false}
       />
     </SafeAreaView>
   );
@@ -248,8 +344,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  tabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: 16,
+  },
   tabScrollContent: {
     paddingHorizontal: 16,
+    flex: 1,
   },
   tabButton: {
     paddingHorizontal: 16,
@@ -268,13 +371,42 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontWeight: '600',
   },
+  myTalkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
+  myTalkButtonActive: {
+    backgroundColor: '#FF6B6B',
+  },
+  myTalkButtonText: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    marginLeft: 4,
+    fontWeight: '600',
+  },
+  myTalkButtonTextActive: {
+    color: '#fff',
+  },
   listContainer: {
     padding: 12,
+    flexGrow: 1,
   },
   talkItem: {
     backgroundColor: '#fff',
     marginBottom: 12,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  myTalkItem: {
+    borderColor: '#FF6B6B',
+    borderWidth: 2,
   },
   talkContent: {
     flexDirection: 'row',
@@ -287,6 +419,15 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 4,
+    marginRight: 12,
+  },
+  noImagePlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 4,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   talkTextContainer: {
@@ -307,17 +448,12 @@ const styles = StyleSheet.create({
   talkInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginTop: 8,
   },
   authorName: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#333',
-    marginRight: 8,
-  },
-  distance: {
-    fontSize: 12,
-    color: '#999',
     marginRight: 8,
   },
   timestamp: {
@@ -328,19 +464,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
-  },
   messageButton: {
-    padding: 10,
+    padding: 8,
     backgroundColor: '#F0F8FF',
-    borderRadius: 20,
+    borderRadius: 16,
   },
   actionButton: {
     padding: 4,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  loadingFooter: {
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
   },
   writeButton: {
     position: 'absolute',

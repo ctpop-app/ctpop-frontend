@@ -8,7 +8,7 @@ const SERVER_PORT = '8080';
 
 // 기본 IP 목록
 const DEFAULT_IPS = [
-  '192.168.0.84'
+  '192.168.219.103'
 ];
 
 // IP 목록 저장용 키
