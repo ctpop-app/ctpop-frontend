@@ -7,6 +7,9 @@
 import { talkApi } from '../api/talk';
 import { Talk } from '../models/Talk';
 
+// 토크 최대 길이 (Talk 모델과 일치시켜야 함)
+const MAX_CONTENT_LENGTH = 100;
+
 export const talkService = {
   /**
    * 내 활성 토크 조회
@@ -35,19 +38,30 @@ export const talkService = {
    * @returns {Promise<Talk>}
    */
   async createTalk(uuid, nickname, content, imageUri = null) {
+    console.log('=== talkService.createTalk 시작 ===');
+    console.log('받은 파라미터:', { uuid, nickname, content, imageUri });
+    
     try {
       // 1. 입력값 검증
       if (!content || !content.trim()) {
         throw new Error('토크 내용을 입력해주세요.');
       }
 
-      if (content.length > Talk.getMaxContentLength()) {
-        throw new Error(`토크는 ${Talk.getMaxContentLength()}자를 초과할 수 없습니다.`);
+      if (content.length > MAX_CONTENT_LENGTH) {
+        throw new Error(`토크는 ${MAX_CONTENT_LENGTH}자를 초과할 수 없습니다.`);
       }
 
       // 2. 토크 객체 생성 및 검증 (nickname은 API에서 설정됨)
-      const talk = Talk.create(uuid, nickname, content, null); // imageUrl은 API에서 설정됨
+      const talk = Talk.create(uuid, nickname, content, null); // content를 그대로 전달
+      console.log('생성된 Talk 객체:', talk);
+      console.log('Talk.isValid() 결과:', talk.isValid());
+      
       if (!talk.isValid()) {
+        console.log('Talk 유효성 검사 실패 상세:');
+        console.log('- uuid:', !!talk.uuid);
+        console.log('- nickname:', !!talk.nickname);
+        console.log('- content:', !!talk.content);
+        console.log('- content.trim().length:', talk.content.trim().length);
         throw new Error('토크가 유효하지 않습니다.');
       }
 
@@ -156,8 +170,8 @@ export const talkService = {
       errors.push('토크 내용을 입력해주세요.');
     }
 
-    if (content && content.length > Talk.getMaxContentLength()) {
-      errors.push(`토크는 ${Talk.getMaxContentLength()}자를 초과할 수 없습니다.`);
+    if (content && content.length > MAX_CONTENT_LENGTH) {
+      errors.push(`토크는 ${MAX_CONTENT_LENGTH}자를 초과할 수 없습니다.`);
     }
 
     return {
@@ -172,7 +186,7 @@ export const talkService = {
    */
   getTalkLengthInfo() {
     return {
-      maxLength: Talk.getMaxContentLength(),
+      maxLength: MAX_CONTENT_LENGTH,
       currentLength: 0
     };
   }

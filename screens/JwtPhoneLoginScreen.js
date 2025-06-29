@@ -8,39 +8,28 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import PhoneInput from '../components/auth/PhoneInput';
 import OtpInput from '../components/auth/OtpInput';
 import AuthButton from '../components/auth/AuthButton';
 import ServerTestButton from '../components/auth/ServerTestButton';
 import { useAuth } from '../hooks/useAuth';
-import { ROUTES, navigationUtils } from '../navigation/constants';
 import * as authService from '../services/authService';
-import * as auth from '../api/auth';
 import useUserStore from '../store/userStore';
-import { getCurrentKST } from '../utils/dateUtils';
 
 export default function JwtPhoneLoginScreen() {
-  const navigation = useNavigation();
   const {
     isLoading,
-    error,
     phoneNumber,
     setPhoneNumber,
     verificationCode,
     setVerificationCode,
     otpSent,
-    setOtpSent,
     handleSendOtp,
     handleVerifyOtp,
     handleResendOtp,
-    checkAuth,
-    isAuthenticated,
-    hasProfile,
     handleTestConnection,
-    clearUser,
+    handleSuperPass,
   } = useAuth();
 
   const { setUser } = useUserStore();
@@ -72,27 +61,6 @@ export default function JwtPhoneLoginScreen() {
     checkInitialAuth();
   }, []);
 
-  // 인증번호 전송
-  const handleSendOtpPress = async () => {
-    const success = await handleSendOtp();
-    if (success) {
-      Alert.alert('성공', '인증번호가 전송되었습니다.');
-    } else if (error) {
-      Alert.alert('오류', error);
-    }
-  };
-
-  // 인증번호 확인
-  const handleOtpVerification = async () => {
-    const result = await handleVerifyOtp();
-    if (result.success) {
-      Alert.alert('성공', '인증되었습니다.');
-      // 네비게이션 제거 - 상태 변경만으로 App.js가 자동으로 화면 전환
-    } else if (error) {
-      Alert.alert('오류', error);
-    }
-  };
-
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -123,29 +91,7 @@ export default function JwtPhoneLoginScreen() {
 
           <TouchableOpacity 
             style={styles.superPassButton}
-            onPress={async () => {
-              try {
-                const response = await auth.getSuperPassToken();
-                console.log('슈퍼패스 응답:', response);  // 디버깅용 로그
-                if (response.refreshToken) {
-                  // 리프레시 토큰 저장
-                  await auth.storeTokens(null, response.refreshToken);
-                  
-                  const user = {
-                    uuid: response.uuid,
-                    createdAt: getCurrentKST(),
-                    hasProfile: false
-                  };
-                  await auth.storeUser(user);
-                  setUser(user);
-                } else {
-                  Alert.alert('오류', '슈퍼패스 인증에 실패했습니다.');
-                }
-              } catch (error) {
-                console.error('슈퍼패스 에러:', error);  // 디버깅용 로그
-                Alert.alert('오류', '슈퍼패스 인증에 실패했습니다.');
-              }
-            }}
+            onPress={handleSuperPass}
             disabled={isLoading}
           >
             <Text style={styles.superPassButtonText}>
@@ -161,7 +107,7 @@ export default function JwtPhoneLoginScreen() {
 
           {!otpSent ? (
             <AuthButton
-              onPress={handleSendOtpPress}
+              onPress={handleSendOtp}
               loading={isLoading}
               text="인증번호 보내기"
             />
@@ -173,7 +119,7 @@ export default function JwtPhoneLoginScreen() {
                 disabled={isLoading}
               />
               <AuthButton
-                onPress={handleOtpVerification}
+                onPress={handleVerifyOtp}
                 loading={isLoading}
                 text="로그인 완료"
               />
