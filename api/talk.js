@@ -178,6 +178,7 @@ export const talkApi = {
             const profileDoc = profileSnapshot.docs[0];
             const profileData = profileDoc.data();
             talk.authorProfile = {
+              uuid: talkData.uuid,
               nickname: profileData.nickname,
               mainPhotoURL: profileData.mainPhotoURL,
               age: profileData.age,
