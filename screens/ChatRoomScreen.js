@@ -39,7 +39,7 @@ export default function ChatRoomScreen() {
     const messagesQuery = query(
       collection(db, 'messages'),
       where('chatId', '==', chatRoomId),
-      orderBy('timestamp', 'desc'),
+      orderBy('timestamp', 'asc'),
       limit(50)
     );
 
@@ -58,11 +58,8 @@ export default function ChatRoomScreen() {
         });
       });
       
-      // 최신 메시지가 아래에 오도록 배열을 뒤집기
-      const sortedMessages = newMessages.reverse();
-      
-      console.log('실시간 메시지 업데이트:', sortedMessages.length, '개');
-      setMessages(sortedMessages);
+      console.log('실시간 메시지 업데이트:', newMessages.length, '개');
+      setMessages(newMessages);
       setLoading(false);
     }, (error) => {
       console.error('메시지 구독 오류:', error);
@@ -191,8 +188,13 @@ export default function ChatRoomScreen() {
         keyExtractor={item => item.id}
         style={styles.messageList}
         contentContainerStyle={styles.messageListContent}
-        inverted={true}
         showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => {
+          if (messages.length > 0) {
+            this.flatListRef?.scrollToEnd({ animated: true });
+          }
+        }}
+        ref={(ref) => { this.flatListRef = ref; }}
       />
 
       {/* 입력 영역 */}
