@@ -22,6 +22,43 @@ export const useAuth = () => {
   const { user, isAuthenticated, hasProfile, setUser, setUserProfile, setHasProfile, clearUser, userProfile } = useUserStore();
   const { exists: checkProfileExists, get: loadUserProfile } = useProfile();
 
+  // 슈퍼패스 인증 (개발용)
+  const handleSuperPass = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await authApi.getSuperPassToken();
+      console.log('슈퍼패스 응답:', response);
+      if (response.refreshToken) {
+        // 리프레시 토큰 저장
+        await authApi.storeTokens(null, response.refreshToken);
+        
+        const user = {
+          uuid: response.uuid,
+          createdAt: getCurrentKST(),
+          hasProfile: false
+        };
+        await authApi.storeUser(user);
+        setUser(user);
+        Alert.alert('성공', '슈퍼패스 인증이 완료되었습니다.');
+        return { success: true };
+      } else {
+        const errorMessage = '슈퍼패스 인증에 실패했습니다.';
+        setError(errorMessage);
+        Alert.alert('오류', errorMessage);
+        return { success: false };
+      }
+    } catch (error) {
+      console.error('슈퍼패스 에러:', error);
+      const errorMessage = '슈퍼패스 인증에 실패했습니다.';
+      setError(errorMessage);
+      Alert.alert('오류', errorMessage);
+      return { success: false };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setUser]);
+
   // 서버 연결 테스트
   const handleTestConnection = useCallback(async () => {
     setIsLoading(true);
@@ -49,11 +86,13 @@ export const useAuth = () => {
   const handleSendOtp = useCallback(async () => {
     if (!phoneNumber) {
       setError('전화번호를 입력해주세요.');
+      Alert.alert('오류', '전화번호를 입력해주세요.');
       return false;
     }
 
     if (!isValidPhoneNumber(phoneNumber)) {
       setError('유효하지 않은 전화번호 형식입니다.');
+      Alert.alert('오류', '유효하지 않은 전화번호 형식입니다.');
       return false;
     }
 
@@ -63,14 +102,19 @@ export const useAuth = () => {
       const result = await authService.sendOtp(phoneNumber);
       if (result.success) {
         setOtpSent(true);
+        Alert.alert('성공', '인증번호가 전송되었습니다.');
         return true;
       } else {
-        setError(result.message || '인증번호 전송에 실패했습니다.');
+        const errorMessage = result.message || '인증번호 전송에 실패했습니다.';
+        setError(errorMessage);
+        Alert.alert('오류', errorMessage);
         return false;
       }
     } catch (error) {
       console.error('OTP 전송 에러:', error);
-      setError(error.message || '인증번호 전송 중 오류가 발생했습니다.');
+      const errorMessage = error.message || '인증번호 전송 중 오류가 발생했습니다.';
+      setError(errorMessage);
+      Alert.alert('오류', errorMessage);
       return false;
     } finally {
       setIsLoading(false);
@@ -81,7 +125,8 @@ export const useAuth = () => {
   const handleVerifyOtp = useCallback(async () => {
     if (!verificationCode) {
       setError('인증번호를 입력해주세요.');
-      return false;
+      Alert.alert('오류', '인증번호를 입력해주세요.');
+      return { success: false };
     }
 
     try {
@@ -91,15 +136,20 @@ export const useAuth = () => {
       if (result.success) {
         const user = await authService.getStoredUser();
         setUser(user);
-        return true;
+        Alert.alert('성공', '인증되었습니다.');
+        return { success: true };
       } else {
-        setError(result.message || '인증에 실패했습니다.');
-        return false;
+        const errorMessage = result.message || '인증에 실패했습니다.';
+        setError(errorMessage);
+        Alert.alert('오류', errorMessage);
+        return { success: false };
       }
     } catch (error) {
       console.error('OTP 검증 에러:', error);
-      setError('인증 중 오류가 발생했습니다.');
-      return false;
+      const errorMessage = '인증 중 오류가 발생했습니다.';
+      setError(errorMessage);
+      Alert.alert('오류', errorMessage);
+      return { success: false };
     }
   }, [phoneNumber, verificationCode]);
 
@@ -264,6 +314,7 @@ export const useAuth = () => {
     handleTestConnection,
     handleSendOtp,
     handleVerifyOtp,
+    handleSuperPass,
     authenticateWithRefreshToken,
     getAccessToken,
     handleLogout,

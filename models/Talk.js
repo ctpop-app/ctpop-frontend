@@ -72,7 +72,21 @@ export class Talk {
 
   // 유효성 검사
   isValid() {
-    return this.uuid && this.nickname && this.content && this.content.trim().length > 0;
+    console.log('Talk.isValid() 체크:', {
+      uuid: this.uuid,
+      nickname: this.nickname,
+      content: this.content,
+      contentLength: this.content?.length,
+      contentTrimLength: this.content?.trim()?.length
+    });
+    
+    return (
+      this.uuid && 
+      this.nickname && 
+      this.content && 
+      typeof this.content === 'string' &&
+      this.content.trim().length > 0
+    );
   }
 
   // 내용 길이 제한 (100자)
