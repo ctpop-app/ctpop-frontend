@@ -9,6 +9,7 @@ export class Talk {
     this.imageUrl = data.imageUrl || null;
     this.isActive = data.isActive !== undefined ? data.isActive : true;
     this.createdAt = data.createdAt || getCurrentKST();
+    this.authorProfile = data.authorProfile || null;
   }
 
   // Firestore 문서로 변환 (id 필드 제외)

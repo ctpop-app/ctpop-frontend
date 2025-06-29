@@ -26,11 +26,15 @@ export const ChatModal = ({ visible, onClose, onConfirm, otherUser }) => {
           <TouchableWithoutFeedback>
             <View style={styles.modalContent}>
               <Image
-                source={otherUser?.mainPhotoURL ? { uri: otherUser.mainPhotoURL } : require('../../assets/default-profile.png')}
+                source={
+                  otherUser?.mainPhotoURL && otherUser.mainPhotoURL.startsWith('http') 
+                    ? { uri: otherUser.mainPhotoURL } 
+                    : require('../../assets/default-profile.png')
+                }
                 style={styles.profileImage}
               />
               <Text style={styles.modalTitle}>
-                {otherUser?.nickname}님과의 채팅
+                {otherUser?.nickname || '익명'}님과의 채팅
               </Text>
               <Text style={styles.modalDescription}>
                 채팅을 시작하시겠습니까?

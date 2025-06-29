@@ -59,7 +59,12 @@ export default function BoardScreen() {
   const handleEvent = {
     // 채팅 관련
     message: (talk) => {
-      setSelectedUser({ nickname: '익명' });
+      // 토크 작성자의 프로필 정보 사용
+      const authorInfo = talk.authorProfile || {
+        nickname: talk.nickname || '익명',
+        mainPhotoURL: null
+      };
+      setSelectedUser(authorInfo);
       setChatModalVisible(true);
     },
     
