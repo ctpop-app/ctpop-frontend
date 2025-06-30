@@ -1,46 +1,39 @@
 import { socketApi } from '../api/socket';
 import { profileService } from './profileService';
 import { getCurrentKST } from '../utils/dateUtils';
-import { userStore } from '../store/userStore';
+import useUserStore from '../store/userStore';
 
-let connectionCheckInterval = null;
+let heartbeatInterval = null;
 
-const startConnectionCheck = () => {
-  console.log('Starting connection check...');
-  connectionCheckInterval = setInterval(() => {
-    if (!socketApi.isConnected()) {
-      console.log('Connection lost, triggering reconnection');    // Socket.IO 자체 재연결 트리거
-      socketApi.connect();
+const startHeartbeat = () => {
+  console.log('SocketService: Setting up heartbeat interval...');
+  heartbeatInterval = setInterval(() => {
+    if (socketApi.isConnected()) {
+      console.log('Ping sent');
+      socketApi.emit('heartbeat');
+    } else {
+      console.log('Socket not connected, skipping heartbeat');
     }
-  }, 10000); // 10초마다 체크
+  }, 30000);
 };
 
-const stopConnectionCheck = () => {
-  if (connectionCheckInterval) {
-    clearInterval(connectionCheckInterval);
-    connectionCheckInterval = null;
+const stopHeartbeat = () => {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
   }
 };
 
 const setupEventListeners = () => {
-  socketApi.on('connect', async () => {
+  socketApi.on('connect', () => {
     console.log('Socket connected');
-    
-    // 소켓 연결 시 lastActive 업데이트
-    const uuid = socketApi.getUuid();
-    if (uuid) {
-      try {
-        await profileService.updateLastActive(uuid, getCurrentKST());
-        console.log('lastActive 업데이트 완료 (연결 시)');
-      } catch (error) {
-        console.error('Failed to update lastActive (연결 시):', error);
-      }
-    }
+    useUserStore.getState().setOnlineStatus(true);
   });
 
   socketApi.on('disconnect', async () => {
     console.log('Socket disconnected');
-    stopConnectionCheck();
+    stopHeartbeat();
+    useUserStore.getState().setOnlineStatus(false);
     
     const uuid = socketApi.getUuid();
     if (uuid) {
@@ -56,9 +49,27 @@ const setupEventListeners = () => {
     console.error('Socket error:', error);
   });
 
-  // 서버에서 직접 받은 사용자 상태 업데이트
+  socketApi.on('pong', () => {
+    console.log('Pong received');
+    console.log('Connection alive');
+  });
+
   socketApi.on('userStatus', ({ uuid, isOnline }) => {
-    console.log('User status update from server:', { uuid, isOnline });
+    console.log('User status update:', { uuid, isOnline });
+    // 소켓이 연결된 상태에서만 이벤트 emit
+    if (socketApi.isConnected()) {
+      socketApi.emit('userStatusUpdate', { uuid, isOnline });
+    } else {
+      console.log('Socket not connected, skipping userStatusUpdate emit');
+    }
+  });
+
+  // 실시간 거리 정보 수신 - 직접 userStore에 저장
+  socketApi.on('nearbyDistances', (distances) => {
+    console.log('🎯 Received nearby distances from backend:', distances);
+    console.log('📊 Distance data type:', typeof distances);
+    console.log('📊 Distance data keys:', Object.keys(distances || {}));
+    useUserStore.getState().setNearbyDistances(distances);
   });
 
   // 소켓이 연결된 상태에서만 온라인 사용자 목록 요청
@@ -68,14 +79,16 @@ const setupEventListeners = () => {
 };
 
 const connect = async (uuid) => {
+  console.log('SocketService: Starting connection...');
   try {
     const connected = await socketApi.connect(uuid);
-    
     if (connected) {
       setupEventListeners();
-      startConnectionCheck();
+      console.log('SocketService: Starting heartbeat...');
+      startHeartbeat();
       return true;
     } else {
+      console.log('SocketService: Connection failed, not starting heartbeat');
       return false;
     }
   } catch (error) {
@@ -85,7 +98,7 @@ const connect = async (uuid) => {
 };
 
 const disconnect = async () => {
-  stopConnectionCheck();
+  stopHeartbeat();
   
   const uuid = socketApi.getUuid();
   if (uuid) {
@@ -99,12 +112,36 @@ const disconnect = async () => {
   socketApi.disconnect();
 };
 
+// 위치 업데이트 전송
+const updateLocation = (latitude, longitude) => {
+  if (socketApi.isConnected()) {
+    const locationData = {
+      latitude,
+      longitude,
+      timestamp: Date.now()
+    };
+    console.log('Sending location update:', locationData);
+    socketApi.emit('updateLocation', locationData);
+  } else {
+    console.log('Socket not connected, cannot send location update');
+  }
+};
+
 export const socketService = {
   connect,
   disconnect,
+  startHeartbeat,
+  stopHeartbeat,
+  updateLocation,
   isConnected: () => socketApi.isConnected(),
   getUuid: () => socketApi.getUuid(),
   on: (event, callback) => socketApi.on(event, callback),
   off: (event, callback) => socketApi.off(event, callback),
-  emit: (event, data) => socketApi.emit(event, data)
+  emit: (event, data) => {
+    if (socketApi.isConnected()) {
+      socketApi.emit(event, data);
+    } else {
+      console.log(`Socket not connected, skipping ${event} emit`);
+    }
+  }
 }; 
