@@ -8,7 +8,17 @@ const SERVER_PORT = '8080';
 
 // 기본 IP 목록
 const DEFAULT_IPS = [
-  '172.30.1.93'
+  '10.0.2.2',      // 안드로이드 에뮬레이터용
+  'localhost',     // 로컬 개발용
+  '127.0.0.1',      // 로컬호스트 대체
+  '192.168.0.7',
+  '172.30.1.1',
+  '192.168.219.66',
+  '192.168.100.20',
+  '192.168.1.151',
+  '192.168.251.129',
+  '172.30.1.84',
+  '172.30.1.47'
 ];
 
 // IP 목록 저장용 키
@@ -142,5 +152,40 @@ export const setServerIp = async (ip) => {
 export const resetServerIp = async () => {
   await AsyncStorage.removeItem(SERVER_IP_KEY);
   console.log('서버 IP 설정이 초기화됨');
-}; 
+};
 
+/**
+ * 두 지점 간의 거리 계산 (Haversine 공식)
+ * @param {number} lat1 첫 번째 지점의 위도
+ * @param {number} lon1 첫 번째 지점의 경도
+ * @param {number} lat2 두 번째 지점의 위도
+ * @param {number} lon2 두 번째 지점의 경도
+ * @returns {number} 거리 (미터)
+ */
+export const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3; // 지구 반지름 (미터)
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) *
+    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // 미터 단위
+};
+
+/**
+ * 거리를 사람이 읽기 쉬운 형태로 변환
+ * @param {number} distance 거리 (미터)
+ * @returns {string} 포맷된 거리 문자열
+ */
+export const formatDistance = (distance) => {
+  if (distance < 1000) {
+    return `${Math.round(distance)}m`;
+  } else {
+    return `${(distance / 1000).toFixed(1)}km`;
+  }
+};

@@ -3,7 +3,6 @@ import { db } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot, doc, limit } from 'firebase/firestore';
 import { sendChatMessage, updateMessageReadStatus } from '../api/chat';
 import { useOfflineQueue } from './useOfflineQueue';
-import { useRealtimeCollection } from './useRealtime';
 import { handleError } from '../utils/errorHandler';
 
 const MESSAGES_PER_PAGE = 20;
