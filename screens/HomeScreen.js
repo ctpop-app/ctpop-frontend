@@ -204,20 +204,61 @@ export default function HomeScreen() {
     }
   };
 
+  // 위치 정보가 없을 때 자동으로 가져오기
+  useEffect(() => {
+    if (userProfile && (!userProfile.latitude || !userProfile.longitude)) {
+      console.log('사용자 위치 정보가 없어서 자동으로 가져옵니다.');
+      updateCurrentUserLocation();
+    }
+  }, [userProfile]);
+
+  // 테스트용: 현재 사용자에게 서울 중심부 위치 설정
+  const setTestLocation = () => {
+    if (userProfile && user?.uuid) {
+      // 서울 중심부 (강남역 근처)
+      const testLat = 37.4979;
+      const testLng = 127.0276;
+      
+      const updatedProfile = {
+        ...userProfile,
+        latitude: testLat,
+        longitude: testLng
+      };
+
+      useUserStore.getState().setUserProfile(updatedProfile);
+      console.log('테스트 위치 설정됨:', testLat, testLng);
+    }
+  };
+
   const renderUserCard = ({ item }) => {
-    // 실시간 거리 정보 가져오기
+    // 실시간 거리 정보 가져오기 (백엔드에서 오는 경우)
     const distanceInfo = getDistanceToUser(item.uuid);
     const distanceText = distanceInfo ? distanceInfo.formattedDistance : null;
     
-    // 백엔드에서 거리 정보가 오지 않을 때 임시 거리 정보 사용
-    const tempDistanceText = distanceText || (isUserOnline(item.uuid) ? '1.2km' : null);
+    // 실제 위도/경도로 거리 계산 (백엔드 거리 정보가 없을 때)
+    let calculatedDistanceText = null;
+    if (!distanceText && userProfile?.latitude && userProfile?.longitude && 
+        item.latitude && item.longitude && item.uuid !== userProfile.uuid) {
+      const distance = calculateDistance(
+        userProfile.latitude, userProfile.longitude,
+        item.latitude, item.longitude
+      );
+      calculatedDistanceText = formatDistance(distance);
+    }
+    
+    // 최종 거리 텍스트 (백엔드 > 직접 계산 > 임시)
+    const finalDistanceText = distanceText || calculatedDistanceText || 
+      (isUserOnline(item.uuid) ? '1.2km' : null);
     
     // 디버깅용 로그
     console.log(`User ${item.nickname} (${item.uuid}):`, {
       isOnline: isUserOnline(item.uuid),
       distanceInfo,
       distanceText,
-      tempDistanceText
+      calculatedDistanceText,
+      finalDistanceText,
+      userLocation: userProfile ? `${userProfile.latitude}, ${userProfile.longitude}` : '없음',
+      itemLocation: item.latitude && item.longitude ? `${item.latitude}, ${item.longitude}` : '없음'
     });
 
     return (
@@ -241,8 +282,8 @@ export default function HomeScreen() {
                 <>
                   <View style={[styles.onlineDot, { backgroundColor: '#4CAF50' }]} />
                   <Text style={[styles.onlineText, { color: '#4CAF50' }]}>접속중</Text>
-                  {tempDistanceText && (
-                    <Text style={styles.distanceText}> • {tempDistanceText}</Text>
+                  {finalDistanceText && (
+                    <Text style={styles.distanceText}> • {finalDistanceText}</Text>
                   )}
                 </>
               ) : (
@@ -262,9 +303,12 @@ export default function HomeScreen() {
             </Text>
           </View>
           {/* 거리 정보 표시 */}
-          {tempDistanceText && (
+          {finalDistanceText && (
             <View style={styles.distanceRow}>
-              <Text style={styles.distanceLabel}>📍 거리: {tempDistanceText}</Text>
+              <Text style={styles.distanceLabel}>
+                📍 거리: {finalDistanceText}
+                {calculatedDistanceText && <Text style={styles.calculatedText}> (직접계산)</Text>}
+              </Text>
             </View>
           )}
           <Text style={styles.userBio} numberOfLines={1} ellipsizeMode="tail">{item.bio || ''}</Text>
@@ -283,6 +327,9 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.testButton} onPress={testRealDistanceCalculation}>
             <Text style={styles.testButtonText}>거리계산</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.testButton} onPress={setTestLocation}>
+            <Text style={styles.testButtonText}>테스트 위치 설정</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.filterButton}>
             <Text style={styles.filterButtonText}>필터</Text>
@@ -483,5 +530,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FF6B6B',
     fontWeight: 'bold',
+  },
+  calculatedText: {
+    fontSize: 12,
+    color: '#666',
   },
 }); 
