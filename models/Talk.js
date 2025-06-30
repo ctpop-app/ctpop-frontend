@@ -4,7 +4,6 @@ export class Talk {
   constructor(data = {}) {
     this.id = data.id || null;
     this.uuid = data.uuid || null;
-    this.nickname = data.nickname || null;
     this.content = data.content || '';
     this.imageUrl = data.imageUrl || null;
     this.isActive = data.isActive !== undefined ? data.isActive : true;
@@ -16,7 +15,6 @@ export class Talk {
   toFirestore() {
     return {
       uuid: this.uuid,
-      nickname: this.nickname,
       content: this.content,
       imageUrl: this.imageUrl,
       isActive: this.isActive,
@@ -46,7 +44,6 @@ export class Talk {
     return new Talk({
       id: doc.id,  // Firestore의 doc.id 사용
       uuid: data.uuid,
-      nickname: data.nickname,
       content: data.content,
       imageUrl: data.imageUrl,
       isActive: data.isActive,
@@ -55,10 +52,9 @@ export class Talk {
   }
 
   // 새 토크 생성
-  static create(uuid, nickname, content, imageUrl = null) {
+  static create(uuid, content, imageUrl = null) {
     return new Talk({
       uuid,
-      nickname,
       content,
       imageUrl,
       isActive: true
@@ -75,7 +71,6 @@ export class Talk {
   isValid() {
     console.log('Talk.isValid() 체크:', {
       uuid: this.uuid,
-      nickname: this.nickname,
       content: this.content,
       contentLength: this.content?.length,
       contentTrimLength: this.content?.trim()?.length
@@ -83,7 +78,6 @@ export class Talk {
     
     return (
       this.uuid && 
-      this.nickname && 
       this.content && 
       typeof this.content === 'string' &&
       this.content.trim().length > 0
