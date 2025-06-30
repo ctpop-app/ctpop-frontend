@@ -14,6 +14,7 @@
     "expo-image-manipulator": "~13.1.7",
     "expo-image-picker": "~16.1.4",
     "expo-location": "^18.1.5",
+    "expo-updates": "~0.28.15",
     "expo-web-browser": "~14.1.6",
     "firebase": "^11.8.1",
     "jwt-decode": "^4.0.0",
@@ -35,12 +36,11 @@
     "react-native-screens": "~4.11.1",
     "react-native-web": "^0.20.0",
     "react-native-webview": "13.13.5",
-    "socket.io-client": "^4.8.1",
+    "socket.io-client": "^2.4.0",
     "source-map": "^0.7.4",
     "source-map-generator": "^2.0.0",
     "source-map-support": "^0.5.21",
-    "zustand": "^4.5.1",
-    "expo-updates": "~0.28.15"
+    "zustand": "^4.5.1"
   },
   "name": "ctpop",
   "version": "1.0.0",

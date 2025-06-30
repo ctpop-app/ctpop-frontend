@@ -72,6 +72,12 @@ const setupEventListeners = () => {
     useUserStore.getState().setNearbyDistances(distances);
   });
 
+  // 거리 정보 요청 응답 수신
+  socketApi.on('nearbyDistancesResponse', (distances) => {
+    console.log('📡 Received nearby distances response:', distances);
+    useUserStore.getState().setNearbyDistances(distances);
+  });
+
   // 소켓이 연결된 상태에서만 온라인 사용자 목록 요청
   if (socketApi.isConnected()) {
     socketApi.emit('getOnlineUsers');

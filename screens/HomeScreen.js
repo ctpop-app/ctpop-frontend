@@ -8,6 +8,7 @@ import { getOrientationColor } from '../utils/colors';
 import { calculateDistance, formatDistance } from '../utils/discovery';
 import useUserStore from '../store/userStore';
 import * as Location from 'expo-location';
+import { socketService } from '../services/socketService';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -122,6 +123,34 @@ export default function HomeScreen() {
       if (userProfile?.latitude && userProfile?.longitude) {
         console.log('현재 사용자 위치:', userProfile.latitude, userProfile.longitude);
       }
+      
+      // 백엔드 거리 정보 수신 상태 확인
+      const { nearbyDistances } = useUserStore.getState();
+      if (Object.keys(nearbyDistances).length > 0) {
+        console.log('✅ 백엔드에서 거리 정보 수신됨:', nearbyDistances);
+      } else {
+        console.log('❌ 백엔드에서 거리 정보 수신 안됨');
+      }
+      
+      // 소켓 연결 상태 확인
+      let isConnected = false;
+      try {
+        isConnected = socketService?.isConnected?.() || false;
+      } catch (error) {
+        console.log('🔌 소켓 연결 상태 확인 실패:', error.message);
+      }
+      console.log('🔌 소켓 연결 상태:', isConnected ? '연결됨' : '연결 안됨');
+      
+      // 백엔드 거리 정보 요청
+      if (isConnected && socketService?.emit) {
+        console.log('📡 백엔드에 거리 정보 요청 중...');
+        try {
+          socketService.emit('requestNearbyDistances');
+        } catch (error) {
+          console.log('📡 거리 정보 요청 실패:', error.message);
+        }
+      }
+      
       console.log('==========================');
     }, 10000); // 10초마다 확인
 
@@ -235,7 +264,7 @@ export default function HomeScreen() {
     const distanceInfo = getDistanceToUser(item.uuid);
     const distanceText = distanceInfo ? distanceInfo.formattedDistance : null;
     
-    // 실제 위도/경도로 거리 계산 (백엔드 거리 정보가 없을 때)
+    // 실제 위도/경도로 거리 계산 (백엔드 거리 정보가 없을 때만)
     let calculatedDistanceText = null;
     if (!distanceText && userProfile?.latitude && userProfile?.longitude && 
         item.latitude && item.longitude && item.uuid !== userProfile.uuid) {
@@ -257,6 +286,7 @@ export default function HomeScreen() {
       distanceText,
       calculatedDistanceText,
       finalDistanceText,
+      source: distanceText ? '백엔드' : calculatedDistanceText ? '직접계산' : '임시',
       userLocation: userProfile ? `${userProfile.latitude}, ${userProfile.longitude}` : '없음',
       itemLocation: item.latitude && item.longitude ? `${item.latitude}, ${item.longitude}` : '없음'
     });
@@ -298,8 +328,6 @@ export default function HomeScreen() {
             <Text style={styles.userInfo}>
               {item.height && `${item.height}cm`}
               {item.weight && ` ${item.weight}kg`}
-              {(item.height || item.weight) && (item.city || item.district) ? ' · ' : ''}
-              {item.city && `${item.city} ${item.district || ''}`}
             </Text>
           </View>
           {/* 거리 정보 표시 */}
@@ -307,6 +335,7 @@ export default function HomeScreen() {
             <View style={styles.distanceRow}>
               <Text style={styles.distanceLabel}>
                 📍 거리: {finalDistanceText}
+                {distanceText && <Text style={styles.backendText}> (백엔드)</Text>}
                 {calculatedDistanceText && <Text style={styles.calculatedText}> (직접계산)</Text>}
               </Text>
             </View>
@@ -534,5 +563,10 @@ const styles = StyleSheet.create({
   calculatedText: {
     fontSize: 12,
     color: '#666',
+  },
+  backendText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: 'bold',
   },
 }); 
