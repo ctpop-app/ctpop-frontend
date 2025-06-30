@@ -73,7 +73,10 @@ export default function ProfileTestScreen() {
         lastActive: new Date(),
         mainPhotoURL: 'https://picsum.photos/200',
         photoURLs: ['https://picsum.photos/200', 'https://picsum.photos/200'],
-        blockedUuid: []
+        blockedUuid: [],
+        // 서울 지역 랜덤 위치 (위도: 37.4~37.7, 경도: 126.8~127.2)
+        latitude: 37.4 + Math.random() * 0.3,
+        longitude: 126.8 + Math.random() * 0.4
       }));
 
       for (const profile of dummyProfiles) {
@@ -85,6 +88,45 @@ export default function ProfileTestScreen() {
     } catch (error) {
       console.error('더미 프로필 생성 실패:', error);
       Alert.alert('오류', '더미 프로필을 생성하는 중 오류가 발생했습니다.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // 기존 프로필에 랜덤 위치 추가
+  const addRandomLocations = async () => {
+    try {
+      setGenerating(true);
+      
+      // 모든 프로필 가져오기
+      const allProfiles = await getAll();
+      let updatedCount = 0;
+      
+      for (const profile of allProfiles) {
+        // 이미 위치가 있는 프로필은 건너뛰기
+        if (profile.latitude && profile.longitude) {
+          continue;
+        }
+        
+        // 서울 지역 랜덤 위치 생성
+        const randomLat = 37.4 + Math.random() * 0.3; // 37.4~37.7
+        const randomLng = 126.8 + Math.random() * 0.4; // 126.8~127.2
+        
+        // 프로필 업데이트
+        await updateDummyProfile(profile.uuid, {
+          ...profile,
+          latitude: randomLat,
+          longitude: randomLng
+        });
+        
+        updatedCount++;
+      }
+      
+      Alert.alert('성공', `${updatedCount}개의 프로필에 랜덤 위치가 추가되었습니다.`);
+      loadProfiles(); // 목록 새로고침
+    } catch (error) {
+      console.error('랜덤 위치 추가 실패:', error);
+      Alert.alert('오류', '랜덤 위치를 추가하는 중 오류가 발생했습니다.');
     } finally {
       setGenerating(false);
     }
@@ -131,6 +173,11 @@ export default function ProfileTestScreen() {
           </Text>
         </View>
         <Text style={styles.location}>{item.city} {item.district}</Text>
+        {item.latitude && item.longitude && (
+          <Text style={styles.coordinates}>
+            📍 {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
+          </Text>
+        )}
         <Text style={styles.preference}>{item.orientation}</Text>
         <Text style={styles.bio} numberOfLines={1} ellipsizeMode="tail">{item.bio}</Text>
       </View>
@@ -184,6 +231,20 @@ export default function ProfileTestScreen() {
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Text style={styles.generateButtonText}>더미 프로필 생성</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.actionButton, generating && styles.disabledButton]}
+          onPress={addRandomLocations}
+          disabled={generating}
+        >
+          {generating ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.actionButtonText}>랜덤 위치 추가</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -353,5 +414,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  buttonContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+    alignItems: 'center',
+  },
+  actionButton: {
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  coordinates: {
+    fontSize: 14,
+    color: '#4a6fa5',
+    marginBottom: 4,
   },
 }); 

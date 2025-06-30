@@ -8,11 +8,16 @@ class SocketApi {
   }
 
   async connect(uuid) {
+    console.log('SocketApi: connect called with uuid:', uuid);
+    console.log('SocketApi: current socket exists?', !!this.socket);
+    
     if (this.socket?.connected) {
+      console.log('SocketApi: socket already connected, returning');
       return true;
     }
 
     if (this.connectionPromise) {
+      console.log('SocketApi: connection in progress, returning existing promise');
       return this.connectionPromise;
     }
     
@@ -25,6 +30,7 @@ class SocketApi {
       if (response.data === 'test') {
         const baseUrl = apiClient.defaults.baseURL;
         const wsUrl = baseUrl.replace('http://', 'ws://').replace(':8080', ':9090');
+        console.log('SocketApi: Connecting to WebSocket:', wsUrl);
         
         this.connectionPromise = new Promise((resolve, reject) => {
           this.socket = io(wsUrl, {
@@ -45,30 +51,53 @@ class SocketApi {
           }, 10000);
 
           this.socket.on('connect', () => {
+            console.log('SocketApi: socket connected successfully');
             clearTimeout(timeout);
             resolve(true);
           });
 
           this.socket.on('connect_error', (error) => {
+            console.log('SocketApi: connection error details:', {
+              message: error.message,
+              description: error.description,
+              type: error.type,
+              stack: error.stack
+            });
             clearTimeout(timeout);
             reject(error);
           });
 
           this.socket.on('error', (error) => {
+            console.log('SocketApi: socket error:', {
+              message: error.message,
+              description: error.description,
+              type: error.type,
+              stack: error.stack
+            });
             clearTimeout(timeout);
             reject(error);
           });
 
           this.socket.io.on('reconnect_attempt', () => {
-            this.socket.io.opts.query = { uuid };
+            console.log('SocketApi: reconnection attempt');
+            if (this.socket) {
+              this.socket.io.opts.query = { uuid };
+            }
           });
 
           this.socket.io.on('reconnect_error', (error) => {
+            console.log('SocketApi: reconnection error:', {
+              message: error.message,
+              description: error.description,
+              type: error.type,
+              stack: error.stack
+            });
             clearTimeout(timeout);
             reject(error);
           });
 
           this.socket.io.on('reconnect_failed', () => {
+            console.log('SocketApi: reconnection failed');
             clearTimeout(timeout);
             reject(new Error('Reconnection failed'));
           });
@@ -76,9 +105,14 @@ class SocketApi {
 
         return await this.connectionPromise;
       } else {
+        console.log('SocketApi: Server connection test failed');
         return false;
       }
     } catch (error) {
+      console.log('SocketApi: Error during socket initialization:', {
+        message: error.message,
+        stack: error.stack
+      });
       return false;
     } finally {
       this.connectionPromise = null;
@@ -86,6 +120,7 @@ class SocketApi {
   }
 
   disconnect() {
+    console.log('SocketApi: disconnect called');
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -95,6 +130,7 @@ class SocketApi {
 
   // 이벤트 리스너 등록
   on(event, callback) {
+    console.log('SocketApi: registering listener for event:', event);
     this.socket?.on(event, callback);
   }
 
@@ -105,12 +141,19 @@ class SocketApi {
 
   // 이벤트 발생
   emit(event, data) {
-    this.socket?.emit(event, data);
+    console.log('SocketApi: emitting event:', event);
+    if (this.socket?.connected) {
+      this.socket.emit(event, data);
+    } else {
+      console.log(`SocketApi: Cannot emit ${event}, socket not connected`);
+    }
   }
 
   // 연결 상태 확인
   isConnected() {
-    return this.socket?.connected || false;
+    const connected = this.socket?.connected || false;
+    console.log('SocketApi: isConnected called, returning:', connected);
+    return connected;
   }
 
   // 현재 연결된 소켓의 UUID 가져오기
