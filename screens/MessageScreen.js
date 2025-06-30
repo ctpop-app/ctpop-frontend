@@ -1,11 +1,13 @@
 // MessageScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { getChatRooms, getChatRoomDetails } from '../api/chat';
-import useUserStore from '../store/userStore';
+import { getChatRooms, getChatRoomDetails, leaveChatRoom } from '../api/chat';
 import { getCurrentKST } from '../utils/dateUtils';
 import ChatRoomSkeleton from '../components/chat/ChatRoomSkeleton';
+import { ChatRoomActionModal } from '../components/chat/ChatRoomActionModal';
+import { useBlock } from '../hooks/useBlock';
+import useUserStore from '../store/userStore';
 
 export default function MessageScreen() {
   const navigation = useNavigation();
@@ -13,6 +15,10 @@ export default function MessageScreen() {
   const [chatRooms, setChatRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [selectedChatRoom, setSelectedChatRoom] = useState(null);
+  const [longPressedItem, setLongPressedItem] = useState(null);
+  const { blockUser: blockUserHook, unblockUser: unblockUserHook } = useBlock();
 
   useEffect(() => {
     loadChatRooms();
@@ -139,13 +145,77 @@ export default function MessageScreen() {
     });
   };
 
+  const handleChatRoomLongPress = (chatRoom) => {
+    setSelectedChatRoom(chatRoom);
+    setActionModalVisible(true);
+  };
+
+  const handleChatRoomPressIn = (chatRoom) => {
+    setLongPressedItem(chatRoom.id);
+  };
+
+  const handleChatRoomPressOut = () => {
+    setLongPressedItem(null);
+  };
+
+  const handleViewProfile = () => {
+    if (!selectedChatRoom?.otherUser?.uuid) return;
+    
+    // 프로필 상세 화면으로 이동
+    navigation.navigate('ProfileDetail', {
+      profile: {
+        uuid: selectedChatRoom.otherUser.uuid,
+        nickname: selectedChatRoom.otherUser.nickname,
+        mainPhotoURL: selectedChatRoom.otherUser.mainPhotoURL
+      }
+    });
+  };
+
+  const handleLeaveChatRoom = async () => {
+    if (!selectedChatRoom || !user?.uuid) return;
+    
+    try {
+      const result = await leaveChatRoom(selectedChatRoom.id, user.uuid);
+      if (result.success) {
+        Alert.alert('알림', '대화방에서 나갔습니다.');
+        loadChatRooms(false); // 채팅방 목록 새로고침
+      } else {
+        Alert.alert('오류', '대화방 나가기에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('대화방 나가기 오류:', error);
+      Alert.alert('오류', '대화방 나가기에 실패했습니다.');
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (!selectedChatRoom?.otherUser?.uuid) return;
+    
+    try {
+      await blockUserHook(selectedChatRoom.otherUser.uuid);
+      Alert.alert('알림', '사용자를 차단했습니다.');
+      loadChatRooms(false); // 채팅방 목록 새로고침
+    } catch (error) {
+      console.error('사용자 차단 오류:', error);
+      Alert.alert('오류', '사용자 차단에 실패했습니다.');
+    }
+  };
+
+  const handleReportUser = () => {
+    Alert.alert('알림', '신고가 접수되었습니다.');
+  };
+
   const renderChatRoom = ({ item }) => {
     const otherParticipant = item.participants.find(p => p !== user.uuid);
     const unreadCount = item.unreadCount?.[user.uuid] || 0;
+    const isLongPressed = longPressedItem === item.id;
     
     return (
       <TouchableOpacity 
-        style={styles.chatRoomItem}
+        style={[
+          styles.chatRoomItem,
+          isLongPressed && styles.chatRoomItemPressed
+        ]}
         onPress={() => navigation.navigate('ChatRoom', { 
           chatRoomId: item.id,
           otherUser: {
@@ -154,6 +224,10 @@ export default function MessageScreen() {
             mainPhotoURL: item.otherUser?.mainPhotoURL
           }
         })}
+        onLongPress={() => handleChatRoomLongPress(item)}
+        onPressIn={() => handleChatRoomPressIn(item)}
+        onPressOut={handleChatRoomPressOut}
+        delayLongPress={500}
       >
         <View style={styles.chatRoomContent}>
           <View style={styles.profileImageContainer}>
@@ -201,6 +275,7 @@ export default function MessageScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>메시지</Text>
+          <Text style={styles.headerSubtitle}>채팅방을 길게 누르면 더 많은 옵션을 볼 수 있습니다</Text>
         </View>
         {renderSkeleton()}
       </View>
@@ -212,6 +287,7 @@ export default function MessageScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>메시지</Text>
+          <Text style={styles.headerSubtitle}>채팅방을 길게 누르면 더 많은 옵션을 볼 수 있습니다</Text>
         </View>
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>오류가 발생했습니다</Text>
@@ -228,6 +304,7 @@ export default function MessageScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>메시지</Text>
+        <Text style={styles.headerSubtitle}>채팅방을 길게 누르면 더 많은 옵션을 볼 수 있습니다</Text>
       </View>
       
       {/* 게시물 목록 */}
@@ -250,6 +327,18 @@ export default function MessageScreen() {
           <Text style={styles.emptySubtext}>새로운 대화를 시작해보세요</Text>
         </View>
       )}
+
+      {/* 채팅방 액션 모달 */}
+      <ChatRoomActionModal
+        visible={actionModalVisible}
+        onClose={() => setActionModalVisible(false)}
+        onViewProfile={handleViewProfile}
+        onLeave={handleLeaveChatRoom}
+        onBlock={handleBlockUser}
+        onReport={handleReportUser}
+        isBlocked={false} // TODO: 차단 상태 확인 로직 추가
+        chatRoomName={selectedChatRoom?.otherUser?.nickname || '채팅방'}
+      />
     </View>
   );
 }
@@ -271,6 +360,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FF6B6B',
   },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+  },
   listContainer: {
     padding: 8,
   },
@@ -278,6 +372,10 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  chatRoomItemPressed: {
+    backgroundColor: '#f0f0f0',
   },
   chatRoomContent: {
     flexDirection: 'row',

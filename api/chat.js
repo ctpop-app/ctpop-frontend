@@ -165,12 +165,29 @@ export const createChatRoom = async (roomData) => {
 /**
  * 채팅방에서 나갑니다.
  * @param {string} roomId - 채팅방 ID
+ * @param {string} userUuid - 나가는 사용자 UUID
  * @returns {Promise<Object>} - 성공 여부
  */
-export const leaveChatRoom = async (roomId) => {
+export const leaveChatRoom = async (roomId, userUuid) => {
   return withNetworkRetry(async () => {
     try {
-      await deleteDoc(doc(db, 'chats', roomId));
+      const chatRef = doc(db, 'chatRooms', roomId);
+      const chatDoc = await getDoc(chatRef);
+      
+      if (!chatDoc.exists()) {
+        throw new Error('채팅방을 찾을 수 없습니다.');
+      }
+
+      const chat = Chat.fromFirestore(chatDoc.id, chatDoc.data());
+      chat.removeParticipant(userUuid);
+      
+      // 참여자가 1명 이하가 되면 채팅방을 삭제
+      if (chat.participants.length <= 1) {
+        await deleteDoc(chatRef);
+      } else {
+        await updateDoc(chatRef, chat.toFirestore());
+      }
+      
       return { success: true, data: {} };
     } catch (error) {
       return handleError(error, '채팅방 나가기 오류');
