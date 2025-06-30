@@ -5,7 +5,9 @@ import { useNavigation } from '@react-navigation/native';
 import { useProfile, useAuth, useSocket, useLocation } from '../hooks';
 import { getLastActiveText } from '../utils/dateUtils';
 import { getOrientationColor } from '../utils/colors';
+import { calculateDistance, formatDistance } from '../utils/discovery';
 import useUserStore from '../store/userStore';
+import * as Location from 'expo-location';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -28,6 +30,9 @@ export default function HomeScreen() {
         if (locationSubscription) {
           locationWatchId.current = locationSubscription;
         }
+        
+        // 현재 위치를 사용자 프로필에 설정
+        await updateCurrentUserLocation();
       } catch (error) {
         console.error('위치 추적 초기화 실패:', error);
       }
@@ -114,11 +119,90 @@ export default function HomeScreen() {
     const debugInterval = setInterval(() => {
       console.log('=== Distance Debug Info ===');
       debugNearbyDistances();
+      if (userProfile?.latitude && userProfile?.longitude) {
+        console.log('현재 사용자 위치:', userProfile.latitude, userProfile.longitude);
+      }
       console.log('==========================');
     }, 10000); // 10초마다 확인
 
     return () => clearInterval(debugInterval);
-  }, [debugNearbyDistances]);
+  }, [debugNearbyDistances, userProfile]);
+
+  // 실제 거리 계산 테스트
+  const testRealDistanceCalculation = () => {
+    if (!userProfile?.latitude || !userProfile?.longitude) {
+      console.log('현재 사용자 위치 정보가 없습니다.');
+      return;
+    }
+
+    console.log('=== 실제 거리 계산 테스트 ===');
+    console.log('현재 사용자 위치:', userProfile.latitude, userProfile.longitude);
+
+    const calculatedDistances = {};
+    
+    profiles.forEach(profile => {
+      if (profile.latitude && profile.longitude && profile.uuid !== userProfile.uuid) {
+        const distance = calculateDistance(
+          userProfile.latitude, userProfile.longitude,
+          profile.latitude, profile.longitude
+        );
+        const formattedDistance = formatDistance(distance);
+        
+        calculatedDistances[profile.uuid] = {
+          distance: distance,
+          formattedDistance: formattedDistance
+        };
+        
+        console.log(`${profile.nickname}: ${formattedDistance} (${distance.toFixed(0)}m)`);
+      }
+    });
+
+    console.log('계산된 거리 정보:', calculatedDistances);
+    console.log('==========================');
+  };
+
+  // 현재 위치를 가져와서 사용자 프로필에 저장
+  const updateCurrentUserLocation = async () => {
+    try {
+      console.log('현재 위치 가져오기 시작...');
+      
+      // 위치 권한 확인
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('위치 권한이 거부되었습니다.');
+        return;
+      }
+
+      // 현재 위치 가져오기
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        timeout: 15000,
+        maximumAge: 10000
+      });
+
+      const { latitude, longitude } = location.coords;
+      console.log('현재 위치:', latitude, longitude);
+
+      // 사용자 프로필 업데이트
+      if (userProfile && user?.uuid) {
+        const updatedProfile = {
+          ...userProfile,
+          latitude: latitude,
+          longitude: longitude
+        };
+
+        // userStore 업데이트
+        useUserStore.getState().setUserProfile(updatedProfile);
+
+        // 백엔드에 프로필 업데이트 요청 (필요시)
+        // await profileService.update(user.uuid, { latitude, longitude });
+
+        console.log('사용자 프로필 위치가 업데이트되었습니다.');
+      }
+    } catch (error) {
+      console.error('위치 업데이트 실패:', error);
+    }
+  };
 
   const renderUserCard = ({ item }) => {
     // 실시간 거리 정보 가져오기
@@ -193,9 +277,17 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>CTpop</Text>
-        <TouchableOpacity style={styles.filterButton}>
-          <Text style={styles.filterButtonText}>필터</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.testButton} onPress={updateCurrentUserLocation}>
+            <Text style={styles.testButtonText}>위치설정</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.testButton} onPress={testRealDistanceCalculation}>
+            <Text style={styles.testButtonText}>거리계산</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.filterButton}>
+            <Text style={styles.filterButtonText}>필터</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       {isLoading ? (
         <ActivityIndicator size="large" color="#FF6B6B" style={{ marginTop: 40 }} />
@@ -243,6 +335,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FF6B6B',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  testButton: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  testButtonText: {
+    color: '#fff',
+    fontWeight: '500',
   },
   filterButton: {
     backgroundColor: '#FF6B6B',

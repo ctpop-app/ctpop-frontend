@@ -32,7 +32,9 @@ export class Profile {
     lastActive = null,
     createdAt = null,
     updatedAt = null,
-    blockedUuid = []
+    blockedUuid = [],
+    latitude = null, // 위도
+    longitude = null // 경도
   }) {
     this.id = id;
     this.uuid = uuid;
@@ -51,6 +53,8 @@ export class Profile {
     this.createdAt = createdAt ? getCurrentKST() : null;
     this.updatedAt = updatedAt ? getCurrentKST() : null;
     this.blockedUuid = blockedUuid;
+    this.latitude = latitude;
+    this.longitude = longitude;
   }
 
   /**
@@ -148,7 +152,9 @@ export class Profile {
       lastActive: this.lastActive ? getCurrentKST() : null,
       createdAt: this.createdAt ? getCurrentKST() : getCurrentKST(),
       updatedAt: getCurrentKST(),
-      blockedUuid: this.blockedUuid || []
+      blockedUuid: this.blockedUuid || [],
+      latitude: this.latitude,
+      longitude: this.longitude
     };
   }
 } 
