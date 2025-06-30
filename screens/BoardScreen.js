@@ -105,6 +105,12 @@ export default function BoardScreen() {
       setProfileMenuVisible(!!talk);
     },
     
+    // 프로필 상세 보기
+    profilePress: (authorProfile) => {
+      console.log('프로필 상세 보기:', authorProfile);
+      navigation.navigate('ProfileDetail', { profile: authorProfile });
+    },
+    
     // 사용자 관리
     block: async () => {
       if (selectedTalk) {
@@ -151,6 +157,7 @@ export default function BoardScreen() {
           onLoadMore={loadMore}
           onMessage={handleEvent.message}
           onMore={handleEvent.profileMenu}
+          onProfilePress={handleEvent.profilePress}
         />
         <WriteButton onPress={() => navigation.navigate('BoardWrite')} />
       </View>

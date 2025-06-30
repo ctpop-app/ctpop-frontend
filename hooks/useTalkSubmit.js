@@ -46,6 +46,8 @@ export const useTalkSubmit = (onSuccess = null, onError = null) => {
     console.log('content:', content);
     console.log('user:', user);
     console.log('profile:', profile);
+    console.log('profile?.nickname:', profile?.nickname);
+    console.log('user?.nickname:', user?.nickname);
     
     if (!content.trim()) {
       Alert.alert('알림', TALK_CONSTANTS.MESSAGES.CONTENT_REQUIRED);
@@ -63,15 +65,11 @@ export const useTalkSubmit = (onSuccess = null, onError = null) => {
     try {
       setSubmitting(true);
       
-      // profile에서 nickname을 가져옴
-      const nickname = profile?.nickname || user?.nickname || '익명';
-      console.log('사용할 nickname:', nickname);
       console.log('사용할 uuid:', user?.uuid);
       
-      // talkService.createTalk은 (uuid, nickname, content, imageUri) 순서로 파라미터를 받음
+      // talkService.createTalk은 (uuid, content, imageUri) 순서로 파라미터를 받음 (nickname 제거)
       const result = await talkService.createTalk(
         user?.uuid,
-        nickname,
         content,
         imageUrl
       );
