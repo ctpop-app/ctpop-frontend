@@ -280,8 +280,9 @@ export default function HomeScreen() {
       (isUserOnline(item.uuid) ? '1.2km' : null);
     
     // 디버깅용 로그
+    const userOnlineStatus = isUserOnline(item.uuid);
     console.log(`User ${item.nickname} (${item.uuid}):`, {
-      isOnline: isUserOnline(item.uuid),
+      isOnline: userOnlineStatus,
       distanceInfo,
       distanceText,
       calculatedDistanceText,

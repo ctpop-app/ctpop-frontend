@@ -39,47 +39,71 @@ export const useSocket = () => {
     });
   }, []);
 
-  // 온라인 사용자 목록 핸들러 (불변 함수)
-  const handleOnlineUsersList = useCallback((users) => {
-    console.log('Received online users list from server:', users);
-    setOnlineUsers(users);
+  // 온라인 사용자 목록 처리
+  const handleOnlineUsersList = useCallback((data) => {
+    console.log('📨 온라인 사용자 목록 수신:', data);
+    
+    if (!data || !Array.isArray(data)) {
+      console.log('❌ 온라인 사용자 목록이 유효하지 않음:', data);
+      return;
+    }
+    
+    console.log(`✅ 온라인 사용자 ${data.length}명 수신됨`);
+    setOnlineUsers(data);
+    
+    // 각 온라인 사용자에 대해 상태 업데이트
+    data.forEach(userId => {
+      console.log(`🟢 사용자 ${userId} 온라인 상태로 설정`);
+    });
   }, []);
 
   // 소켓 연결 (불변 함수)
   const connect = useCallback(async () => {
     const currentUser = useAuth().user; // 현재 user 상태를 직접 가져옴
-    if (!currentUser?.uuid) return;
+    if (!currentUser?.uuid) {
+      console.log('❌ 소켓 연결 실패: 사용자 UUID가 없음');
+      return;
+    }
+    
+    console.log('🔌 소켓 연결 시도 중...', { uuid: currentUser.uuid });
     
     // 이미 연결되어 있으면 이벤트 리스너만 설정
     if (globalSocketConnected) {
+      console.log('✅ 이미 소켓이 연결되어 있음. 이벤트 리스너만 설정');
       socketService.on('userStatus', handleUserStatus);
       socketService.on('onlineUsersList', handleOnlineUsersList);
       // 현재 온라인 사용자 목록 요청
+      console.log('📡 온라인 사용자 목록 요청 중...');
       socketService.emit('getOnlineUsers');
       return;
     }
     
     // 이미 연결 중이면 중복 연결 방지
     if (isConnecting) {
-      console.log('이미 연결 중입니다. 중복 연결 시도 무시');
+      console.log('⏳ 이미 연결 중입니다. 중복 연결 시도 무시');
       return;
     }
     
     // 새로운 연결 시도
     try {
       isConnecting = true;
+      console.log('🔄 새로운 소켓 연결 시도...');
       const connected = await socketService.connect(currentUser.uuid);
       if (connected) {
         globalSocketConnected = true;
+        console.log('✅ 소켓 연결 성공! 이벤트 리스너 설정 중...');
         socketService.on('userStatus', handleUserStatus);
         socketService.on('onlineUsersList', handleOnlineUsersList);
         // 서버에서 현재 온라인 사용자 목록 요청
+        console.log('📡 온라인 사용자 목록 요청 중...');
         socketService.emit('getOnlineUsers');
       } else {
         globalSocketConnected = false;
+        console.log('❌ 소켓 연결 실패');
       }
     } catch (error) {
       globalSocketConnected = false;
+      console.error('❌ 소켓 연결 에러:', error);
     } finally {
       isConnecting = false;
     }
@@ -96,9 +120,15 @@ export const useSocket = () => {
     }
   }, [handleUserStatus, handleOnlineUsersList]);
 
-  // 사용자가 온라인인지 확인
-  const isUserOnline = useCallback((uuid) => {
-    return onlineUsers.includes(uuid);
+  // 사용자 온라인 상태 확인
+  const isUserOnline = useCallback((userId) => {
+    const isOnline = onlineUsers.includes(userId);
+    console.log(`🔍 사용자 ${userId} 온라인 상태 확인:`, {
+      isOnline,
+      onlineUsersCount: onlineUsers.length,
+      onlineUsers: onlineUsers.slice(0, 5) // 처음 5개만 로그에 표시
+    });
+    return isOnline;
   }, [onlineUsers]);
 
   // 컴포넌트 마운트 시 이벤트 리스너만 설정 (연결 해제하지 않음)

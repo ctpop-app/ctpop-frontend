@@ -70,6 +70,10 @@ socket1.on('error', (error) => {
   console.error('❌ 소켓 에러:', error);
 });
 
+socket1.on('onlineStatus', (status) => {
+  console.log('🔍 사용자', testUsers[0].uuid, '온라인 상태 확인:', status);
+});
+
 // 5초 후 두 번째 사용자 연결
 setTimeout(() => {
   console.log('\n🔄 두 번째 사용자 연결 시도...');
@@ -106,6 +110,10 @@ setTimeout(() => {
 
   socket2.on('error', (error) => {
     console.error('❌ 사용자2 소켓 에러:', error);
+  });
+
+  socket2.on('onlineStatus', (status) => {
+    console.log('🔍 사용자', testUsers[1].uuid, '온라인 상태 확인:', status);
   });
 }, 5000);
 
