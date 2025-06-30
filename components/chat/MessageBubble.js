@@ -4,7 +4,7 @@ import { formatMessageTime } from '../../utils/dateUtils';
 import { getMessageStatusText } from '../../constants/messageStatus';
 
 const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
-  const { text, timestamp, status, error } = message;
+  const { content, timestamp, status, error } = message;
 
   return (
     <View style={[
@@ -12,15 +12,21 @@ const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
       isOwnMessage ? styles.ownMessage : styles.otherMessage
     ]}>
       {!isOwnMessage && (
-        <Image
-          source={otherUserPhotoURL ? { uri: otherUserPhotoURL } : require('../../assets/default-profile.png')}
-          style={styles.avatar}
-        />
+        <View style={styles.avatarContainer}>
+          {otherUserPhotoURL ? (
+            <Image
+              source={{ uri: otherUserPhotoURL }}
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={styles.defaultAvatar} />
+          )}
+        </View>
       )}
       <View style={styles.messageContainer}>
         <View style={[styles.messageBubble, isOwnMessage ? styles.messageBubbleMe : styles.messageBubbleOther]}>
           <Text style={[styles.messageText, isOwnMessage ? styles.messageTextMe : styles.messageTextOther]}>
-            {text}
+            {content}
           </Text>
         </View>
         <View style={styles.messageFooter}>
@@ -38,42 +44,52 @@ const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
 
 const styles = StyleSheet.create({
   container: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     marginVertical: 4,
+    paddingHorizontal: 12,
   },
   ownMessage: {
-    alignSelf: 'flex-end',
+    justifyContent: 'flex-end',
   },
   otherMessage: {
-    alignSelf: 'flex-start',
+    justifyContent: 'flex-start',
+  },
+  avatarContainer: {
+    marginRight: 8,
+    marginBottom: 4,
   },
   avatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    marginRight: 6,
+  },
+  defaultAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E0E0E0',
   },
   messageContainer: {
-    maxWidth: '100%',
-    alignItems: 'flex-end',
+    maxWidth: '70%',
   },
   messageBubble: {
-    padding: 10,
-    borderRadius: 16,
+    padding: 12,
+    borderRadius: 18,
   },
   messageBubbleMe: {
     backgroundColor: '#FF6B6B',
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 6,
   },
   messageBubbleOther: {
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   messageText: {
     fontSize: 16,
-    color: '#000',
+    lineHeight: 20,
   },
   messageTextMe: {
     color: '#fff',
@@ -84,7 +100,7 @@ const styles = StyleSheet.create({
   messageFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 4,
     marginHorizontal: 4,
   },
   messageTime: {

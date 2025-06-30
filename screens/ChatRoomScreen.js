@@ -16,35 +16,10 @@ import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import MessageBubble from '../components/chat/MessageBubble';
 import MessageInput from '../components/chat/MessageInput';
-import { sendChatMessage } from '../api/chat';
+import { sendChatMessage, getChatMessages } from '../api/chat';
 import { MESSAGE_STATUS } from '../constants/messageStatus';
-
-// 더미 메시지 데이터
-const dummyMessages = {
-  '1': [
-    {
-      id: '1-1',
-      text: '안녕하세요! 반갑습니다.',
-      senderId: '1',
-      timestamp: new Date(Date.now() - 3600000).toISOString(), // 1시간 전
-      status: 'read'
-    },
-    {
-      id: '1-2',
-      text: '네, 반갑습니다!',
-      senderId: 'current-user',
-      timestamp: new Date(Date.now() - 3500000).toISOString(),
-      status: 'delivered'
-    },
-    {
-      id: '1-3',
-      text: '오늘 날씨가 정말 좋네요.',
-      senderId: '1',
-      timestamp: new Date(Date.now() - 3400000).toISOString(),
-      status: 'read'
-    }
-  ]
-};
+import { db } from '../firebase';
+import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
 
 export default function ChatRoomScreen() {
   const route = useRoute();
@@ -53,22 +28,61 @@ export default function ChatRoomScreen() {
   const { user } = useAuth();
   const { isUserOnline } = useSocket();
   const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // 채팅방 ID에 해당하는 더미 메시지 로드
+  // 실시간 메시지 구독
   useEffect(() => {
-    const chatMessages = dummyMessages[chatRoomId] || [];
-    setMessages(chatMessages);
+    if (!chatRoomId) return;
+
+    console.log('채팅방 메시지 구독 시작:', chatRoomId);
+    
+    const messagesQuery = query(
+      collection(db, 'messages'),
+      where('chatId', '==', chatRoomId),
+      orderBy('timestamp', 'asc'),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+      const newMessages = [];
+      snapshot.forEach((doc) => {
+        const messageData = doc.data();
+        newMessages.push({
+          id: doc.id,
+          content: messageData.content,
+          uuid: messageData.uuid,
+          timestamp: messageData.timestamp,
+          type: messageData.type,
+          status: messageData.status || 'sent',
+          isRead: messageData.isRead || false
+        });
+      });
+      
+      console.log('실시간 메시지 업데이트:', newMessages.length, '개');
+      setMessages(newMessages);
+      setLoading(false);
+    }, (error) => {
+      console.error('메시지 구독 오류:', error);
+      setLoading(false);
+    });
+
+    return () => {
+      console.log('메시지 구독 해제');
+      unsubscribe();
+    };
   }, [chatRoomId]);
 
   const handleSend = async (text) => {
     const newMessage = {
       id: Date.now().toString(),
-      text: text,
-      senderId: user.uuid,
+      content: text,
+      uuid: user.uuid,
       timestamp: new Date().toISOString(),
+      type: 'text',
       status: MESSAGE_STATUS.SENDING
     };
     
+    // 로컬에 즉시 추가 (낙관적 업데이트)
     setMessages(prev => [...prev, newMessage]);
 
     try {
@@ -83,6 +97,7 @@ export default function ChatRoomScreen() {
       }
 
       if (result.success) {
+        // 성공 시 로컬 메시지 업데이트
         setMessages(prev => 
           prev.map(msg => 
             msg.id === newMessage.id 
@@ -131,13 +146,13 @@ export default function ChatRoomScreen() {
   };
 
   const renderMessage = ({ item }) => {
-    const isMe = item.senderId === 'current-user';
+    const isMe = item.uuid === user.uuid;
     
     return (
       <MessageBubble
         message={item}
         isOwnMessage={isMe}
-        otherUserPhotoURL={otherUser.mainPhotoURL}
+        otherUserPhotoURL={isMe ? null : otherUser?.mainPhotoURL}
       />
     );
   };
@@ -173,6 +188,13 @@ export default function ChatRoomScreen() {
         keyExtractor={item => item.id}
         style={styles.messageList}
         contentContainerStyle={styles.messageListContent}
+        showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => {
+          if (messages.length > 0) {
+            this.flatListRef?.scrollToEnd({ animated: true });
+          }
+        }}
+        ref={(ref) => { this.flatListRef = ref; }}
       />
 
       {/* 입력 영역 */}

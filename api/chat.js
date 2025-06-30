@@ -3,6 +3,9 @@ import { collection, addDoc, query, where, orderBy, limit, getDocs, updateDoc, d
 import Chat from '../models/Chat';
 import Message from '../models/Message';
 import { handleError, withNetworkRetry } from '../utils/errorHandler';
+import { auth } from '../firebase';
+import { getCurrentKST } from '../utils/dateUtils';
+import { profileApi } from './profile';
 
 /**
  * 사용자의 채팅방 목록을 가져옵니다.
@@ -10,23 +13,42 @@ import { handleError, withNetworkRetry } from '../utils/errorHandler';
  * @param {Object} params - 페이징 등의 파라미터
  * @returns {Promise<Object>} - 성공 여부와 채팅방 목록
  */
-export const getChatRooms = async (uuid, params = {}) => {
-  return withNetworkRetry(async () => {
-    try {
-      const chatsQuery = query(
-        collection(db, 'chats'),
-        where('participants', 'array-contains', uuid),
-        orderBy('updatedAt', 'desc')
-      );
-      const snapshot = await getDocs(chatsQuery);
-      return { 
-        success: true, 
-        data: snapshot.docs.map(doc => Chat.fromFirestore(doc.id, doc.data()))
-      };
-    } catch (error) {
-      return handleError(error, '채팅방 목록 가져오기 오류');
+export const getChatRooms = async (uuid) => {
+  try {
+    if (!uuid) {
+      throw new Error('사용자 UUID가 필요합니다.');
     }
-  });
+
+    console.log('채팅방 조회 시작 - 사용자:', uuid);
+    
+    // 채팅방 컬렉션에서 현재 사용자가 참여한 채팅방만 조회
+    const chatRoomsRef = collection(db, 'chatRooms');
+    const q = query(
+      chatRoomsRef,
+      where('participants', 'array-contains', uuid)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    console.log('채팅방 조회 결과:', querySnapshot.size, '개의 채팅방 발견');
+    
+    const rooms = [];
+    for (const doc of querySnapshot.docs) {
+      const roomData = doc.data();
+      console.log('채팅방 데이터:', doc.id, roomData);
+      
+      rooms.push({
+        id: doc.id,
+        ...roomData,
+        createdAt: roomData.createdAt?.toDate?.() || new Date(),
+        updatedAt: roomData.updatedAt?.toDate?.() || new Date()
+      });
+    }
+
+    return rooms;
+  } catch (error) {
+    console.error('채팅방 조회 중 오류 발생:', error);
+    throw error;
+  }
 };
 
 /**
@@ -100,7 +122,7 @@ export const sendChatMessage = async (roomId, messageData) => {
       });
 
       // 채팅방 업데이트
-      const chatRef = doc(db, 'chats', roomId);
+      const chatRef = doc(db, 'chatRooms', roomId);
       const chatDoc = await getDoc(chatRef);
       if (chatDoc.exists()) {
         const chat = Chat.fromFirestore(chatDoc.id, chatDoc.data());
@@ -132,7 +154,7 @@ export const createChatRoom = async (roomData) => {
     try {
       const chat = Chat.create(roomData.participants);
       chat.validate();
-      const chatRef = await addDoc(collection(db, 'chats'), chat.toFirestore());
+      const chatRef = await addDoc(collection(db, 'chatRooms'), chat.toFirestore());
       return { success: true, data: { id: chatRef.id } };
     } catch (error) {
       return handleError(error, '채팅방 생성 오류');
@@ -165,9 +187,9 @@ export const leaveChatRoom = async (roomId) => {
 export const inviteToChat = async (roomId, uuids) => {
   return withNetworkRetry(async () => {
     try {
-      const chatRef = doc(db, 'chats', roomId);
-      const chatDoc = await getDocs(chatRef);
-      if (!chatDoc.empty) {
+      const chatRef = doc(db, 'chatRooms', roomId);
+      const chatDoc = await getDoc(chatRef);
+      if (chatDoc.exists()) {
         const chat = Chat.fromFirestore(chatDoc.id, chatDoc.data());
         uuids.forEach(uuid => chat.addParticipant(uuid));
         await updateDoc(chatRef, chat.toFirestore());
@@ -188,9 +210,9 @@ export const inviteToChat = async (roomId, uuids) => {
 export const updateChatRoom = async (roomId, roomData) => {
   return withNetworkRetry(async () => {
     try {
-      const chatRef = doc(db, 'chats', roomId);
-      const chatDoc = await getDocs(chatRef);
-      if (!chatDoc.empty) {
+      const chatRef = doc(db, 'chatRooms', roomId);
+      const chatDoc = await getDoc(chatRef);
+      if (chatDoc.exists()) {
         const chat = Chat.fromFirestore(chatDoc.id, chatDoc.data());
         if (roomData.participants) {
           chat.participants = roomData.participants;
@@ -240,10 +262,60 @@ export const updateMessageReadStatus = async (messageId, isRead) => {
 export const deleteChat = async (chatId) => {
   return withNetworkRetry(async () => {
     try {
-      await deleteDoc(doc(db, 'chats', chatId));
+      await deleteDoc(doc(db, 'chatRooms', chatId));
       return { success: true, data: {} };
     } catch (error) {
       return handleError(error, '채팅방 삭제 오류');
+    }
+  });
+};
+
+/**
+ * 특정 채팅방의 상세 정보를 가져옵니다.
+ * @param {string} roomId - 채팅방 ID
+ * @param {string} currentUserUuid - 현재 사용자 UUID
+ * @returns {Promise<Object>} - 성공 여부와 채팅방 상세 정보
+ */
+export const getChatRoomDetails = async (roomId, currentUserUuid) => {
+  return withNetworkRetry(async () => {
+    try {
+      const chatRef = doc(db, 'chatRooms', roomId);
+      const chatDoc = await getDoc(chatRef);
+      
+      if (!chatDoc.exists()) {
+        throw new Error('채팅방을 찾을 수 없습니다.');
+      }
+
+      const chatData = chatDoc.data();
+      
+      // 마지막 메시지 정보 가져오기
+      const messagesQuery = query(
+        collection(db, 'messages'),
+        where('chatId', '==', roomId),
+        orderBy('timestamp', 'desc'),
+        limit(1)
+      );
+      
+      const messagesSnapshot = await getDocs(messagesQuery);
+      const lastMessage = messagesSnapshot.empty ? null : messagesSnapshot.docs[0].data();
+
+      // 상대방 정보 가져오기
+      const otherParticipantId = chatData.participants.find(p => p !== currentUserUuid);
+      
+      const otherUserProfile = await profileApi.get(otherParticipantId);
+      const otherUser = otherUserProfile ? otherUserProfile.data() : null;
+
+      return {
+        ...chatData,
+        lastMessage,
+        otherUser: otherUser ? {
+          uuid: otherUserProfile.id,
+          nickname: otherUser.nickname,
+          mainPhotoURL: otherUser.mainPhotoURL
+        } : null
+      };
+    } catch (error) {
+      return handleError(error, '채팅방 상세 정보 가져오기 오류');
     }
   });
 }; 
