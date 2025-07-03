@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { ROUTES } from '../navigation/constants';
 import { CommonActions } from '@react-navigation/native';
+import TabHeader from '../components/common/TabHeader';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
@@ -139,9 +140,7 @@ const SettingsScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>설정</Text>
-      </View>
+      <TabHeader title="설정" />
 
       <ScrollView style={styles.settingsContainer}>
         {/* 프로필 섹션 */}
@@ -233,18 +232,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
-  },
-  header: {
-    padding: 16,
-    paddingTop: 60,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF6B6B',
   },
   settingsContainer: {
     flex: 1,
