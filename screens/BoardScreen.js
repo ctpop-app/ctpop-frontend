@@ -136,7 +136,9 @@ export default function BoardScreen() {
     myTalkToggle: () => setShowMyTalk(!showMyTalk),
   };
 
-  const listData = showMyTalk ? (myTalk ? [myTalk] : []) : talks;
+  const listData = showMyTalk 
+    ? talks.filter(talk => talk.uuid === user?.uuid)
+    : talks;
 
   return (
     <SafeAreaView style={styles.safeArea}>
