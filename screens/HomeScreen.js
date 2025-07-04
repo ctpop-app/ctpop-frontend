@@ -8,6 +8,7 @@ import { getOrientationColor } from '../utils/colors';
 import { calculateDistance, formatDistance } from '../utils/discovery';
 import useUserStore from '../store/userStore';
 import * as Location from 'expo-location';
+import TabHeader from '../components/common/TabHeader';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -319,23 +320,25 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>CTpop</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.testButton} onPress={updateCurrentUserLocation}>
-            <Text style={styles.testButtonText}>위치설정</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.testButton} onPress={testRealDistanceCalculation}>
-            <Text style={styles.testButtonText}>거리계산</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.testButton} onPress={setTestLocation}>
-            <Text style={styles.testButtonText}>테스트 위치 설정</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterButton}>
-            <Text style={styles.filterButtonText}>필터</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <TabHeader 
+        title="홈" 
+        rightComponent={
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.testButton} onPress={updateCurrentUserLocation}>
+              <Text style={styles.testButtonText}>위치설정</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.testButton} onPress={testRealDistanceCalculation}>
+              <Text style={styles.testButtonText}>거리계산</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.testButton} onPress={setTestLocation}>
+              <Text style={styles.testButtonText}>테스트 위치 설정</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.filterButton}>
+              <Text style={styles.filterButtonText}>필터</Text>
+            </TouchableOpacity>
+          </View>
+        } 
+      />
       {isLoading ? (
         <ActivityIndicator size="large" color="#FF6B6B" style={{ marginTop: 40 }} />
       ) : (
@@ -367,21 +370,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: 60,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF6B6B',
   },
   headerButtons: {
     flexDirection: 'row',

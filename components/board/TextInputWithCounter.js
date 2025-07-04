@@ -36,6 +36,7 @@ export const TextInputWithCounter = ({
         value={value}
         onChangeText={onChangeText}
         editable={editable}
+        textAlignVertical="top"
       />
       
       <View style={styles.characterCount}>
@@ -56,7 +57,7 @@ const styles = StyleSheet.create({
   },
   input: {
     fontSize: 16,
-    minHeight: 100,
+    flex: 1,
     textAlignVertical: 'top',
     padding: 0,
   },
