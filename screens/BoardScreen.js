@@ -7,6 +7,8 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  TouchableOpacity,
+  Text,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ChatModal } from '../components/chat/ChatModal';
@@ -14,10 +16,10 @@ import { ProfileMenuModal } from '../components/ProfileMenuModal';
 import { useTalkFeed, useMyTalk } from '../hooks/useTalk';
 import { useBlock } from '../hooks/useBlock';
 import { useAuth } from '../hooks/useAuth';
-import BoardHeader from '../components/board/BoardHeader';
 import DistanceTabs from '../components/board/DistanceTabs';
 import TalkList from '../components/board/TalkList';
 import WriteButton from '../components/board/WriteButton';
+import TabHeader from '../components/common/TabHeader';
 
 export default function BoardScreen() {
   const navigation = useNavigation();
@@ -105,6 +107,12 @@ export default function BoardScreen() {
       setProfileMenuVisible(!!talk);
     },
     
+    // 프로필 상세 보기
+    profilePress: (authorProfile) => {
+      console.log('프로필 상세 보기:', authorProfile);
+      navigation.navigate('ProfileDetail', { profile: authorProfile });
+    },
+    
     // 사용자 관리
     block: async () => {
       if (selectedTalk) {
@@ -130,12 +138,21 @@ export default function BoardScreen() {
     myTalkToggle: () => setShowMyTalk(!showMyTalk),
   };
 
-  const listData = showMyTalk ? (myTalk ? [myTalk] : []) : talks;
+  const listData = showMyTalk 
+    ? talks.filter(talk => talk.uuid === user?.uuid)
+    : talks;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <BoardHeader onFilterPress={handleEvent.filter} />
+        <TabHeader 
+          title="토크" 
+          rightComponent={
+            <TouchableOpacity style={styles.filterButton} onPress={handleEvent.filter}>
+              <Text style={styles.filterButtonText}>필터</Text>
+            </TouchableOpacity>
+          } 
+        />
         <DistanceTabs 
           showMyTalk={showMyTalk} 
           onMyTalkToggle={handleEvent.myTalkToggle} 
@@ -151,6 +168,7 @@ export default function BoardScreen() {
           onLoadMore={loadMore}
           onMessage={handleEvent.message}
           onMore={handleEvent.profileMenu}
+          onProfilePress={handleEvent.profilePress}
         />
         <WriteButton onPress={() => navigation.navigate('BoardWrite')} />
       </View>
@@ -176,10 +194,19 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  filterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  filterButtonText: {
+    fontSize: 14,
+    color: '#666',
   },
 }); 

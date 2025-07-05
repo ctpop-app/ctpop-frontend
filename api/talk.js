@@ -72,7 +72,7 @@ export const talkApi = {
     }
   },
 
-  async createTalk(uuid, nickname, content, imageUri = null) {
+  async createTalk(uuid, content, imageUri = null) {
     try {
       // 기존 활성 토크 비활성화
       const existingTalkId = await AsyncStorage.getItem(MY_ACTIVE_TALK_ID_KEY);
@@ -87,8 +87,8 @@ export const talkApi = {
         imageUrl = await uploadImage(imageUri, 'talks', uuid);
       }
       
-      // 새 토크 생성
-      const talk = Talk.create(uuid, nickname, content, imageUrl);
+      // 새 토크 생성 (nickname 제거)
+      const talk = Talk.create(uuid, content, imageUrl);
       const talksRef = collection(db, 'talks');
       const talkRef = await addDoc(talksRef, talk.toFirestore());
       
@@ -169,7 +169,6 @@ export const talkApi = {
           const profileQuery = query(
             profileRef,
             where('uuid', '==', talkData.uuid),
-            where('isActive', '==', true),
             limit(1)
           );
           const profileSnapshot = await getDocs(profileQuery);
@@ -182,6 +181,9 @@ export const talkApi = {
               nickname: profileData.nickname,
               mainPhotoURL: profileData.mainPhotoURL,
               age: profileData.age,
+              height: profileData.height,
+              weight: profileData.weight,
+              orientation: profileData.orientation,
               city: profileData.city,
               district: profileData.district
             };

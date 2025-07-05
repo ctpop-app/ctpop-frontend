@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { useTalkSubmit } from '../hooks/useTalkSubmit';
@@ -26,6 +27,7 @@ import { TALK_CONSTANTS } from '../constants/talkConstants';
 export default function BoardWriteScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   
   // 커스텀 훅 사용
   const {
@@ -67,7 +69,8 @@ export default function BoardWriteScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 40}
     >
       <View style={styles.content}>
         {/* 이미지 업로드 컴포넌트 */}
@@ -88,11 +91,13 @@ export default function BoardWriteScreen() {
       </View>
 
       {/* 제출 버튼 컴포넌트 */}
-      <SubmitButton
-        loading={submitting || uploadingImage}
-        disabled={!canSubmit || isOverLimit}
-        onPress={handleSubmit}
-      />
+      <View style={[styles.submitContainer, { paddingBottom: insets.bottom }]}>
+        <SubmitButton
+          loading={submitting || uploadingImage}
+          disabled={!canSubmit || isOverLimit}
+          onPress={handleSubmit}
+        />
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -104,6 +109,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    padding: 16,
+  },
+  submitContainer: {
     padding: 16,
   },
 }); 

@@ -8,7 +8,11 @@ import { getOrientationColor } from '../utils/colors';
 import { calculateDistance, formatDistance } from '../utils/discovery';
 import useUserStore from '../store/userStore';
 import * as Location from 'expo-location';
+
 import { socketService } from '../services/socketService';
+
+import TabHeader from '../components/common/TabHeader';
+
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -309,6 +313,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+
       {/* 간단한 헤더 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>CTpop</Text>
@@ -346,6 +351,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
+
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

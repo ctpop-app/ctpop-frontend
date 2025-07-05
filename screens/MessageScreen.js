@@ -6,6 +6,7 @@ import { getChatRooms, getChatRoomDetails } from '../api/chat';
 import useUserStore from '../store/userStore';
 import { getCurrentKST } from '../utils/dateUtils';
 import ChatRoomSkeleton from '../components/chat/ChatRoomSkeleton';
+import TabHeader from '../components/common/TabHeader';
 
 export default function MessageScreen() {
   const navigation = useNavigation();
@@ -199,9 +200,7 @@ export default function MessageScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>메시지</Text>
-        </View>
+        <TabHeader title="메시지" />
         {renderSkeleton()}
       </View>
     );
@@ -210,9 +209,7 @@ export default function MessageScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>메시지</Text>
-        </View>
+        <TabHeader title="메시지" />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>오류가 발생했습니다</Text>
           <Text style={styles.emptySubtext}>{error}</Text>
@@ -226,9 +223,7 @@ export default function MessageScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>메시지</Text>
-      </View>
+      <TabHeader title="메시지" />
       
       {/* 게시물 목록 */}
       {loading ? (
@@ -258,18 +253,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
-  },
-  header: {
-    padding: 16,
-    paddingTop: 60,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF6B6B',
   },
   listContainer: {
     padding: 8,

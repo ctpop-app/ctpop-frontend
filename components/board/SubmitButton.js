@@ -45,7 +45,7 @@ export const SubmitButton = ({
 
 const styles = StyleSheet.create({
   footer: {
-    padding: 16,
+    padding: 8,
     borderTopWidth: 1,
     borderTopColor: '#eee',
     backgroundColor: '#fff',

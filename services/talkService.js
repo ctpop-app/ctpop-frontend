@@ -32,14 +32,13 @@ export const talkService = {
   /**
    * 토크 생성 (비즈니스 로직 포함)
    * @param {string} uuid - 사용자 UUID
-   * @param {string} nickname - 사용자 닉네임
    * @param {string} content - 토크 내용
    * @param {string} imageUri - 이미지 URI (선택사항)
    * @returns {Promise<Talk>}
    */
-  async createTalk(uuid, nickname, content, imageUri = null) {
+  async createTalk(uuid, content, imageUri = null) {
     console.log('=== talkService.createTalk 시작 ===');
-    console.log('받은 파라미터:', { uuid, nickname, content, imageUri });
+    console.log('받은 파라미터:', { uuid, content, imageUri });
     
     try {
       // 1. 입력값 검증
@@ -51,22 +50,21 @@ export const talkService = {
         throw new Error(`토크는 ${MAX_CONTENT_LENGTH}자를 초과할 수 없습니다.`);
       }
 
-      // 2. 토크 객체 생성 및 검증 (nickname은 API에서 설정됨)
-      const talk = Talk.create(uuid, nickname, content, null); // content를 그대로 전달
+      // 2. 토크 객체 생성 및 검증 (nickname 제거)
+      const talk = Talk.create(uuid, content, null);
       console.log('생성된 Talk 객체:', talk);
       console.log('Talk.isValid() 결과:', talk.isValid());
       
       if (!talk.isValid()) {
         console.log('Talk 유효성 검사 실패 상세:');
         console.log('- uuid:', !!talk.uuid);
-        console.log('- nickname:', !!talk.nickname);
         console.log('- content:', !!talk.content);
         console.log('- content.trim().length:', talk.content.trim().length);
         throw new Error('토크가 유효하지 않습니다.');
       }
 
-      // 3. API 호출
-      const result = await talkApi.createTalk(uuid, nickname, content, imageUri);
+      // 3. API 호출 (nickname 제거)
+      const result = await talkApi.createTalk(uuid, content, imageUri);
       if (!result.success) {
         throw new Error(result.error);
       }

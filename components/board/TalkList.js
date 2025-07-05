@@ -14,7 +14,8 @@ export default function TalkList({
   onRefresh,
   onLoadMore,
   onMessage,
-  onMore
+  onMore,
+  onProfilePress
 }) {
   return (
     <FlatList
@@ -24,6 +25,7 @@ export default function TalkList({
           talk={item}
           onMessage={onMessage}
           onMore={onMore}
+          onProfilePress={onProfilePress}
         />
       )}
       keyExtractor={(item) => item.id}
