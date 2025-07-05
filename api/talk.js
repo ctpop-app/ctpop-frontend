@@ -156,7 +156,43 @@ export const talkApi = {
       }
       
       const snapshot = await getDocs(q);
-      const talks = snapshot.docs.map(doc => Talk.fromFirestore(doc));
+      const talks = [];
+      
+      // 각 토크에 대해 작성자의 프로필 정보도 함께 가져오기
+      for (const doc of snapshot.docs) {
+        const talkData = doc.data();
+        const talk = Talk.fromFirestore(doc);
+        
+        // 작성자의 프로필 정보 가져오기
+        try {
+          const profileRef = collection(db, 'profiles');
+          const profileQuery = query(
+            profileRef,
+            where('uuid', '==', talkData.uuid),
+            where('isActive', '==', true),
+            limit(1)
+          );
+          const profileSnapshot = await getDocs(profileQuery);
+          
+          if (!profileSnapshot.empty) {
+            const profileDoc = profileSnapshot.docs[0];
+            const profileData = profileDoc.data();
+            talk.authorProfile = {
+              uuid: talkData.uuid,
+              nickname: profileData.nickname,
+              mainPhotoURL: profileData.mainPhotoURL,
+              age: profileData.age,
+              city: profileData.city,
+              district: profileData.district
+            };
+          }
+        } catch (profileError) {
+          console.warn('프로필 정보 조회 실패:', profileError);
+          // 프로필 정보가 없어도 토크는 표시
+        }
+        
+        talks.push(talk);
+      }
       
       return { 
         success: true, 

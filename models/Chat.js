@@ -31,7 +31,7 @@ class Chat {
   updateLastMessage(message) {
     this.lastMessage = {
       content: message.content,
-      senderId: message.senderId,
+      senderId: message.uuid,
       timestamp: message.timestamp,
       type: message.type
     };

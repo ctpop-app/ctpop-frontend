@@ -59,13 +59,44 @@ export default function BoardScreen() {
   const handleEvent = {
     // 채팅 관련
     message: (talk) => {
-      setSelectedUser({ nickname: '익명' });
+      console.log('=== BoardScreen message 이벤트 시작 ===');
+      console.log('선택된 토크 전체 데이터:', JSON.stringify(talk, null, 2));
+      
+      // 토크 작성자의 프로필 정보 사용
+      const authorInfo = talk.authorProfile || {
+        nickname: talk.nickname || '익명',
+        mainPhotoURL: null,
+        uuid: talk.uuid // 작성자의 UUID 추가
+      };
+      
+      // authorProfile이 있지만 uuid가 없는 경우 talk.uuid 사용
+      if (authorInfo && !authorInfo.uuid && talk.uuid) {
+        authorInfo.uuid = talk.uuid;
+      }
+      
+      console.log('작성자 정보:', authorInfo);
+      console.log('작성자 UUID 확인:', authorInfo.uuid);
+      
+      setSelectedUser(authorInfo);
       setChatModalVisible(true);
+      console.log('ChatModal 열림');
     },
     
-    chatConfirm: () => {
+    chatConfirm: (chatRoomId, otherUser) => {
+      console.log('=== BoardScreen chatConfirm 시작 ===');
+      console.log('채팅방 생성 완료:', { chatRoomId, otherUser });
       setChatModalVisible(false);
-      // TODO: 채팅방 생성 및 이동 로직 구현
+      
+      // 채팅방으로 이동
+      if (chatRoomId) {
+        console.log('ChatRoom으로 이동:', { chatRoomId, otherUser });
+        navigation.navigate('ChatRoom', {
+          chatRoomId: chatRoomId,
+          otherUser: otherUser
+        });
+      } else {
+        console.error('chatRoomId가 없습니다.');
+      }
     },
     
     // 프로필 메뉴 관련
@@ -128,6 +159,7 @@ export default function BoardScreen() {
         onClose={() => setChatModalVisible(false)}
         onConfirm={handleEvent.chatConfirm}
         otherUser={selectedUser}
+        talkData={selectedTalk}
       />
       <ProfileMenuModal
         visible={profileMenuVisible}

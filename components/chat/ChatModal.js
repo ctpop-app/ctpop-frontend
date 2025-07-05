@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,70 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { createChatRoom } from '../../api/chat';
+import { useAuth } from '../../hooks/useAuth';
 
 const { width } = Dimensions.get('window');
 
-export const ChatModal = ({ visible, onClose, onConfirm, otherUser }) => {
+export const ChatModal = ({ visible, onClose, onConfirm, otherUser, talkData }) => {
+  const { user } = useAuth();
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleConfirm = async () => {
+    console.log('=== ChatModal handleConfirm 시작 ===');
+    console.log('현재 사용자:', user);
+    console.log('상대방 정보:', otherUser);
+    
+    if (!user?.uuid || !otherUser?.uuid) {
+      console.error('사용자 정보 누락:', { userUuid: user?.uuid, otherUserUuid: otherUser?.uuid });
+      Alert.alert('오류', '사용자 정보를 불러올 수 없습니다.');
+      return;
+    }
+
+    setIsCreating(true);
+    console.log('채팅방 생성 시작...');
+
+    try {
+      // 기존 채팅방이 있는지 확인 (선택사항)
+      // 여기서는 바로 새 채팅방을 생성합니다
+      
+      const roomData = {
+        participants: [user.uuid, otherUser.uuid]
+      };
+
+      console.log('채팅방 생성 데이터:', roomData);
+      
+      const result = await createChatRoom(roomData);
+      console.log('채팅방 생성 결과:', result);
+      
+      if (!result.success) {
+        throw new Error(result.error || '채팅방 생성에 실패했습니다.');
+      }
+
+      const chatRoomId = result.data.id;
+      console.log('채팅방 생성 성공 - ID:', chatRoomId);
+
+      // 채팅방 생성 성공 시 콜백 호출
+      if (onConfirm) {
+        console.log('onConfirm 콜백 호출:', { chatRoomId, otherUser });
+        onConfirm(chatRoomId, otherUser);
+      } else {
+        console.warn('onConfirm 콜백이 없습니다.');
+      }
+
+    } catch (error) {
+      console.error('채팅방 생성 오류:', error);
+      Alert.alert('오류', error.message || '채팅방 생성에 실패했습니다.');
+    } finally {
+      setIsCreating(false);
+      console.log('=== ChatModal handleConfirm 종료 ===');
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -26,11 +84,15 @@ export const ChatModal = ({ visible, onClose, onConfirm, otherUser }) => {
           <TouchableWithoutFeedback>
             <View style={styles.modalContent}>
               <Image
-                source={otherUser?.profileImage ? { uri: otherUser.profileImage } : require('../../assets/default-profile.png')}
+                source={
+                  otherUser?.mainPhotoURL && otherUser.mainPhotoURL.startsWith('http') 
+                    ? { uri: otherUser.mainPhotoURL } 
+                    : require('../../assets/default-profile.png')
+                }
                 style={styles.profileImage}
               />
               <Text style={styles.modalTitle}>
-                {otherUser?.nickname}님과의 채팅
+                {otherUser?.nickname || '익명'}님과의 채팅
               </Text>
               <Text style={styles.modalDescription}>
                 채팅을 시작하시겠습니까?
@@ -40,15 +102,21 @@ export const ChatModal = ({ visible, onClose, onConfirm, otherUser }) => {
                 <TouchableOpacity 
                   style={[styles.button, styles.cancelButton]}
                   onPress={onClose}
+                  disabled={isCreating}
                 >
                   <Text style={styles.cancelButtonText}>취소</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.button, styles.confirmButton]}
-                  onPress={onConfirm}
+                  style={[styles.button, styles.confirmButton, isCreating && styles.disabledButton]}
+                  onPress={handleConfirm}
+                  disabled={isCreating}
                 >
-                  <Text style={styles.confirmButtonText}>채팅 시작하기</Text>
+                  {isCreating ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.confirmButtonText}>채팅 시작하기</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -129,5 +197,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
 }); 

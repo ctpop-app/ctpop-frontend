@@ -59,13 +59,7 @@ export const useSocket = () => {
 
   // 소켓 연결 (불변 함수)
   const connect = useCallback(async () => {
-    const currentUser = useAuth().user; // 현재 user 상태를 직접 가져옴
-    if (!currentUser?.uuid) {
-      console.log('❌ 소켓 연결 실패: 사용자 UUID가 없음');
-      return;
-    }
-    
-    console.log('🔌 소켓 연결 시도 중...', { uuid: currentUser.uuid });
+    if (!user?.uuid) return;
     
     // 이미 연결되어 있으면 이벤트 리스너만 설정
     if (globalSocketConnected) {
@@ -88,7 +82,8 @@ export const useSocket = () => {
     try {
       isConnecting = true;
       console.log('🔄 새로운 소켓 연결 시도...');
-      const connected = await socketService.connect(currentUser.uuid);
+      const connected = await socketService.connect(user.uuid);
+
       if (connected) {
         globalSocketConnected = true;
         console.log('✅ 소켓 연결 성공! 이벤트 리스너 설정 중...');
@@ -107,7 +102,7 @@ export const useSocket = () => {
     } finally {
       isConnecting = false;
     }
-  }, [handleUserStatus, handleOnlineUsersList]);
+  }, [user?.uuid, handleUserStatus, handleOnlineUsersList]);
 
   // 소켓 연결 해제 (전역에서만 호출)
   const disconnect = useCallback(async () => {
