@@ -259,6 +259,37 @@ export default function HomeScreen() {
     }
   };
 
+  // 다른 사용자들에게도 테스트 위치 설정
+  const setTestLocationsForAllUsers = () => {
+    const updatedProfiles = profiles.map(profile => {
+      if (profile.uuid === userProfile?.uuid) {
+        // 현재 사용자는 강남역 근처
+        return {
+          ...profile,
+          latitude: 37.4979,
+          longitude: 127.0276
+        };
+      } else {
+        // 다른 사용자들은 서울의 다른 지역들
+        const locations = [
+          { lat: 37.5079, lng: 127.0376 }, // 강남구청
+          { lat: 37.4879, lng: 127.0176 }, // 역삼동
+          { lat: 37.5179, lng: 127.0476 }, // 삼성동
+          { lat: 37.4779, lng: 127.0076 }  // 서초구
+        ];
+        const randomLocation = locations[Math.floor(Math.random() * locations.length)];
+        return {
+          ...profile,
+          latitude: randomLocation.lat,
+          longitude: randomLocation.lng
+        };
+      }
+    });
+    
+    setProfiles(updatedProfiles);
+    console.log('모든 사용자에게 테스트 위치 설정 완료');
+  };
+
   const renderUserCard = ({ item }) => {
     // 실시간 거리 정보 가져오기 (백엔드에서 오는 경우)
     const distanceInfo = getDistanceToUser(item.uuid);
@@ -360,6 +391,9 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.testButton} onPress={setTestLocation}>
             <Text style={styles.testButtonText}>테스트 위치 설정</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.testButton} onPress={setTestLocationsForAllUsers}>
+            <Text style={styles.testButtonText}>전체 위치 설정</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.filterButton}>
             <Text style={styles.filterButtonText}>필터</Text>
