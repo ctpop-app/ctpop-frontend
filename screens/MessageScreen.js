@@ -83,8 +83,43 @@ export default function MessageScreen() {
         })
       );
 
-      console.log('최종 채팅방 목록:', JSON.stringify(roomsWithDetails, null, 2));
-      setChatRooms(roomsWithDetails);
+      // 잘못된 채팅방 필터링
+      const validRooms = roomsWithDetails.filter(room => {
+        if (!room.participants || !Array.isArray(room.participants)) {
+          console.warn(`채팅방 ${room.id}: participants가 없거나 배열이 아님`);
+          return false;
+        }
+        
+        // 중복 제거 후 참가자 수 확인
+        const uniqueParticipants = [...new Set(room.participants)];
+        if (uniqueParticipants.length < 2) {
+          console.warn(`채팅방 ${room.id}: 유효한 참가자가 2명 미만 (${uniqueParticipants.length}명)`);
+          return false;
+        }
+        
+        // 현재 사용자가 포함되어 있는지 확인
+        if (!uniqueParticipants.includes(user.uuid)) {
+          console.warn(`채팅방 ${room.id}: 현재 사용자가 참가자 목록에 없음`);
+          return false;
+        }
+        
+        // 상대방 정보가 없거나 유효하지 않은 경우 필터링
+        if (!room.otherUser || !room.otherUser.uuid || room.otherUser.uuid === 'unknown') {
+          console.warn(`채팅방 ${room.id}: 상대방 정보가 없거나 유효하지 않음`, room.otherUser);
+          return false;
+        }
+        
+        // 상대방이 현재 사용자인 경우 필터링 (자기 자신과의 채팅방)
+        if (room.otherUser.uuid === user.uuid) {
+          console.warn(`채팅방 ${room.id}: 자기 자신과의 채팅방`);
+          return false;
+        }
+        
+        return true;
+      });
+
+      console.log('최종 채팅방 목록:', JSON.stringify(validRooms, null, 2));
+      setChatRooms(validRooms);
     } catch (error) {
       console.error('채팅방 로딩 중 오류 발생:', error);
       
@@ -222,9 +257,17 @@ export default function MessageScreen() {
   };
 
   const renderChatRoom = ({ item }) => {
-    const otherParticipant = item.participants.find(p => p !== user.uuid);
+    // participants가 없거나 undefined인 경우 안전하게 처리
+    const participants = item.participants || [];
+    const otherParticipant = participants.find(p => p !== user.uuid);
     const unreadCount = item.unreadCount?.[user.uuid] || 0;
     const isLongPressed = longPressedItem === item.id;
+    
+    // 상대방 정보가 없으면 렌더링하지 않음
+    if (!item.otherUser || !item.otherUser.uuid) {
+      console.warn(`채팅방 ${item.id}: 상대방 정보가 없어 렌더링하지 않음`);
+      return null;
+    }
     
     return (
       <TouchableOpacity 
