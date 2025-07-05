@@ -133,12 +133,23 @@ const updateLocation = (latitude, longitude) => {
   }
 };
 
+// 마지막 위치 전송 (앱 종료 시)
+const updateLastLocation = (lastLocation) => {
+  if (socketApi.isConnected()) {
+    console.log('Sending last location on app exit:', lastLocation);
+    socketApi.emit('updateLastLocation', lastLocation);
+  } else {
+    console.log('Socket not connected, cannot send last location');
+  }
+};
+
 export const socketService = {
   connect,
   disconnect,
   startHeartbeat,
   stopHeartbeat,
   updateLocation,
+  updateLastLocation,
   isConnected: () => socketApi.isConnected(),
   getUuid: () => socketApi.getUuid(),
   on: (event, callback) => socketApi.on(event, callback),

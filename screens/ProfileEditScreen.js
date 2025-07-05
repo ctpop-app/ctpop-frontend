@@ -10,6 +10,7 @@ import {
   Platform
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import { PhotoGrid } from '../components/profile-setup/photo-grid/PhotoGrid';
 import { useProfileForm } from '../hooks/useProfileForm';
 import { usePhotoGrid } from '../hooks/usePhotoGrid';
@@ -76,6 +77,24 @@ const ProfileEditScreen = () => {
 
   const handleSave = async () => {
     try {
+      // 현재 위치 가져오기
+      let currentLocation = null;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+            timeout: 15000,
+            maximumAge: 10000
+          });
+          currentLocation = location.coords;
+          console.log('현재 위치 가져옴 (수정):', currentLocation);
+        }
+      } catch (locationError) {
+        console.warn('위치 정보 가져오기 실패 (수정):', locationError);
+        // 위치 정보 없이도 프로필 수정 가능하도록 계속 진행
+      }
+
       // 사진 업로드
       const photoURLs = await uploadPhotos();
       if (!photoURLs) {
@@ -83,10 +102,12 @@ const ProfileEditScreen = () => {
         return;
       }
 
-      // 프로필 저장
+      // 프로필 저장 (위치 정보 포함)
       const profileData = await handleSubmit({
         mainPhotoURL: photoURLs[0],
-        photoURLs: photoURLs
+        photoURLs: photoURLs,
+        latitude: currentLocation?.latitude || currentProfile?.latitude || null,
+        longitude: currentLocation?.longitude || currentProfile?.longitude || null
       });
 
       if (profileData) {

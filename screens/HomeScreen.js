@@ -1,6 +1,6 @@
 // HomeScreen.js
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useProfile, useAuth, useSocket, useLocation } from '../hooks';
 import { getLastActiveText } from '../utils/dateUtils';
@@ -15,40 +15,145 @@ export default function HomeScreen() {
   const { getAll, loading } = useProfile();
   const { user } = useAuth();
   const { isUserOnline } = useSocket();
-  const { userProfile, getDistanceToUser, debugNearbyDistances } = useUserStore();
+  const { userProfile, getDistanceToUser, setUserProfile } = useUserStore();
   const { startLocationTracking, stopLocationTracking } = useLocation();
   const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
+  const [isLocationTracking, setIsLocationTracking] = useState(false);
   const locationWatchId = useRef(null);
 
-  // 위치 추적 시작
+  // 앱 진입 시 위치 권한 강제 요청
   useEffect(() => {
-    const initLocationTracking = async () => {
+    const requestLocationPermissionOnAppStart = async () => {
       try {
-        const locationSubscription = await startLocationTracking();
-        if (locationSubscription) {
-          locationWatchId.current = locationSubscription;
-        }
+        // 위치 권한 요청
+        const { status } = await Location.requestForegroundPermissionsAsync();
         
-        // 현재 위치를 사용자 프로필에 설정
-        await updateCurrentUserLocation();
+        if (status === 'granted') {
+          // 위치 권한 허용됨
+          setLocationPermissionGranted(true);
+          startRealTimeLocationTracking();
+        } else {
+          // 위치 권한 거부됨 - 앱 사용 불가
+          Alert.alert(
+            '위치 권한 필요',
+            '위치 권한을 허용해야 서비스를 이용할 수 있습니다.',
+            [
+              {
+                text: '다시 시도',
+                onPress: () => requestLocationPermissionOnAppStart()
+              },
+              {
+                text: '앱 종료',
+                onPress: () => {
+                  // 앱 종료 또는 진입 차단
+                  Alert.alert('앱 종료', '위치 권한 없이는 서비스를 이용할 수 없습니다.');
+                }
+              }
+            ],
+            { cancelable: false }
+          );
+        }
       } catch (error) {
-        console.error('위치 추적 초기화 실패:', error);
+        console.error('위치 권한 요청 실패:', error);
+        Alert.alert('오류', '위치 권한 요청 중 오류가 발생했습니다.');
       }
     };
 
-    if (user?.uuid) {
-      initLocationTracking();
+    // 앱 시작 시 즉시 위치 권한 요청
+    requestLocationPermissionOnAppStart();
+  }, []);
+
+  // 앱 종료 시 마지막 위치 전송
+  const sendLastLocationOnAppExit = useCallback(async () => {
+    if (!user?.uuid || !userProfile?.latitude || !userProfile?.longitude) return;
+    
+    try {
+      // 현재 위치를 마지막 위치로 서버에 전송
+      const lastLocation = {
+        uuid: user.uuid,
+        latitude: userProfile.latitude,
+        longitude: userProfile.longitude,
+        timestamp: Date.now(),
+        isLastLocation: true
+      };
+      
+      // 소켓을 통해 마지막 위치 전송
+      socketService.updateLastLocation(lastLocation);
+      
+      // 프로필 서비스에 마지막 위치 업데이트
+      // await profileService.updateLastLocation(user.uuid, lastLocation);
+      
+      console.log('앱 종료 시 마지막 위치 전송됨:', lastLocation);
+    } catch (error) {
+      console.error('마지막 위치 전송 실패:', error);
     }
+  }, [user?.uuid, userProfile]);
 
-    return () => {
-      if (locationWatchId.current) {
-        stopLocationTracking(locationWatchId.current);
+  // 실시간 위치 추적 시작
+  const startRealTimeLocationTracking = useCallback(async () => {
+    if (!user?.uuid) return;
+
+    try {
+      setIsLocationTracking(true);
+      
+      // 현재 위치 가져오기
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        timeout: 15000,
+        maximumAge: 10000
+      });
+
+      const { latitude, longitude } = currentLocation.coords;
+      
+      // 사용자 프로필에 위치 정보 업데이트
+      if (userProfile) {
+        const updatedProfile = {
+          ...userProfile,
+          latitude,
+          longitude
+        };
+        setUserProfile(updatedProfile);
+        
+        // 소켓을 통해 실시간 위치 정보 전송 (접속 중일 때만)
+        socketService.updateLocation(latitude, longitude);
       }
-    };
-  }, [user?.uuid, startLocationTracking, stopLocationTracking]);
+
+      // 실시간 위치 추적 시작 (접속 중일 때만)
+      const locationSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          distanceInterval: 10, // 10미터 이상 이동 시 업데이트
+          timeInterval: 30000,  // 30초마다 업데이트
+        },
+        (location) => {
+          const { latitude, longitude } = location.coords;
+          
+          // 사용자 프로필 업데이트
+          if (userProfile) {
+            const updatedProfile = {
+              ...userProfile,
+              latitude,
+              longitude
+            };
+            setUserProfile(updatedProfile);
+          }
+          
+          // 소켓을 통해 실시간 위치 정보 전송 (접속 중일 때만)
+          socketService.updateLocation(latitude, longitude);
+        }
+      );
+
+      locationWatchId.current = locationSubscription;
+      
+    } catch (error) {
+      console.error('실시간 위치 추적 시작 실패:', error);
+      setIsLocationTracking(false);
+    }
+  }, [user?.uuid, userProfile, setUserProfile]);
 
   const loadProfiles = useCallback(async (isBackground = false) => {
     if (isBackground) {
@@ -115,213 +220,45 @@ export default function HomeScreen() {
     loadProfiles();
   }, [loadProfiles]);
 
-  // 디버깅용: 주기적으로 거리 정보 상태 확인
+  // 컴포넌트 언마운트 시 위치 추적 정리 및 마지막 위치 전송
   useEffect(() => {
-    const debugInterval = setInterval(() => {
-      console.log('=== Distance Debug Info ===');
-      debugNearbyDistances();
-      if (userProfile?.latitude && userProfile?.longitude) {
-        console.log('현재 사용자 위치:', userProfile.latitude, userProfile.longitude);
-      }
+    return () => {
+      // 마지막 위치 전송
+      sendLastLocationOnAppExit();
       
-      // 백엔드 거리 정보 수신 상태 확인
-      const { nearbyDistances } = useUserStore.getState();
-      if (Object.keys(nearbyDistances).length > 0) {
-        console.log('✅ 백엔드에서 거리 정보 수신됨:', nearbyDistances);
-      } else {
-        console.log('❌ 백엔드에서 거리 정보 수신 안됨');
+      // 위치 추적 정리
+      if (locationWatchId.current) {
+        locationWatchId.current.remove();
+        locationWatchId.current = null;
       }
-      
-      // 소켓 연결 상태 확인
-      let isConnected = false;
-      try {
-        isConnected = socketService?.isConnected?.() || false;
-      } catch (error) {
-        console.log('🔌 소켓 연결 상태 확인 실패:', error.message);
-      }
-      console.log('🔌 소켓 연결 상태:', isConnected ? '연결됨' : '연결 안됨');
-      
-      // 백엔드 거리 정보 요청
-      if (isConnected && socketService?.emit) {
-        console.log('📡 백엔드에 거리 정보 요청 중...');
-        try {
-          socketService.emit('requestNearbyDistances');
-        } catch (error) {
-          console.log('📡 거리 정보 요청 실패:', error.message);
-        }
-      }
-      
-      console.log('==========================');
-    }, 10000); // 10초마다 확인
-
-    return () => clearInterval(debugInterval);
-  }, [debugNearbyDistances, userProfile]);
-
-  // 실제 거리 계산 테스트
-  const testRealDistanceCalculation = () => {
-    if (!userProfile?.latitude || !userProfile?.longitude) {
-      console.log('현재 사용자 위치 정보가 없습니다.');
-      return;
-    }
-
-    console.log('=== 실제 거리 계산 테스트 ===');
-    console.log('현재 사용자 위치:', userProfile.latitude, userProfile.longitude);
-
-    const calculatedDistances = {};
-    
-    profiles.forEach(profile => {
-      if (profile.latitude && profile.longitude && profile.uuid !== userProfile.uuid) {
-        const distance = calculateDistance(
-          userProfile.latitude, userProfile.longitude,
-          profile.latitude, profile.longitude
-        );
-        const formattedDistance = formatDistance(distance);
-        
-        calculatedDistances[profile.uuid] = {
-          distance: distance,
-          formattedDistance: formattedDistance
-        };
-        
-        console.log(`${profile.nickname}: ${formattedDistance} (${distance.toFixed(0)}m)`);
-      }
-    });
-
-    console.log('계산된 거리 정보:', calculatedDistances);
-    console.log('==========================');
-  };
-
-  // 현재 위치를 가져와서 사용자 프로필에 저장
-  const updateCurrentUserLocation = async () => {
-    try {
-      console.log('현재 위치 가져오기 시작...');
-      
-      // 위치 권한 확인
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('위치 권한이 거부되었습니다.');
-        return;
-      }
-
-      // 현재 위치 가져오기
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-        timeout: 15000,
-        maximumAge: 10000
-      });
-
-      const { latitude, longitude } = location.coords;
-      console.log('현재 위치:', latitude, longitude);
-
-      // 사용자 프로필 업데이트
-      if (userProfile && user?.uuid) {
-        const updatedProfile = {
-          ...userProfile,
-          latitude: latitude,
-          longitude: longitude
-        };
-
-        // userStore 업데이트
-        useUserStore.getState().setUserProfile(updatedProfile);
-
-        // 백엔드에 프로필 업데이트 요청 (필요시)
-        // await profileService.update(user.uuid, { latitude, longitude });
-
-        console.log('사용자 프로필 위치가 업데이트되었습니다.');
-      }
-    } catch (error) {
-      console.error('위치 업데이트 실패:', error);
-    }
-  };
-
-  // 위치 정보가 없을 때 자동으로 가져오기
-  useEffect(() => {
-    if (userProfile && (!userProfile.latitude || !userProfile.longitude)) {
-      console.log('사용자 위치 정보가 없어서 자동으로 가져옵니다.');
-      updateCurrentUserLocation();
-    }
-  }, [userProfile]);
-
-  // 테스트용: 현재 사용자에게 서울 중심부 위치 설정
-  const setTestLocation = () => {
-    if (userProfile && user?.uuid) {
-      // 서울 중심부 (강남역 근처)
-      const testLat = 37.4979;
-      const testLng = 127.0276;
-      
-      const updatedProfile = {
-        ...userProfile,
-        latitude: testLat,
-        longitude: testLng
-      };
-
-      useUserStore.getState().setUserProfile(updatedProfile);
-      console.log('테스트 위치 설정됨:', testLat, testLng);
-    }
-  };
-
-  // 다른 사용자들에게도 테스트 위치 설정
-  const setTestLocationsForAllUsers = () => {
-    const updatedProfiles = profiles.map(profile => {
-      if (profile.uuid === userProfile?.uuid) {
-        // 현재 사용자는 강남역 근처
-        return {
-          ...profile,
-          latitude: 37.4979,
-          longitude: 127.0276
-        };
-      } else {
-        // 다른 사용자들은 서울의 다른 지역들
-        const locations = [
-          { lat: 37.5079, lng: 127.0376 }, // 강남구청
-          { lat: 37.4879, lng: 127.0176 }, // 역삼동
-          { lat: 37.5179, lng: 127.0476 }, // 삼성동
-          { lat: 37.4779, lng: 127.0076 }  // 서초구
-        ];
-        const randomLocation = locations[Math.floor(Math.random() * locations.length)];
-        return {
-          ...profile,
-          latitude: randomLocation.lat,
-          longitude: randomLocation.lng
-        };
-      }
-    });
-    
-    setProfiles(updatedProfiles);
-    console.log('모든 사용자에게 테스트 위치 설정 완료');
-  };
+    };
+  }, [sendLastLocationOnAppExit]);
 
   const renderUserCard = ({ item }) => {
-    // 실시간 거리 정보 가져오기 (백엔드에서 오는 경우)
-    const distanceInfo = getDistanceToUser(item.uuid);
-    const distanceText = distanceInfo ? distanceInfo.formattedDistance : null;
+    // 내 프로필인지 확인
+    const isMyProfile = item.uuid === userProfile?.uuid;
     
-    // 실제 위도/경도로 거리 계산 (백엔드 거리 정보가 없을 때만)
-    let calculatedDistanceText = null;
-    if (!distanceText && userProfile?.latitude && userProfile?.longitude && 
-        item.latitude && item.longitude && item.uuid !== userProfile.uuid) {
-      const distance = calculateDistance(
-        userProfile.latitude, userProfile.longitude,
-        item.latitude, item.longitude
-      );
-      calculatedDistanceText = formatDistance(distance);
+    // 내 프로필이 아닌 경우에만 거리 계산
+    let finalDistanceText = null;
+    if (!isMyProfile) {
+      // 실시간 거리 정보 가져오기 (백엔드에서 오는 경우)
+      const distanceInfo = getDistanceToUser(item.uuid);
+      const distanceText = distanceInfo ? distanceInfo.formattedDistance : null;
+      
+      // 실제 위도/경도로 거리 계산 (백엔드 거리 정보가 없을 때만)
+      let calculatedDistanceText = null;
+      if (!distanceText && userProfile?.latitude && userProfile?.longitude && 
+          item.latitude && item.longitude) {
+        const distance = calculateDistance(
+          userProfile.latitude, userProfile.longitude,
+          item.latitude, item.longitude
+        );
+        calculatedDistanceText = formatDistance(distance);
+      }
+      
+      // 최종 거리 텍스트 (백엔드 > 직접 계산)
+      finalDistanceText = distanceText || calculatedDistanceText;
     }
-    
-    // 최종 거리 텍스트 (백엔드 > 직접 계산 > 임시)
-    const finalDistanceText = distanceText || calculatedDistanceText || 
-      (isUserOnline(item.uuid) ? '1.2km' : null);
-    
-    // 디버깅용 로그
-    const userOnlineStatus = isUserOnline(item.uuid);
-    console.log(`User ${item.nickname} (${item.uuid}):`, {
-      isOnline: userOnlineStatus,
-      distanceInfo,
-      distanceText,
-      calculatedDistanceText,
-      finalDistanceText,
-      source: distanceText ? '백엔드' : calculatedDistanceText ? '직접계산' : '임시',
-      userLocation: userProfile ? `${userProfile.latitude}, ${userProfile.longitude}` : '없음',
-      itemLocation: item.latitude && item.longitude ? `${item.latitude}, ${item.longitude}` : '없음'
-    });
 
     return (
       <TouchableOpacity 
@@ -337,16 +274,18 @@ export default function HomeScreen() {
         />
         <View style={styles.userInfo}>
           <View style={styles.nameAgeContainer}>
-            <Text style={styles.userName}>{item.nickname}</Text>
-            {item.age && <Text style={styles.userAge}>{item.age}세</Text>}
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <Text style={styles.userName}>{item.nickname}</Text>
+              {!isMyProfile && finalDistanceText && (
+                <Text style={styles.distanceText}>  •  {finalDistanceText}</Text>
+              )}
+              {item.age && <Text style={styles.userAge}>  {item.age}세</Text>}
+            </View>
             <View style={styles.statusContainer}>
               {isUserOnline(item.uuid) ? (
                 <>
                   <View style={[styles.onlineDot, { backgroundColor: '#4CAF50' }]} />
                   <Text style={[styles.onlineText, { color: '#4CAF50' }]}>접속중</Text>
-                  {finalDistanceText && (
-                    <Text style={styles.distanceText}> • {finalDistanceText}</Text>
-                  )}
                 </>
               ) : (
                 <Text style={styles.lastActiveText}>{getLastActiveText(item.lastActive)}</Text>
@@ -362,16 +301,6 @@ export default function HomeScreen() {
               {item.weight && ` ${item.weight}kg`}
             </Text>
           </View>
-          {/* 거리 정보 표시 */}
-          {finalDistanceText && (
-            <View style={styles.distanceRow}>
-              <Text style={styles.distanceLabel}>
-                📍 거리: {finalDistanceText}
-                {distanceText && <Text style={styles.backendText}> (백엔드)</Text>}
-                {calculatedDistanceText && <Text style={styles.calculatedText}> (직접계산)</Text>}
-              </Text>
-            </View>
-          )}
           <Text style={styles.userBio} numberOfLines={1} ellipsizeMode="tail">{item.bio || ''}</Text>
         </View>
       </TouchableOpacity>
@@ -380,26 +309,11 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* 간단한 헤더 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>CTpop</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.testButton} onPress={updateCurrentUserLocation}>
-            <Text style={styles.testButtonText}>위치설정</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.testButton} onPress={testRealDistanceCalculation}>
-            <Text style={styles.testButtonText}>거리계산</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.testButton} onPress={setTestLocation}>
-            <Text style={styles.testButtonText}>테스트 위치 설정</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.testButton} onPress={setTestLocationsForAllUsers}>
-            <Text style={styles.testButtonText}>전체 위치 설정</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterButton}>
-            <Text style={styles.filterButtonText}>필터</Text>
-          </TouchableOpacity>
-        </View>
       </View>
+
       {isLoading ? (
         <ActivityIndicator size="large" color="#FF6B6B" style={{ marginTop: 40 }} />
       ) : (
@@ -446,31 +360,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FF6B6B',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  testButton: {
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  testButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
-  filterButton: {
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  filterButtonText: {
-    color: '#fff',
-    fontWeight: '500',
   },
   listContainer: {
     padding: 6,
@@ -604,4 +493,5 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontWeight: 'bold',
   },
+
 }); 
