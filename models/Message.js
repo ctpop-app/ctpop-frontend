@@ -1,10 +1,9 @@
-import { v4 as uuidv4 } from 'uuid';
 import { Timestamp } from 'firebase/firestore';
 import { getCurrentKST } from '../utils/dateUtils';
 
 class Message {
   constructor(data = {}) {
-    this.id = data.id || uuidv4();
+    this.id = data.id || null; // Firestore에서 자동 생성
     this.chatId = data.chatId;
     this.content = data.content;
     this.uuid = data.uuid;

@@ -160,14 +160,29 @@ export default function MessageScreen() {
   };
 
   const handleViewProfile = () => {
-    if (!selectedChatRoom?.otherUser?.uuid) return;
+    if (!selectedChatRoom?.otherUser?.uuid) {
+      console.log('상대방 정보가 없습니다:', selectedChatRoom);
+      return;
+    }
+    
+    console.log('프로필 보기 클릭됨:', selectedChatRoom.otherUser);
     
     // 프로필 상세 화면으로 이동
     navigation.navigate('ProfileDetail', {
       profile: {
         uuid: selectedChatRoom.otherUser.uuid,
-        nickname: selectedChatRoom.otherUser.nickname,
-        mainPhotoURL: selectedChatRoom.otherUser.mainPhotoURL
+        nickname: selectedChatRoom.otherUser.nickname || '알 수 없는 사용자',
+        mainPhotoURL: selectedChatRoom.otherUser.mainPhotoURL,
+        age: selectedChatRoom.otherUser.age,
+        orientation: selectedChatRoom.otherUser.orientation,
+        height: selectedChatRoom.otherUser.height,
+        weight: selectedChatRoom.otherUser.weight,
+        city: selectedChatRoom.otherUser.city,
+        district: selectedChatRoom.otherUser.district,
+        bio: selectedChatRoom.otherUser.bio,
+        interests: selectedChatRoom.otherUser.interests,
+        photoURLs: selectedChatRoom.otherUser.photoURLs,
+        lastActive: selectedChatRoom.otherUser.lastActive
       }
     });
   };

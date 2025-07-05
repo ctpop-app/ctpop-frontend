@@ -115,19 +115,19 @@ export default function HomeScreen() {
     loadProfiles();
   }, [loadProfiles]);
 
-  // 디버깅용: 주기적으로 거리 정보 상태 확인
-  useEffect(() => {
-    const debugInterval = setInterval(() => {
-      console.log('=== Distance Debug Info ===');
-      debugNearbyDistances();
-      if (userProfile?.latitude && userProfile?.longitude) {
-        console.log('현재 사용자 위치:', userProfile.latitude, userProfile.longitude);
-      }
-      console.log('==========================');
-    }, 10000); // 10초마다 확인
+  // 디버깅용: 주기적으로 거리 정보 상태 확인 (개발 중에만 활성화)
+  // useEffect(() => {
+  //   const debugInterval = setInterval(() => {
+  //     console.log('=== Distance Debug Info ===');
+  //     debugNearbyDistances();
+  //     if (userProfile?.latitude && userProfile?.longitude) {
+  //       console.log('현재 사용자 위치:', userProfile.latitude, userProfile.longitude);
+  //     }
+  //     console.log('==========================');
+  //   }, 10000); // 10초마다 확인
 
-    return () => clearInterval(debugInterval);
-  }, [debugNearbyDistances, userProfile]);
+  //   return () => clearInterval(debugInterval);
+  // }, [debugNearbyDistances, userProfile]);
 
   // 실제 거리 계산 테스트
   const testRealDistanceCalculation = () => {
@@ -154,18 +154,18 @@ export default function HomeScreen() {
           formattedDistance: formattedDistance
         };
         
-        console.log(`${profile.nickname}: ${formattedDistance} (${distance.toFixed(0)}m)`);
+        // console.log(`${profile.nickname}: ${formattedDistance} (${distance.toFixed(0)}m)`);
       }
     });
 
-    console.log('계산된 거리 정보:', calculatedDistances);
+    // console.log('계산된 거리 정보:', calculatedDistances);
     console.log('==========================');
   };
 
   // 현재 위치를 가져와서 사용자 프로필에 저장
   const updateCurrentUserLocation = async () => {
     try {
-      console.log('현재 위치 가져오기 시작...');
+      // console.log('현재 위치 가져오기 시작...');
       
       // 위치 권한 확인
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -182,7 +182,7 @@ export default function HomeScreen() {
       });
 
       const { latitude, longitude } = location.coords;
-      console.log('현재 위치:', latitude, longitude);
+      // console.log('현재 위치:', latitude, longitude);
 
       // 사용자 프로필 업데이트
       if (userProfile && user?.uuid) {
@@ -198,7 +198,7 @@ export default function HomeScreen() {
         // 백엔드에 프로필 업데이트 요청 (필요시)
         // await profileService.update(user.uuid, { latitude, longitude });
 
-        console.log('사용자 프로필 위치가 업데이트되었습니다.');
+        // console.log('사용자 프로필 위치가 업데이트되었습니다.');
       }
     } catch (error) {
       console.error('위치 업데이트 실패:', error);
@@ -208,7 +208,7 @@ export default function HomeScreen() {
   // 위치 정보가 없을 때 자동으로 가져오기
   useEffect(() => {
     if (userProfile && (!userProfile.latitude || !userProfile.longitude)) {
-      console.log('사용자 위치 정보가 없어서 자동으로 가져옵니다.');
+      // console.log('사용자 위치 정보가 없어서 자동으로 가져옵니다.');
       updateCurrentUserLocation();
     }
   }, [userProfile]);
@@ -251,16 +251,16 @@ export default function HomeScreen() {
     const finalDistanceText = distanceText || calculatedDistanceText || 
       (isUserOnline(item.uuid) ? '1.2km' : null);
     
-    // 디버깅용 로그
-    console.log(`User ${item.nickname} (${item.uuid}):`, {
-      isOnline: isUserOnline(item.uuid),
-      distanceInfo,
-      distanceText,
-      calculatedDistanceText,
-      finalDistanceText,
-      userLocation: userProfile ? `${userProfile.latitude}, ${userProfile.longitude}` : '없음',
-      itemLocation: item.latitude && item.longitude ? `${item.latitude}, ${item.longitude}` : '없음'
-    });
+    // 디버깅용 로그 (개발 중에만 활성화)
+    // console.log(`User ${item.nickname} (${item.uuid}):`, {
+    //   isOnline: isUserOnline(item.uuid),
+    //   distanceInfo,
+    //   distanceText,
+    //   calculatedDistanceText,
+    //   finalDistanceText,
+    //   userLocation: userProfile ? `${userProfile.latitude}, ${userProfile.longitude}` : '없음',
+    //   itemLocation: item.latitude && item.longitude ? `${item.latitude}, ${item.longitude}` : '없음'
+    // });
 
     return (
       <TouchableOpacity 

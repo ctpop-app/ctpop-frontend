@@ -305,16 +305,23 @@ export const getChatRoomDetails = async (roomId, currentUserUuid) => {
 
       const chatData = chatDoc.data();
       
-      // 마지막 메시지 정보 가져오기
-      const messagesQuery = query(
-        collection(db, 'messages'),
-        where('chatId', '==', roomId),
-        orderBy('timestamp', 'desc'),
-        limit(1)
-      );
-      
-      const messagesSnapshot = await getDocs(messagesQuery);
-      const lastMessage = messagesSnapshot.empty ? null : messagesSnapshot.docs[0].data();
+      // 마지막 메시지 정보 가져오기 (인덱스 문제로 임시 비활성화)
+      let lastMessage = null;
+      try {
+        const messagesQuery = query(
+          collection(db, 'messages'),
+          where('chatId', '==', roomId),
+          orderBy('timestamp', 'desc'),
+          limit(1)
+        );
+        
+        const messagesSnapshot = await getDocs(messagesQuery);
+        lastMessage = messagesSnapshot.empty ? null : messagesSnapshot.docs[0].data();
+      } catch (error) {
+        console.warn('메시지 쿼리 실패 (인덱스 필요):', error.message);
+        // 인덱스가 없으면 메시지 정보 없이 진행
+        lastMessage = null;
+      }
 
       // 상대방 정보 가져오기
       const otherParticipantId = chatData.participants.find(p => p !== currentUserUuid);
