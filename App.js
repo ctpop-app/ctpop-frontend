@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar, View, Text, StyleSheet, LogBox, TouchableOpacity } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -116,55 +117,57 @@ export default function App() {
   }, [checkAuth, clearTokens, connect]);
 
   return (
-    <NavigationContainer>
-      <StatusBar 
-        style="auto" 
-        backgroundColor={COLORS.background.primary}
-        barStyle="dark-content"
-      />
-      <Stack.Navigator 
-        screenOptions={{
-          ...HEADER_OPTIONS.MAIN,
-          cardStyle: { backgroundColor: COLORS.background.primary },
-          animationEnabled: true,
-          gestureEnabled: false
-        }}
-      >
-        {error ? (
-          <Stack.Screen 
-            name={ROUTES.ERROR} 
-            options={{ 
-              headerShown: false,
-              animationEnabled: false
-            }}
-          >
-            {() => <ErrorScreen error={error} onRetry={handleRetry} />}
-          </Stack.Screen>
-        ) : isLoading ? (
-          <Stack.Screen 
-            name={ROUTES.SPLASH} 
-            options={{ 
-              headerShown: false,
-              animationEnabled: false
-            }}
-          >
-            {() => <SplashScreen />}
-          </Stack.Screen>
-        ) : !isAuthenticated ? (
-          <Stack.Screen name={ROUTES.ROOT.AUTH}>
-            {() => <AuthNavigator />}
-          </Stack.Screen>
-        ) : !hasProfile ? (
-          <Stack.Screen name={ROUTES.AUTH.PROFILE_SETUP}>
-            {() => <ProfileSetupScreen />}
-          </Stack.Screen>
-        ) : (
-          <Stack.Screen name={ROUTES.ROOT.MAIN}>
-            {() => <MainNavigator />}
-          </Stack.Screen>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <StatusBar 
+          style="auto" 
+          backgroundColor={COLORS.background.primary}
+          barStyle="dark-content"
+        />
+        <Stack.Navigator 
+          screenOptions={{
+            ...HEADER_OPTIONS.MAIN,
+            cardStyle: { backgroundColor: COLORS.background.primary },
+            animationEnabled: true,
+            gestureEnabled: false
+          }}
+        >
+          {error ? (
+            <Stack.Screen 
+              name={ROUTES.ERROR} 
+              options={{ 
+                headerShown: false,
+                animationEnabled: false
+              }}
+            >
+              {() => <ErrorScreen error={error} onRetry={handleRetry} />}
+            </Stack.Screen>
+          ) : isLoading ? (
+            <Stack.Screen 
+              name={ROUTES.SPLASH} 
+              options={{ 
+                headerShown: false,
+                animationEnabled: false
+              }}
+            >
+              {() => <SplashScreen />}
+            </Stack.Screen>
+          ) : !isAuthenticated ? (
+            <Stack.Screen name={ROUTES.ROOT.AUTH}>
+              {() => <AuthNavigator />}
+            </Stack.Screen>
+          ) : !hasProfile ? (
+            <Stack.Screen name={ROUTES.AUTH.PROFILE_SETUP}>
+              {() => <ProfileSetupScreen />}
+            </Stack.Screen>
+          ) : (
+            <Stack.Screen name={ROUTES.ROOT.MAIN}>
+              {() => <MainNavigator />}
+            </Stack.Screen>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 

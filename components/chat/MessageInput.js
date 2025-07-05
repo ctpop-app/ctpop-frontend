@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../../services/imageService';
 
-const MessageInput = ({ onSend, onSendImage, uuid }) => {
+const MessageInput = ({ onSend, onSendImage, uuid, bottomInset = 0 }) => {
   const [message, setMessage] = useState('');
   const [appState, setAppState] = useState(AppState.currentState);
   const keyboardTimeoutRef = useRef(null);
@@ -71,7 +71,7 @@ const MessageInput = ({ onSend, onSendImage, uuid }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: Math.max(bottomInset, 8) }]}>
       <TouchableOpacity onPress={handleImagePick} style={styles.imageButton}>
         <Ionicons name="image-outline" size={24} color="#007AFF" />
       </TouchableOpacity>

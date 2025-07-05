@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  StatusBar,
+  RefreshControl,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSocket } from '../hooks/useSocket';
@@ -29,6 +33,25 @@ export default function ChatRoomScreen() {
   const { isUserOnline } = useSocket();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const insets = useSafeAreaInsets();
+  const flatListRef = useRef(null);
+
+  // 키보드 상태 감지
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setIsKeyboardVisible(true);
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   // 실시간 메시지 구독
   useEffect(() => {
@@ -71,6 +94,22 @@ export default function ChatRoomScreen() {
       unsubscribe();
     };
   }, [chatRoomId]);
+
+  // 새로고침 핸들러
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Firebase 실시간 구독이 이미 있으므로, 단순히 로딩 상태만 리셋
+      console.log('메시지 새로고침 중...');
+      // 실제로는 Firebase가 자동으로 최신 데이터를 제공하므로
+      // 추가적인 API 호출 없이 상태만 리셋
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 최소 1초 로딩
+    } catch (error) {
+      console.error('새로고침 오류:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleSend = async (text) => {
     const newMessage = {
@@ -158,51 +197,72 @@ export default function ChatRoomScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      enabled
-    >
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialIcons name="arrow-back" size={24} color="#FF6B6B" />
-        </TouchableOpacity>
-        <Image
-          source={otherUser.mainPhotoURL ? { uri: otherUser.mainPhotoURL } : require('../assets/default-profile.png')}
-          style={styles.headerAvatar}
-        />
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerName}>{otherUser.nickname}</Text>
-          <Text style={styles.headerStatus}>
-            {isUserOnline(otherUser.uuid) ? '접속중' : '오프라인'}
-          </Text>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar 
+        barStyle="dark-content" 
+        backgroundColor="#fff"
+        translucent={true}
+      />
+      <KeyboardAvoidingView 
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        enabled
+      >
+        {/* 헤더 */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <MaterialIcons name="arrow-back" size={24} color="#FF6B6B" />
+          </TouchableOpacity>
+          <Image
+            source={otherUser.mainPhotoURL ? { uri: otherUser.mainPhotoURL } : require('../assets/default-profile.png')}
+            style={styles.headerAvatar}
+          />
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerName}>{otherUser.nickname}</Text>
+            <Text style={styles.headerStatus}>
+              {isUserOnline(otherUser.uuid) ? '접속중' : '오프라인'}
+            </Text>
+          </View>
         </View>
-      </View>
 
-      {/* 메시지 목록 */}
-      <FlatList
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={item => item.id}
-        style={styles.messageList}
-        contentContainerStyle={styles.messageListContent}
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => {
-          if (messages.length > 0) {
-            this.flatListRef?.scrollToEnd({ animated: true });
+        {/* 메시지 목록 */}
+        <FlatList
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={item => item.id}
+          style={styles.messageList}
+          contentContainerStyle={styles.messageListContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={['#FF6B6B']}
+              tintColor="#FF6B6B"
+              title="새로고침 중..."
+              titleColor="#FF6B6B"
+            />
           }
-        }}
-        ref={(ref) => { this.flatListRef = ref; }}
-      />
+          onContentSizeChange={() => {
+            // 키보드가 보이지 않을 때만 자동 스크롤
+            if (messages.length > 0 && !isKeyboardVisible) {
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 100);
+            }
+          }}
+          ref={flatListRef}
+        />
 
-      {/* 입력 영역 */}
-      <MessageInput
-        onSend={handleSend}
-        uuid={user.uuid}
-      />
-    </KeyboardAvoidingView>
+        {/* 입력 영역 */}
+        <MessageInput
+          onSend={handleSend}
+          uuid={user.uuid}
+          bottomInset={insets.bottom}
+        />
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -211,10 +271,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fafafa',
   },
+  keyboardContainer: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    paddingTop: 20,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',

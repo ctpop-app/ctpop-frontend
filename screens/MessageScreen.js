@@ -1,6 +1,6 @@
 // MessageScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert, StatusBar } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { getChatRooms, getChatRoomDetails, leaveChatRoom } from '../api/chat';
 import { getCurrentKST } from '../utils/dateUtils';
