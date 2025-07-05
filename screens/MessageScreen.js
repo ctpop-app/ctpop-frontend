@@ -6,6 +6,9 @@ import { getChatRooms, getChatRoomDetails, leaveChatRoom } from '../api/chat';
 import { getCurrentKST } from '../utils/dateUtils';
 import ChatRoomSkeleton from '../components/chat/ChatRoomSkeleton';
 import TabHeader from '../components/common/TabHeader';
+import { ChatRoomActionModal } from '../components/chat/ChatRoomActionModal';
+import useUserStore from '../store/userStore';
+import { useBlock } from '../hooks/useBlock';
 
 export default function MessageScreen() {
   const navigation = useNavigation();
