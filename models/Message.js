@@ -1,4 +1,4 @@
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { getCurrentKST } from '../utils/dateUtils';
 
 class Message {
@@ -89,7 +89,7 @@ class Message {
       chatId: this.chatId,
       content: this.content,
       uuid: this.uuid,
-      timestamp: this.timestamp,
+      timestamp: serverTimestamp(), // 서버 시간 기준으로 저장
       isRead: this.isRead,
       type: this.type,
       metadata: this.metadata,
@@ -102,7 +102,9 @@ class Message {
   static fromFirestore(id, data) {
     return new Message({
       id,
-      ...data
+      ...data,
+      // Firebase Timestamp를 JavaScript Date로 변환
+      timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : data.timestamp
     });
   }
 

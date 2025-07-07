@@ -62,7 +62,7 @@ export default function ChatRoomScreen() {
     const messagesQuery = query(
       collection(db, 'messages'),
       where('chatId', '==', chatRoomId),
-      orderBy('timestamp', 'asc'),
+      orderBy('timestamp', 'desc'),
       limit(50)
     );
 
@@ -74,7 +74,7 @@ export default function ChatRoomScreen() {
           id: doc.id,
           content: messageData.content,
           uuid: messageData.uuid,
-          timestamp: messageData.timestamp,
+          timestamp: messageData.timestamp?.toDate ? messageData.timestamp.toDate() : messageData.timestamp,
           type: messageData.type,
           status: messageData.status || 'sent',
           isRead: messageData.isRead || false
@@ -82,7 +82,22 @@ export default function ChatRoomScreen() {
       });
       
       console.log('실시간 메시지 업데이트:', newMessages.length, '개');
-      setMessages(newMessages);
+      
+      // 메시지를 시간순으로 정렬 (오래된 메시지부터 최신 메시지까지)
+      const sortedMessages = newMessages.sort((a, b) => {
+        const aTime = a.timestamp?.getTime ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+        const bTime = b.timestamp?.getTime ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+        return aTime - bTime; // 오름차순 정렬
+      });
+      
+      // 메시지 정렬 확인을 위한 디버깅
+      console.log('정렬된 메시지들:');
+      sortedMessages.forEach((msg, index) => {
+        const timeStr = msg.timestamp?.toLocaleTimeString ? msg.timestamp.toLocaleTimeString() : msg.timestamp;
+        console.log(`${index}: ${msg.uuid} - ${msg.content} - ${timeStr}`);
+      });
+      
+      setMessages(sortedMessages);
       setLoading(false);
     }, (error) => {
       console.error('메시지 구독 오류:', error);
@@ -116,7 +131,7 @@ export default function ChatRoomScreen() {
       id: Date.now().toString(),
       content: text,
       uuid: user.uuid,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(), // Date 객체로 저장하여 밀리초 단위 정확도 보장
       type: 'text',
       status: MESSAGE_STATUS.SENDING
     };
