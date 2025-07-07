@@ -57,8 +57,6 @@ export default function ChatRoomScreen() {
   useEffect(() => {
     if (!chatRoomId) return;
 
-    console.log('채팅방 메시지 구독 시작:', chatRoomId);
-    
     const messagesQuery = query(
       collection(db, 'messages'),
       where('chatId', '==', chatRoomId),
@@ -67,58 +65,27 @@ export default function ChatRoomScreen() {
     );
 
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-      const newMessages = [];
-      snapshot.forEach((doc) => {
-        const messageData = doc.data();
-        newMessages.push({
-          id: doc.id,
-          content: messageData.content,
-          uuid: messageData.uuid,
-          timestamp: messageData.timestamp?.toDate ? messageData.timestamp.toDate() : messageData.timestamp,
-          type: messageData.type,
-          status: messageData.status || 'sent',
-          isRead: messageData.isRead || false
-        });
-      });
-      
-      console.log('실시간 메시지 업데이트:', newMessages.length, '개');
-      
-      // 메시지를 시간순으로 정렬 (오래된 메시지부터 최신 메시지까지)
-      const sortedMessages = newMessages.sort((a, b) => {
-        const aTime = a.timestamp?.getTime ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
-        const bTime = b.timestamp?.getTime ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
-        return aTime - bTime; // 오름차순 정렬
-      });
-      
-      // 메시지 정렬 확인을 위한 디버깅
-      console.log('정렬된 메시지들:');
-      sortedMessages.forEach((msg, index) => {
-        const timeStr = msg.timestamp?.toLocaleTimeString ? msg.timestamp.toLocaleTimeString() : msg.timestamp;
-        console.log(`${index}: ${msg.uuid} - ${msg.content} - ${timeStr}`);
-      });
-      
-      setMessages(sortedMessages);
+      const newMessages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : new Date(doc.data().timestamp)
+      })).sort((a, b) => a.timestamp - b.timestamp);
+
+      setMessages(newMessages);
       setLoading(false);
     }, (error) => {
       console.error('메시지 구독 오류:', error);
       setLoading(false);
     });
 
-    return () => {
-      console.log('메시지 구독 해제');
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [chatRoomId]);
 
   // 새로고침 핸들러
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      // Firebase 실시간 구독이 이미 있으므로, 단순히 로딩 상태만 리셋
-      console.log('메시지 새로고침 중...');
-      // 실제로는 Firebase가 자동으로 최신 데이터를 제공하므로
-      // 추가적인 API 호출 없이 상태만 리셋
-      await new Promise(resolve => setTimeout(resolve, 1000)); // 최소 1초 로딩
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error) {
       console.error('새로고침 오류:', error);
     } finally {
@@ -221,8 +188,8 @@ export default function ChatRoomScreen() {
       <KeyboardAvoidingView 
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        enabled
+        keyboardVerticalOffset={0}
+        enabled={true}
       >
         {/* 헤더 */}
         <View style={styles.header}>
@@ -259,12 +226,27 @@ export default function ChatRoomScreen() {
               titleColor="#FF6B6B"
             />
           }
-          onContentSizeChange={() => {
-            // 키보드가 보이지 않을 때만 자동 스크롤
-            if (messages.length > 0 && !isKeyboardVisible) {
+          onContentSizeChange={(width, height) => {
+            console.log('📏 FlatList 콘텐츠 크기 변경:', { width, height });
+            // 새 메시지가 추가될 때 자동 스크롤
+            if (messages.length > 0) {
               setTimeout(() => {
+                console.log('  - 자동 스크롤 실행');
                 flatListRef.current?.scrollToEnd({ animated: true });
-              }, 100);
+              }, 50);
+            }
+          }}
+          onLayout={(event) => {
+            const { width, height, x, y } = event.nativeEvent.layout;
+            console.log('📐 FlatList 레이아웃 변경:', { width, height, x, y });
+            console.log('  - 키보드 상태:', isKeyboardVisible);
+            
+            // 레이아웃이 변경될 때 스크롤 조정
+            if (messages.length > 0) {
+              setTimeout(() => {
+                console.log('  - 레이아웃 변경 후 스크롤 조정');
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }, 50);
             }
           }}
           ref={flatListRef}

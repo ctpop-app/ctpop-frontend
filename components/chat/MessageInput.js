@@ -18,7 +18,7 @@ const MessageInput = ({ onSend, onSendImage, uuid, bottomInset = 0 }) => {
           clearTimeout(keyboardTimeoutRef.current);
         }
         keyboardTimeoutRef.current = setTimeout(() => {
-          if (inputRef.current) {
+          if (inputRef.current && Platform.OS !== 'web') {
             inputRef.current.blur();
           }
         }, 100);
@@ -26,11 +26,25 @@ const MessageInput = ({ onSend, onSendImage, uuid, bottomInset = 0 }) => {
       setAppState(nextAppState);
     });
 
+    // 키보드 이벤트 리스너 추가
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {});
+    
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      // 키보드가 닫힐 때 입력창 포커스 제거 (Android)
+      if (Platform.OS === 'android' && inputRef.current) {
+        setTimeout(() => {
+          inputRef.current.blur();
+        }, 50);
+      }
+    });
+
     return () => {
       if (keyboardTimeoutRef.current) {
         clearTimeout(keyboardTimeoutRef.current);
       }
       subscription.remove();
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
     };
   }, [appState]);
 
@@ -41,6 +55,22 @@ const MessageInput = ({ onSend, onSendImage, uuid, bottomInset = 0 }) => {
       // 메시지 전송 후 키보드 포커스 유지
       if (inputRef.current) {
         inputRef.current.focus();
+      }
+    }
+  };
+
+  // 웹에서 Enter 키 처리
+  const handleKeyPress = (event) => {
+    if (Platform.OS === 'web') {
+      if (event.nativeEvent.key === 'Enter') {
+        if (event.nativeEvent.shiftKey) {
+          // Shift + Enter: 줄바꿈
+          return;
+        } else {
+          // Enter: 메시지 전송
+          event.preventDefault();
+          handleSend();
+        }
       }
     }
   };
@@ -71,7 +101,15 @@ const MessageInput = ({ onSend, onSendImage, uuid, bottomInset = 0 }) => {
   };
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(bottomInset, 8) }]}>
+    <View 
+      style={[styles.container, { paddingBottom: Math.max(bottomInset, 8) }]}
+      onLayout={(event) => {
+        const { width, height, x, y } = event.nativeEvent.layout;
+        console.log('💬 MessageInput 레이아웃:', { width, height, x, y });
+        console.log('  - bottomInset:', bottomInset);
+        console.log('  - 계산된 paddingBottom:', Math.max(bottomInset, 8));
+      }}
+    >
       <TouchableOpacity onPress={handleImagePick} style={styles.imageButton}>
         <Ionicons name="image-outline" size={24} color="#007AFF" />
       </TouchableOpacity>
@@ -85,6 +123,7 @@ const MessageInput = ({ onSend, onSendImage, uuid, bottomInset = 0 }) => {
         maxLength={1000}
         returnKeyType="send"
         onSubmitEditing={handleSend}
+        onKeyPress={handleKeyPress}
         blurOnSubmit={false}
         keyboardType="default"
         autoCapitalize="none"
