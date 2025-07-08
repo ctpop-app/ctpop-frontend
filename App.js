@@ -1,6 +1,7 @@
 // App.js
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import notificationService from './services/notificationService';
 import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar, View, Text, StyleSheet, LogBox, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -79,6 +80,7 @@ export default function App() {
   // 상태 관리
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [navigationRef, setNavigationRef] = useState(null);
   const { checkAuth } = useAuth();
   const { connect, disconnect } = useSocket();
   
@@ -115,6 +117,39 @@ export default function App() {
     };
   }, [isAuthenticated, disconnect]);
 
+  // 알림 클릭 시 네비게이션 핸들러 설정
+  useEffect(() => {
+    if (navigationRef) {
+      const handleNotificationNavigation = (chatRoomId, otherUser) => {
+        console.log('알림 클릭 - 채팅방으로 이동:', { chatRoomId, otherUser });
+        try {
+          navigationRef.navigate(ROUTES.ROOT.MAIN, {
+            screen: 'MessageStack',
+            params: {
+              screen: 'ChatRoom',
+              params: {
+                chatRoomId,
+                otherUser
+              }
+            }
+          });
+        } catch (error) {
+          console.error('알림 네비게이션 실패:', error);
+          // 기본적으로 메시지 탭으로 이동
+          try {
+            navigationRef.navigate(ROUTES.ROOT.MAIN, {
+              screen: ROUTES.MAIN.MESSAGES
+            });
+          } catch (fallbackError) {
+            console.error('대체 네비게이션도 실패:', fallbackError);
+          }
+        }
+      };
+
+      notificationService.setNavigationHandler(handleNotificationNavigation);
+    }
+  }, [navigationRef]);
+
   // 재시도 핸들러
   const handleRetry = useCallback(() => {
     setError(null);
@@ -124,7 +159,9 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer
+        ref={setNavigationRef}
+      >
         <StatusBar 
           style="auto" 
           backgroundColor={COLORS.background.primary}

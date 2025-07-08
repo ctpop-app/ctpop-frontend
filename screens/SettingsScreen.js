@@ -6,6 +6,7 @@ import useUserStore from '../store/userStore';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { useNotifications } from '../hooks/useNotifications';
+import { useGlobalChat } from '../hooks/useGlobalChat';
 import { ROUTES } from '../navigation/constants';
 import { CommonActions } from '@react-navigation/native';
 import TabHeader from '../components/common/TabHeader';
@@ -16,6 +17,7 @@ const SettingsScreen = () => {
   const { handleLogout, loadUserProfile, handleEditProfile } = useAuth();
   const { profile: userProfileFromProfile, withdraw } = useProfile();
   const { showTestNotification, permission, requestPermission, pushToken } = useNotifications();
+  const { isMonitoring, allMessages } = useGlobalChat();
   const [isLoading, setIsLoading] = useState(true);
   const [notificationEnabled, setNotificationEnabled] = useState(permission === 'granted');
 
@@ -63,6 +65,9 @@ const SettingsScreen = () => {
               console.log('handleLogout 결과:', result);
               if (!result) {
                 Alert.alert('오류', '로그아웃에 실패했습니다.');
+              } else {
+                // 로그아웃 성공 시 앱에서 자동으로 인증 화면으로 이동됨
+                console.log('로그아웃 성공 - 자동 네비게이션 대기 중');
               }
             } catch (error) {
               console.error('로그아웃 실패:', error);
@@ -92,13 +97,13 @@ const SettingsScreen = () => {
             try {
               const success = await withdraw();
               if (success) {
-                // 로그인 화면으로 이동
+                // 인증 화면으로 이동
                 navigation.dispatch(
                   CommonActions.reset({
                     index: 0,
                     routes: [
                       {
-                        name: ROUTES.AUTH.LOGIN
+                        name: ROUTES.ROOT.AUTH
                       }
                     ]
                   })
@@ -149,10 +154,12 @@ const SettingsScreen = () => {
   const showNotificationStatus = () => {
     const status = permission === 'granted' ? '허용됨' : permission === 'denied' ? '거부됨' : '미설정';
     const tokenInfo = pushToken ? `토큰: ${pushToken.substring(0, 20)}...` : '토큰 없음';
+    const monitoringStatus = isMonitoring ? '모니터링 중' : '모니터링 중지';
+    const messageCount = allMessages ? allMessages.length : 0;
     
     Alert.alert(
       '알림 상태',
-      `권한: ${status}\n${tokenInfo}`,
+      `권한: ${status}\n${tokenInfo}\n실시간 모니터링: ${monitoringStatus}\n최근 메시지: ${messageCount}개`,
       [{ text: '확인' }]
     );
   };
