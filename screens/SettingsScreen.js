@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import useUserStore from '../store/userStore';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
+import { useNotifications } from '../hooks/useNotifications';
 import { ROUTES } from '../navigation/constants';
 import { CommonActions } from '@react-navigation/native';
 import TabHeader from '../components/common/TabHeader';
@@ -14,7 +15,9 @@ const SettingsScreen = () => {
   const { user, userProfile, setUserProfile } = useUserStore();
   const { handleLogout, loadUserProfile, handleEditProfile } = useAuth();
   const { profile: userProfileFromProfile, withdraw } = useProfile();
+  const { showTestNotification, permission, requestPermission, pushToken } = useNotifications();
   const [isLoading, setIsLoading] = useState(true);
+  const [notificationEnabled, setNotificationEnabled] = useState(permission === 'granted');
 
   useEffect(() => {
     if (user?.uuid) {
@@ -25,6 +28,11 @@ const SettingsScreen = () => {
       setIsLoading(false);
     }
   }, [user?.uuid, loadUserProfile]);
+
+  // 알림 권한 상태 업데이트
+  useEffect(() => {
+    setNotificationEnabled(permission === 'granted');
+  }, [permission]);
 
   const onEditProfile = () => {
     const serializedProfile = handleEditProfile();
@@ -105,6 +113,50 @@ const SettingsScreen = () => {
     );
   };
 
+  // 알림 토글 핸들러
+  const handleNotificationToggle = async (value) => {
+    if (value && permission !== 'granted') {
+      const granted = await requestPermission();
+      if (!granted) {
+        Alert.alert(
+          '알림 권한 필요',
+          '설정에서 알림 권한을 허용해주세요.',
+          [{ text: '확인' }]
+        );
+        return;
+      }
+    }
+    setNotificationEnabled(value);
+  };
+
+  // 테스트 알림 표시
+  const handleTestNotification = async () => {
+    if (permission !== 'granted') {
+      Alert.alert('알림 권한이 필요합니다', '먼저 알림을 활성화해주세요.');
+      return;
+    }
+
+    try {
+      await showTestNotification('테스트 알림', '알림이 정상적으로 작동합니다! 🎉');
+      Alert.alert('성공', '테스트 알림이 전송되었습니다.');
+    } catch (error) {
+      console.error('테스트 알림 실패:', error);
+      Alert.alert('오류', '테스트 알림 전송에 실패했습니다.');
+    }
+  };
+
+  // 알림 상태 확인
+  const showNotificationStatus = () => {
+    const status = permission === 'granted' ? '허용됨' : permission === 'denied' ? '거부됨' : '미설정';
+    const tokenInfo = pushToken ? `토큰: ${pushToken.substring(0, 20)}...` : '토큰 없음';
+    
+    Alert.alert(
+      '알림 상태',
+      `권한: ${status}\n${tokenInfo}`,
+      [{ text: '확인' }]
+    );
+  };
+
   const renderSettingItem = (icon, title, value, onValueChange) => (
     <View style={styles.settingItem}>
       <View style={styles.settingItemLeft}>
@@ -163,10 +215,12 @@ const SettingsScreen = () => {
           <Text style={styles.sectionTitle}>알림 설정</Text>
           {renderSettingItem(
             'notifications-outline',
-            '앱 알림',
-            true,
-            () => {}
+            '새 메시지 알림',
+            notificationEnabled,
+            handleNotificationToggle
           )}
+          {renderLinkItem('information-circle-outline', '알림 상태 확인', showNotificationStatus)}
+          {renderLinkItem('flash-outline', '테스트 알림 보내기', handleTestNotification)}
           {renderSettingItem(
             'location-outline',
             '위치 서비스',

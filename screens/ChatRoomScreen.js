@@ -18,6 +18,8 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
+import { useNotifications } from '../hooks/useNotifications';
+import { useGlobalChat } from '../hooks/useGlobalChat';
 import MessageBubble from '../components/chat/MessageBubble';
 import MessageInput from '../components/chat/MessageInput';
 import { sendChatMessage, getChatMessages } from '../api/chat';
@@ -31,6 +33,8 @@ export default function ChatRoomScreen() {
   const { chatRoomId, otherUser } = route.params;
   const { user } = useAuth();
   const { isUserOnline } = useSocket();
+  const { setCurrentChatRoom, clearCurrentChatRoom } = useNotifications();
+  const { setCurrentChatRoomId, clearCurrentChatRoomId } = useGlobalChat();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,6 +56,23 @@ export default function ChatRoomScreen() {
       keyboardDidHideListener.remove();
     };
   }, []);
+
+  // 현재 채팅방 상태 추적
+  useEffect(() => {
+    if (chatRoomId) {
+      // 채팅방 진입 시 현재 채팅방 설정
+      setCurrentChatRoom(chatRoomId);
+      setCurrentChatRoomId(chatRoomId);
+      console.log('📍 채팅방 진입:', chatRoomId);
+    }
+
+    return () => {
+      // 채팅방 이탈 시 현재 채팅방 제거
+      clearCurrentChatRoom();
+      clearCurrentChatRoomId();
+      console.log('📍 채팅방 이탈:', chatRoomId);
+    };
+  }, [chatRoomId, setCurrentChatRoom, clearCurrentChatRoom, setCurrentChatRoomId, clearCurrentChatRoomId]);
 
   // 실시간 메시지 구독
   useEffect(() => {

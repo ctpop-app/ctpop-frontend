@@ -11,6 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import useUserStore from './store/userStore';
 import { useAuth } from './hooks/useAuth';
 import { useSocket } from './hooks/useSocket';
+import { useNotifications } from './hooks/useNotifications';
+import { useGlobalChat } from './hooks/useGlobalChat';
 
 // 서버 설정
 import { discoverServer } from './utils/discovery';
@@ -79,6 +81,10 @@ export default function App() {
   const [error, setError] = useState(null);
   const { checkAuth } = useAuth();
   const { connect, disconnect } = useSocket();
+  
+  // 알림 및 글로벌 채팅 훅
+  const { isInitialized: notificationInitialized, pushToken } = useNotifications();
+  const { isMonitoring, setCurrentChatRoomId, clearCurrentChatRoomId } = useGlobalChat();
   
   // Zustand store 사용
   const userStore = useUserStore();
