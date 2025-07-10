@@ -20,6 +20,7 @@ import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import { useGlobalChat } from '../hooks/useGlobalChat';
+import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import MessageBubble from '../components/chat/MessageBubble';
 import MessageInput from '../components/chat/MessageInput';
 import { sendChatMessage, getChatMessages } from '../api/chat';
@@ -35,6 +36,7 @@ export default function ChatRoomScreen() {
   const { isUserOnline } = useSocket();
   const { setCurrentChatRoom, clearCurrentChatRoom } = useNotifications();
   const { setCurrentChatRoomId, clearCurrentChatRoomId } = useGlobalChat();
+  const { markChatAsRead } = useUnreadMessages();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,13 +59,16 @@ export default function ChatRoomScreen() {
     };
   }, []);
 
-  // 현재 채팅방 상태 추적
+  // 현재 채팅방 상태 추적 및 읽음 처리
   useEffect(() => {
     if (chatRoomId) {
       // 채팅방 진입 시 현재 채팅방 설정
       setCurrentChatRoom(chatRoomId);
       setCurrentChatRoomId(chatRoomId);
       console.log('📍 채팅방 진입:', chatRoomId);
+      
+      // 채팅방 진입 시 한 번만 읽음 처리
+      markChatAsRead(chatRoomId);
     }
 
     return () => {
