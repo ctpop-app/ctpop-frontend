@@ -242,12 +242,16 @@ export default function HomeScreen() {
     // 내 프로필인지 확인
     const isMyProfile = item.uuid === userProfile?.uuid;
     
+
+    
     // 내 프로필이 아닌 경우에만 거리 계산
     let finalDistanceText = null;
     if (!isMyProfile) {
       // 실시간 거리 정보 가져오기 (백엔드에서 오는 경우)
       const distanceInfo = getDistanceToUser(item.uuid);
       const distanceText = distanceInfo ? distanceInfo.formattedDistance : null;
+      
+
       
       // 실제 위도/경도로 거리 계산 (백엔드 거리 정보가 없을 때만)
       let calculatedDistanceText = null;
@@ -258,10 +262,14 @@ export default function HomeScreen() {
           item.latitude, item.longitude
         );
         calculatedDistanceText = formatDistance(distance);
+        
+
       }
       
       // 최종 거리 텍스트 (백엔드 > 직접 계산)
       finalDistanceText = distanceText || calculatedDistanceText;
+      
+
     }
 
     return (
