@@ -249,6 +249,12 @@ const SettingsScreen = () => {
           {renderLinkItem('lock-closed-outline', '개인정보 설정', () => Alert.alert('준비중', '곧 서비스될 예정입니다.'))}
         </View>
 
+        {/* 개발자 도구 */}
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>개발자 도구</Text>
+          {renderLinkItem('code-outline', '프로필 테스트', () => navigation.navigate(ROUTES.MAIN.PROFILE_TEST))}
+        </View>
+
         {/* 지원 및 정보 */}
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>지원 및 정보</Text>
