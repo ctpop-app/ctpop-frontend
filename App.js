@@ -1,8 +1,10 @@
 // App.js
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import notificationService from './services/notificationService';
 import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar, View, Text, StyleSheet, LogBox, TouchableOpacity } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -10,6 +12,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import useUserStore from './store/userStore';
 import { useAuth } from './hooks/useAuth';
 import { useSocket } from './hooks/useSocket';
+import { useNotifications } from './hooks/useNotifications';
+import { useGlobalChat } from './hooks/useGlobalChat';
 
 // 서버 설정
 import { discoverServer } from './utils/discovery';
@@ -76,8 +80,13 @@ export default function App() {
   // 상태 관리
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [navigationRef, setNavigationRef] = useState(null);
   const { checkAuth } = useAuth();
   const { connect, disconnect } = useSocket();
+  
+  // 알림 및 글로벌 채팅 훅
+  const { isInitialized: notificationInitialized, pushToken } = useNotifications();
+  const { isMonitoring, setCurrentChatRoomId, clearCurrentChatRoomId } = useGlobalChat();
   
   // Zustand store 사용
   const userStore = useUserStore();
@@ -108,6 +117,39 @@ export default function App() {
     };
   }, [isAuthenticated, disconnect]);
 
+  // 알림 클릭 시 네비게이션 핸들러 설정
+  useEffect(() => {
+    if (navigationRef) {
+      const handleNotificationNavigation = (chatRoomId, otherUser) => {
+        console.log('알림 클릭 - 채팅방으로 이동:', { chatRoomId, otherUser });
+        try {
+          navigationRef.navigate(ROUTES.ROOT.MAIN, {
+            screen: 'MessageStack',
+            params: {
+              screen: 'ChatRoom',
+              params: {
+                chatRoomId,
+                otherUser
+              }
+            }
+          });
+        } catch (error) {
+          console.error('알림 네비게이션 실패:', error);
+          // 기본적으로 메시지 탭으로 이동
+          try {
+            navigationRef.navigate(ROUTES.ROOT.MAIN, {
+              screen: ROUTES.MAIN.MESSAGES
+            });
+          } catch (fallbackError) {
+            console.error('대체 네비게이션도 실패:', fallbackError);
+          }
+        }
+      };
+
+      notificationService.setNavigationHandler(handleNotificationNavigation);
+    }
+  }, [navigationRef]);
+
   // 재시도 핸들러
   const handleRetry = useCallback(() => {
     setError(null);
@@ -116,55 +158,59 @@ export default function App() {
   }, [checkAuth, clearTokens, connect]);
 
   return (
-    <NavigationContainer>
-      <StatusBar 
-        style="auto" 
-        backgroundColor={COLORS.background.primary}
-        barStyle="dark-content"
-      />
-      <Stack.Navigator 
-        screenOptions={{
-          ...HEADER_OPTIONS.MAIN,
-          cardStyle: { backgroundColor: COLORS.background.primary },
-          animationEnabled: true,
-          gestureEnabled: false
-        }}
+    <SafeAreaProvider>
+      <NavigationContainer
+        ref={setNavigationRef}
       >
-        {error ? (
-          <Stack.Screen 
-            name={ROUTES.ERROR} 
-            options={{ 
-              headerShown: false,
-              animationEnabled: false
-            }}
-          >
-            {() => <ErrorScreen error={error} onRetry={handleRetry} />}
-          </Stack.Screen>
-        ) : isLoading ? (
-          <Stack.Screen 
-            name={ROUTES.SPLASH} 
-            options={{ 
-              headerShown: false,
-              animationEnabled: false
-            }}
-          >
-            {() => <SplashScreen />}
-          </Stack.Screen>
-        ) : !isAuthenticated ? (
-          <Stack.Screen name={ROUTES.ROOT.AUTH}>
-            {() => <AuthNavigator />}
-          </Stack.Screen>
-        ) : !hasProfile ? (
-          <Stack.Screen name={ROUTES.AUTH.PROFILE_SETUP}>
-            {() => <ProfileSetupScreen />}
-          </Stack.Screen>
-        ) : (
-          <Stack.Screen name={ROUTES.ROOT.MAIN}>
-            {() => <MainNavigator />}
-          </Stack.Screen>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+        <StatusBar 
+          style="auto" 
+          backgroundColor={COLORS.background.primary}
+          barStyle="dark-content"
+        />
+        <Stack.Navigator 
+          screenOptions={{
+            ...HEADER_OPTIONS.MAIN,
+            cardStyle: { backgroundColor: COLORS.background.primary },
+            animationEnabled: true,
+            gestureEnabled: false
+          }}
+        >
+          {error ? (
+            <Stack.Screen 
+              name={ROUTES.ERROR} 
+              options={{ 
+                headerShown: false,
+                animationEnabled: false
+              }}
+            >
+              {() => <ErrorScreen error={error} onRetry={handleRetry} />}
+            </Stack.Screen>
+          ) : isLoading ? (
+            <Stack.Screen 
+              name={ROUTES.SPLASH} 
+              options={{ 
+                headerShown: false,
+                animationEnabled: false
+              }}
+            >
+              {() => <SplashScreen />}
+            </Stack.Screen>
+          ) : !isAuthenticated ? (
+            <Stack.Screen name={ROUTES.ROOT.AUTH}>
+              {() => <AuthNavigator />}
+            </Stack.Screen>
+          ) : !hasProfile ? (
+            <Stack.Screen name={ROUTES.AUTH.PROFILE_SETUP}>
+              {() => <ProfileSetupScreen />}
+            </Stack.Screen>
+          ) : (
+            <Stack.Screen name={ROUTES.ROOT.MAIN}>
+              {() => <MainNavigator />}
+            </Stack.Screen>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 
