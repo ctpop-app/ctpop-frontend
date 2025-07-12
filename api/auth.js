@@ -4,7 +4,6 @@ import { AUTH_KEYS } from '../utils/constants';
 import { jwtDecode } from 'jwt-decode';
 import { toE164Format } from '../utils/phoneUtils';
 import useUserStore from '../store/userStore';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * 서버 연결을 테스트합니다.
