@@ -72,6 +72,12 @@ const setupEventListeners = () => {
     useUserStore.getState().setNearbyDistances(distances);
   });
 
+  // 거리 정보 요청 응답 수신
+  socketApi.on('nearbyDistancesResponse', (distances) => {
+    console.log('📡 Received nearby distances response:', distances);
+    useUserStore.getState().setNearbyDistances(distances);
+  });
+
   // 소켓이 연결된 상태에서만 온라인 사용자 목록 요청
   if (socketApi.isConnected()) {
     socketApi.emit('getOnlineUsers');
@@ -127,12 +133,23 @@ const updateLocation = (latitude, longitude) => {
   }
 };
 
+// 마지막 위치 전송 (앱 종료 시)
+const updateLastLocation = (lastLocation) => {
+  if (socketApi.isConnected()) {
+    console.log('Sending last location on app exit:', lastLocation);
+    socketApi.emit('updateLastLocation', lastLocation);
+  } else {
+    console.log('Socket not connected, cannot send last location');
+  }
+};
+
 export const socketService = {
   connect,
   disconnect,
   startHeartbeat,
   stopHeartbeat,
   updateLocation,
+  updateLastLocation,
   isConnected: () => socketApi.isConnected(),
   getUuid: () => socketApi.getUuid(),
   on: (event, callback) => socketApi.on(event, callback),
