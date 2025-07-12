@@ -33,18 +33,20 @@ class SocketApi {
         console.log('SocketApi: Connecting to WebSocket:', wsUrl);
         
         this.connectionPromise = new Promise((resolve, reject) => {
-          this.socket = io(wsUrl, {
-            transports: ['websocket'],
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
-            randomizationFactor: 0.5,
-            timeout: 10000,
-            autoConnect: true,
-            forceNew: true,
-            query: { uuid }
-          });
+                  this.socket = io(wsUrl, {
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionAttempts: 10,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          randomizationFactor: 0.5,
+          timeout: 15000,
+          autoConnect: true,
+          forceNew: true,
+          query: { uuid },
+          upgrade: true,
+          rememberUpgrade: true
+        });
 
           const timeout = setTimeout(() => {
             reject(new Error('Connection timeout'));
@@ -64,7 +66,11 @@ class SocketApi {
               stack: error.stack
             });
             clearTimeout(timeout);
-            reject(error);
+            // 연결 에러 시에도 계속 시도하도록 수정
+            setTimeout(() => {
+              console.log('SocketApi: Retrying connection after error...');
+              this.connect(uuid).then(resolve).catch(reject);
+            }, 2000);
           });
 
           this.socket.on('error', (error) => {
@@ -74,8 +80,8 @@ class SocketApi {
               type: error.type,
               stack: error.stack
             });
-            clearTimeout(timeout);
-            reject(error);
+            // 소켓 에러 시에도 계속 시도
+            console.log('SocketApi: Socket error occurred, will retry...');
           });
 
           this.socket.io.on('reconnect_attempt', () => {
