@@ -118,11 +118,11 @@ export const useSocket = () => {
   // 사용자 온라인 상태 확인
   const isUserOnline = useCallback((userId) => {
     const isOnline = onlineUsers.includes(userId);
-    console.log(`🔍 사용자 ${userId} 온라인 상태 확인:`, {
-      isOnline,
-      onlineUsersCount: onlineUsers.length,
-      onlineUsers: onlineUsers.slice(0, 5) // 처음 5개만 로그에 표시
-    });
+    // console.log(`🔍 사용자 ${userId} 온라인 상태 확인:`, {
+    //   isOnline,
+    //   onlineUsersCount: onlineUsers.length,
+    //   onlineUsers: onlineUsers.slice(0, 5) // 처음 5개만 로그에 표시
+    // });
     return isOnline;
   }, [onlineUsers]);
 

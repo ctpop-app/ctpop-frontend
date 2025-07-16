@@ -85,14 +85,31 @@ const MessageInput = ({ onSend, onSendImage, uuid, bottomInset = 0 }) => {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: false,
         quality: 0.8,
       });
 
       if (!result.canceled) {
-        const imageUrl = await uploadImage(result.assets[0].uri, 'chat', uuid);
-        await onSendImage(imageUrl);
+        // 즉시 스켈레톤 메시지 표시
+        const tempImageId = Date.now().toString();
+        await onSendImage(null, tempImageId, result.assets[0].uri);
+        
+        // 업로드 진행률 콜백
+        const onProgress = (progress) => {
+          if (onSendImage.updateProgress) {
+            onSendImage.updateProgress(tempImageId, progress);
+          }
+        };
+
+        try {
+          const imageUrl = await uploadImage(result.assets[0].uri, 'chat', uuid, onProgress);
+          await onSendImage(imageUrl, tempImageId);
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError);
+          if (onSendImage.onError) {
+            onSendImage.onError(tempImageId, uploadError.message);
+          }
+        }
       }
     } catch (error) {
       console.error('Error picking image:', error);

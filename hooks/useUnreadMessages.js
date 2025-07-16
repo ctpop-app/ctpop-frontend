@@ -15,7 +15,7 @@ export const useUnreadMessages = () => {
   useEffect(() => {
     if (!user?.uuid) return;
 
-    console.log('읽지 않은 메시지 모니터링 시작:', user.uuid);
+    // console.log('읽지 않은 메시지 모니터링 시작:', user.uuid);
 
     // 모든 메시지를 조회하고 클라이언트에서 필터링
     const messagesQuery = query(
@@ -69,7 +69,7 @@ export const useUnreadMessages = () => {
     });
 
     return () => {
-      console.log('읽지 않은 메시지 모니터링 종료');
+      // console.log('읽지 않은 메시지 모니터링 종료');
       unsubscribe();
     };
   }, [user?.uuid]);

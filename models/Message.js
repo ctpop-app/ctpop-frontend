@@ -42,9 +42,9 @@ class Message {
       type: 'image',
       metadata: {
         imageUrl,
-        imageSize,
-        imageWidth,
-        imageHeight
+        imageSize: imageSize || null,
+        imageWidth: imageWidth || null,
+        imageHeight: imageHeight || null
       }
     });
   }
@@ -85,6 +85,16 @@ class Message {
 
   // Firestore 데이터로 변환
   toFirestore() {
+    // undefined 값들을 필터링하여 Firestore 오류 방지
+    const cleanMetadata = {};
+    if (this.metadata) {
+      Object.keys(this.metadata).forEach(key => {
+        if (this.metadata[key] !== undefined) {
+          cleanMetadata[key] = this.metadata[key];
+        }
+      });
+    }
+
     return {
       chatId: this.chatId,
       content: this.content,
@@ -92,7 +102,7 @@ class Message {
       timestamp: serverTimestamp(), // 서버 시간 기준으로 저장
       isRead: this.isRead,
       type: this.type,
-      metadata: this.metadata,
+      metadata: cleanMetadata,
       status: this.status,
       error: this.error
     };
