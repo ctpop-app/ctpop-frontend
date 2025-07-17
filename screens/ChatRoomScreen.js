@@ -23,6 +23,7 @@ import { useGlobalChat } from '../hooks/useGlobalChat';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import MessageBubble from '../components/chat/MessageBubble';
 import MessageInput from '../components/chat/MessageInput';
+import ImageModal from '../components/chat/ImageModal';
 import { sendChatMessage, getChatMessages } from '../api/chat';
 import { MESSAGE_STATUS } from '../constants/messageStatus';
 import { db } from '../firebase';
@@ -41,6 +42,8 @@ export default function ChatRoomScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState(null);
+  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
   const insets = useSafeAreaInsets();
   const flatListRef = useRef(null);
 
@@ -322,6 +325,20 @@ export default function ChatRoomScreen() {
   handleSendImage.updateProgress = updateImageProgress;
   handleSendImage.onError = handleImageUploadError;
 
+  // 이미지 모달 핸들러
+  const handleImagePress = (imageUri) => {
+    console.log('📱 [DEBUG] 이미지 모달 열기 시도:', imageUri);
+    setSelectedImageUri(imageUri);
+    setIsImageModalVisible(true);
+    console.log('📱 [DEBUG] 모달 상태 변경 완료');
+  };
+
+  const handleCloseImageModal = () => {
+    console.log('❌ [DEBUG] 이미지 모달 닫기 버튼 클릭');
+    setIsImageModalVisible(false);
+    setSelectedImageUri(null);
+  };
+
   const renderMessage = ({ item }) => {
     const isMe = item.uuid === user.uuid;
     
@@ -330,6 +347,7 @@ export default function ChatRoomScreen() {
         message={item}
         isOwnMessage={isMe}
         otherUserPhotoURL={isMe ? null : otherUser?.mainPhotoURL}
+        onImagePress={handleImagePress}
       />
     );
   };
@@ -416,6 +434,13 @@ export default function ChatRoomScreen() {
           bottomInset={insets.bottom}
         />
       </KeyboardAvoidingView>
+      
+      {/* 이미지 모달 */}
+      <ImageModal
+        visible={isImageModalVisible}
+        imageUri={selectedImageUri}
+        onClose={handleCloseImageModal}
+      />
     </View>
   );
 }

@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { formatMessageTime } from '../../utils/dateUtils';
 import { getMessageStatusText } from '../../constants/messageStatus';
 import ImageUploadSkeleton from './ImageUploadSkeleton';
 
-const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
+const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL, onImagePress }) => {
   const { content, timestamp, status, error, type, isSkeleton, uploadProgress } = message;
 
   const renderMessageContent = () => {
@@ -23,13 +23,20 @@ const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
       } else {
         // 실제 이미지 표시
         return (
-          <View style={styles.imageContainer}>
+          <TouchableOpacity 
+            style={styles.imageContainer}
+            onPress={() => {
+              console.log('🖼️ [DEBUG] 이미지 클릭됨:', content);
+              onImagePress && onImagePress(content);
+            }}
+            activeOpacity={0.8}
+          >
             <Image
               source={{ uri: content }}
               style={styles.messageImage}
               resizeMode="cover"
             />
-          </View>
+          </TouchableOpacity>
         );
       }
     } else {
