@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -8,128 +8,30 @@ import {
   StyleSheet, 
   Dimensions,
   StatusBar,
-  SafeAreaView
+  SafeAreaView,
+  ScrollView
 } from 'react-native';
-import { PanGestureHandler, PinchGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  useAnimatedGestureHandler,
-  runOnJS,
-  withSpring,
-  interpolate,
-  Extrapolate
-} from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const ImageModal = ({ visible, imageUri, onClose }) => {
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const focalX = useSharedValue(0);
-  const focalY = useSharedValue(0);
-  
-  const panRef = useRef();
-  const pinchRef = useRef();
+  const [zoomScale, setZoomScale] = useState(1);
 
-  // 모달이 열릴 때마다 값들 초기화
-  useEffect(() => {
-    if (visible) {
-      scale.value = 1;
-      translateX.value = 0;
-      translateY.value = 0;
-      focalX.value = 0;
-      focalY.value = 0;
-    }
-  }, [visible]);
-
-  const resetTransform = () => {
-    'worklet';
-    scale.value = withSpring(1);
-    translateX.value = withSpring(0);
-    translateY.value = withSpring(0);
-    focalX.value = 0;
-    focalY.value = 0;
+  const handleZoomIn = () => {
+    console.log('🔍 [DEBUG] 줌인 버튼 클릭');
+    setZoomScale(prev => Math.min(prev * 1.5, 3));
   };
 
-  const pinchGestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context) => {
-      runOnJS(console.log)('🤏 [DEBUG] 핀치 제스처 시작');
-      context.startScale = scale.value;
-      focalX.value = _.focalX;
-      focalY.value = _.focalY;
-    },
-    onActive: (event, context) => {
-      const newScale = Math.min(Math.max(context.startScale * event.scale, 0.5), 3);
-      scale.value = newScale;
-      
-      runOnJS(console.log)('🤏 [DEBUG] 핀치 제스처 활성:', { scale: newScale.toFixed(2) });
-      
-      // 줌 중심점 기준으로 이미지 위치 조정
-      const deltaX = (event.focalX - focalX.value) * (newScale - 1);
-      const deltaY = (event.focalY - focalY.value) * (newScale - 1);
-      
-      translateX.value = deltaX;
-      translateY.value = deltaY;
-    },
-    onEnd: () => {
-      runOnJS(console.log)('🤏 [DEBUG] 핀치 제스처 종료, 현재 스케일:', scale.value.toFixed(2));
-      if (scale.value < 1) {
-        runOnJS(console.log)('🔄 [DEBUG] 스케일 1미만, 리셋 실행');
-        runOnJS(resetTransform)();
-      }
-    },
-  });
+  const handleZoomOut = () => {
+    console.log('🔍 [DEBUG] 줌아웃 버튼 클릭');
+    setZoomScale(prev => Math.max(prev / 1.5, 0.5));
+  };
 
-  const panGestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context) => {
-      runOnJS(console.log)('👆 [DEBUG] 드래그 제스처 시작');
-      context.startX = translateX.value;
-      context.startY = translateY.value;
-    },
-    onActive: (event, context) => {
-      if (scale.value > 1) {
-        const maxTranslateX = (SCREEN_WIDTH * (scale.value - 1)) / 2;
-        const maxTranslateY = (SCREEN_HEIGHT * (scale.value - 1)) / 2;
-        
-        translateX.value = Math.min(
-          Math.max(context.startX + event.translationX, -maxTranslateX),
-          maxTranslateX
-        );
-        translateY.value = Math.min(
-          Math.max(context.startY + event.translationY, -maxTranslateY),
-          maxTranslateY
-        );
-        
-        runOnJS(console.log)('👆 [DEBUG] 드래그 중:', { 
-          x: translateX.value.toFixed(0), 
-          y: translateY.value.toFixed(0),
-          scale: scale.value.toFixed(2)
-        });
-      } else {
-        runOnJS(console.log)('👆 [DEBUG] 드래그 무시 (스케일 1 이하)');
-      }
-    },
-    onEnd: () => {
-      runOnJS(console.log)('👆 [DEBUG] 드래그 제스처 종료');
-      if (scale.value <= 1) {
-        runOnJS(console.log)('🔄 [DEBUG] 스케일 1 이하, 리셋 실행');
-        runOnJS(resetTransform)();
-      }
-    },
-  });
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { translateX: translateX.value },
-        { translateY: translateY.value },
-        { scale: scale.value },
-      ],
-    };
-  });
+  const handleReset = () => {
+    console.log('🔄 [DEBUG] 리셋 버튼 클릭');
+    setZoomScale(1);
+  };
 
   if (!visible || !imageUri) {
     return null;
@@ -150,14 +52,46 @@ const ImageModal = ({ visible, imageUri, onClose }) => {
             <MaterialIcons name="close" size={30} color="#fff" />
           </TouchableOpacity>
           
+          {/* 줌 컨트롤 버튼들 */}
+          <View style={styles.zoomControls}>
+            <TouchableOpacity style={styles.zoomButton} onPress={handleZoomOut}>
+              <MaterialIcons name="zoom-out" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.zoomButton} onPress={handleReset}>
+              <MaterialIcons name="refresh" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.zoomButton} onPress={handleZoomIn}>
+              <MaterialIcons name="zoom-in" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
           {/* 이미지 */}
-          <View style={styles.imageContainer}>
+          <ScrollView
+            style={styles.imageContainer}
+            contentContainerStyle={styles.scrollContent}
+            maximumZoomScale={3}
+            minimumZoomScale={0.5}
+            zoomScale={zoomScale}
+            onZoomScaleChange={(scale) => {
+              console.log('📱 [DEBUG] ScrollView 줌 변경:', scale.toFixed(2));
+              setZoomScale(scale);
+            }}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            centerContent={true}
+            scrollEnabled={true}
+            pinchGestureEnabled={true}
+            doubleTapToZoomEnabled={true}
+            onScroll={(event) => {
+              console.log('📱 [DEBUG] ScrollView 스크롤 이벤트');
+            }}
+          >
             <Image
               source={{ uri: imageUri }}
-              style={styles.image}
+              style={[styles.image, { transform: [{ scale: zoomScale }] }]}
               resizeMode="contain"
             />
-          </View>
+          </ScrollView>
         </View>
       </SafeAreaView>
     </Modal>
@@ -178,29 +112,40 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 50,
     right: 20,
-    zIndex: 1,
+    zIndex: 2,
     padding: 10,
+  },
+  zoomControls: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  zoomButton: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 10,
   },
   imageContainer: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT * 0.8,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  gestureContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageWrapper: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT * 0.8,
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   image: {
-    width: '100%',
-    height: '100%',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.8,
   },
 });
 

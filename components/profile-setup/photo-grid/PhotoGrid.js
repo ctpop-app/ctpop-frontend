@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap', 
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     marginBottom: 20 
   }
 }); 
