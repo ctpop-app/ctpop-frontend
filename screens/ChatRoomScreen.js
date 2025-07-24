@@ -23,6 +23,7 @@ import { useGlobalChat } from '../hooks/useGlobalChat';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import MessageBubble from '../components/chat/MessageBubble';
 import MessageInput from '../components/chat/MessageInput';
+import ImageModal from '../components/chat/ImageModal';
 import { sendChatMessage, getChatMessages } from '../api/chat';
 import { MESSAGE_STATUS } from '../constants/messageStatus';
 import { db } from '../firebase';
@@ -41,6 +42,8 @@ export default function ChatRoomScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState(null);
+  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
   const insets = useSafeAreaInsets();
   const flatListRef = useRef(null);
 
@@ -65,7 +68,7 @@ export default function ChatRoomScreen() {
       // 채팅방 진입 시 현재 채팅방 설정
       setCurrentChatRoom(chatRoomId);
       setCurrentChatRoomId(chatRoomId);
-      console.log('📍 채팅방 진입:', chatRoomId);
+      // console.log('📍 채팅방 진입:', chatRoomId);
       
       // 채팅방 진입 시 한 번만 읽음 처리
       markChatAsRead(chatRoomId);
@@ -75,7 +78,7 @@ export default function ChatRoomScreen() {
       // 채팅방 이탈 시 현재 채팅방 제거
       clearCurrentChatRoom();
       clearCurrentChatRoomId();
-      console.log('📍 채팅방 이탈:', chatRoomId);
+      // console.log('📍 채팅방 이탈:', chatRoomId);
     };
   }, [chatRoomId, setCurrentChatRoom, clearCurrentChatRoom, setCurrentChatRoomId, clearCurrentChatRoomId]);
 
@@ -192,6 +195,150 @@ export default function ChatRoomScreen() {
     }
   };
 
+  const handleSendImage = async (imageUrl, tempId = null, localUri = null) => {
+    const messageId = tempId || Date.now().toString();
+    
+    if (!imageUrl && tempId && localUri) {
+      // 스켈레톤 메시지 생성
+      const skeletonMessage = {
+        id: messageId,
+        content: localUri,
+        uuid: user.uuid,
+        timestamp: new Date(),
+        type: 'image',
+        status: MESSAGE_STATUS.SENDING,
+        isSkeleton: true,
+        uploadProgress: 0
+      };
+      
+      setMessages(prev => [...prev, skeletonMessage]);
+      return;
+    }
+
+    if (imageUrl && tempId) {
+      // 업로드 완료 - 스켈레톤을 실제 이미지로 교체
+      const newMessage = {
+        id: messageId,
+        content: imageUrl,
+        uuid: user.uuid,
+        timestamp: new Date(),
+        type: 'image',
+        status: MESSAGE_STATUS.SENDING,
+        isSkeleton: false,
+        uploadProgress: 100
+      };
+      
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === messageId ? newMessage : msg
+        )
+      );
+
+      try {
+        const result = await sendChatMessage(chatRoomId, {
+          type: 'image',
+          uuid: user.uuid,
+          content: imageUrl
+        });
+
+        if (!result) {
+          throw new Error('서버 응답이 없습니다.');
+        }
+
+        if (result.success) {
+          // 성공 시 로컬 메시지 업데이트
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === messageId 
+                ? { ...msg, id: result.data.id, status: MESSAGE_STATUS.SENT }
+                : msg
+            )
+          );
+        } else {
+          throw new Error(result.error || '이미지 전송에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('이미지 전송 오류:', error);
+        
+        // 에러 메시지 설정
+        const errorMessage = error.message || '알 수 없는 오류가 발생했습니다.';
+        
+        // 메시지 상태 업데이트
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === messageId 
+              ? { 
+                  ...msg, 
+                  status: MESSAGE_STATUS.ERROR,
+                  error: errorMessage
+                }
+              : msg
+          )
+        );
+
+        // 사용자에게 알림
+        Alert.alert(
+          '이미지 전송 실패',
+          errorMessage,
+          [
+            {
+              text: '다시 시도',
+              onPress: () => handleSendImage(imageUrl, tempId)
+            },
+            {
+              text: '취소',
+              style: 'cancel'
+            }
+          ]
+        );
+      }
+    }
+  };
+
+  // 업로드 진행률 업데이트 함수
+  const updateImageProgress = (tempId, progress) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === tempId 
+          ? { ...msg, uploadProgress: progress }
+          : msg
+      )
+    );
+  };
+
+  // 업로드 에러 처리 함수
+  const handleImageUploadError = (tempId, errorMessage) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === tempId 
+          ? { 
+              ...msg, 
+              status: MESSAGE_STATUS.ERROR,
+              error: errorMessage
+            }
+          : msg
+      )
+    );
+  };
+
+  // handleSendImage에 추가 함수들을 바인딩
+  handleSendImage.updateProgress = updateImageProgress;
+  handleSendImage.onError = handleImageUploadError;
+
+  // 이미지 모달 핸들러
+  const handleImagePress = (imageUri) => {
+    console.log('📱 [DEBUG] 이미지 모달 열기 시도:', imageUri);
+    setSelectedImageUri(imageUri);
+    setIsImageModalVisible(true);
+    console.log('📱 [DEBUG] 모달 상태 변경 완료');
+  };
+
+  const handleCloseImageModal = () => {
+    console.log('❌ [DEBUG] 이미지 모달 닫기 버튼 클릭');
+    setIsImageModalVisible(false);
+    setSelectedImageUri(null);
+  };
+
   const renderMessage = ({ item }) => {
     const isMe = item.uuid === user.uuid;
     
@@ -200,6 +347,7 @@ export default function ChatRoomScreen() {
         message={item}
         isOwnMessage={isMe}
         otherUserPhotoURL={isMe ? null : otherUser?.mainPhotoURL}
+        onImagePress={handleImagePress}
       />
     );
   };
@@ -253,24 +401,24 @@ export default function ChatRoomScreen() {
             />
           }
           onContentSizeChange={(width, height) => {
-            console.log('📏 FlatList 콘텐츠 크기 변경:', { width, height });
+            // console.log('📏 FlatList 콘텐츠 크기 변경:', { width, height });
             // 새 메시지가 추가될 때 자동 스크롤
             if (messages.length > 0) {
               setTimeout(() => {
-                console.log('  - 자동 스크롤 실행');
+                // console.log('  - 자동 스크롤 실행');
                 flatListRef.current?.scrollToEnd({ animated: true });
               }, 50);
             }
           }}
           onLayout={(event) => {
             const { width, height, x, y } = event.nativeEvent.layout;
-            console.log('📐 FlatList 레이아웃 변경:', { width, height, x, y });
-            console.log('  - 키보드 상태:', isKeyboardVisible);
+            // console.log('📐 FlatList 레이아웃 변경:', { width, height, x, y });
+            // console.log('  - 키보드 상태:', isKeyboardVisible);
             
             // 레이아웃이 변경될 때 스크롤 조정
             if (messages.length > 0) {
               setTimeout(() => {
-                console.log('  - 레이아웃 변경 후 스크롤 조정');
+                // console.log('  - 레이아웃 변경 후 스크롤 조정');
                 flatListRef.current?.scrollToEnd({ animated: false });
               }, 50);
             }
@@ -281,10 +429,18 @@ export default function ChatRoomScreen() {
         {/* 입력 영역 */}
         <MessageInput
           onSend={handleSend}
+          onSendImage={handleSendImage}
           uuid={user.uuid}
           bottomInset={insets.bottom}
         />
       </KeyboardAvoidingView>
+      
+      {/* 이미지 모달 */}
+      <ImageModal
+        visible={isImageModalVisible}
+        imageUri={selectedImageUri}
+        onClose={handleCloseImageModal}
+      />
     </View>
   );
 }

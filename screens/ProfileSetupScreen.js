@@ -47,7 +47,7 @@ const ProfileSetupScreen = () => {
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
-            routes: [{ name: ROUTES.AUTH.LOGIN }]
+            routes: [{ name: ROUTES.ROOT.AUTH }]
           })
         );
         return;
@@ -77,6 +77,7 @@ const ProfileSetupScreen = () => {
 
     checkProfile();
   }, [user, navigation]);
+
 
   const handleSave = async () => {
     if (!user?.uuid) {

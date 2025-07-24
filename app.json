@@ -78,9 +78,6 @@
           "sounds": ["./assets/notification.wav"]
         }
       ]
-    ],
-    "updates": {
-      "url": "https://u.expo.dev/188021df-21e9-47be-8d76-53035ad41d65"
-    }
+    ]
   }
 }

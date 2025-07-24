@@ -223,7 +223,7 @@ class NotificationService {
    */
   setCurrentChatRoomId(chatRoomId) {
     this.currentChatRoomId = chatRoomId;
-    console.log('현재 채팅방 ID 설정:', chatRoomId);
+    // console.log('현재 채팅방 ID 설정:', chatRoomId);
   }
 
   /**
@@ -231,7 +231,7 @@ class NotificationService {
    */
   clearCurrentChatRoomId() {
     this.currentChatRoomId = null;
-    console.log('현재 채팅방 ID 제거');
+    // console.log('현재 채팅방 ID 제거');
   }
 
   /**

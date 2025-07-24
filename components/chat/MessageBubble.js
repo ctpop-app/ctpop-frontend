@@ -1,10 +1,53 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { formatMessageTime } from '../../utils/dateUtils';
 import { getMessageStatusText } from '../../constants/messageStatus';
+import ImageUploadSkeleton from './ImageUploadSkeleton';
 
-const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
-  const { content, timestamp, status, error } = message;
+const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL, onImagePress }) => {
+  const { content, timestamp, status, error, type, isSkeleton, uploadProgress } = message;
+
+  const renderMessageContent = () => {
+    if (type === 'image') {
+      if (isSkeleton) {
+        // 스켈레톤 상태 - 로컬 이미지와 진행률 표시
+        return (
+          <View style={styles.imageContainer}>
+            <ImageUploadSkeleton 
+              progress={uploadProgress || 0} 
+              width={200} 
+              height={150} 
+            />
+          </View>
+        );
+      } else {
+        // 실제 이미지 표시
+        return (
+          <TouchableOpacity 
+            style={styles.imageContainer}
+            onPress={() => {
+              console.log('🖼️ [DEBUG] 이미지 클릭됨:', content);
+              onImagePress && onImagePress(content);
+            }}
+            activeOpacity={0.8}
+          >
+            <Image
+              source={{ uri: content }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+        );
+      }
+    } else {
+      // 텍스트 메시지
+      return (
+        <Text style={[styles.messageText, isOwnMessage ? styles.messageTextMe : styles.messageTextOther]}>
+          {content}
+        </Text>
+      );
+    }
+  };
 
   return (
     <View style={[
@@ -24,10 +67,12 @@ const MessageBubble = ({ message, isOwnMessage, otherUserPhotoURL }) => {
         </View>
       )}
       <View style={styles.messageContainer}>
-        <View style={[styles.messageBubble, isOwnMessage ? styles.messageBubbleMe : styles.messageBubbleOther]}>
-          <Text style={[styles.messageText, isOwnMessage ? styles.messageTextMe : styles.messageTextOther]}>
-            {content}
-          </Text>
+        <View style={[
+          styles.messageBubble, 
+          isOwnMessage ? styles.messageBubbleMe : styles.messageBubbleOther,
+          type === 'image' && styles.imageBubble
+        ]}>
+          {renderMessageContent()}
         </View>
         <View style={styles.messageFooter}>
           <Text style={styles.messageTime}>
@@ -77,6 +122,9 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 18,
   },
+  imageBubble: {
+    padding: 4,
+  },
   messageBubbleMe: {
     backgroundColor: '#FF6B6B',
     borderBottomRightRadius: 6,
@@ -96,6 +144,15 @@ const styles = StyleSheet.create({
   },
   messageTextOther: {
     color: '#222',
+  },
+  imageContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  messageImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 12,
   },
   messageFooter: {
     flexDirection: 'row',
