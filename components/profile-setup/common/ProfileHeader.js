@@ -1,13 +1,23 @@
 import React from 'react';
-import { StyleSheet, Text, View, Platform } from 'react-native';
+import { StyleSheet, Text, View, Platform, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export const ProfileHeader = ({ 
   title = '프로필 설정',
-  subtitle = '프로필을 완성하여 매칭을 시작하세요'
+  subtitle = '프로필을 완성하여 매칭을 시작하세요',
+  onBackPress = null
 }) => {
   return (
     <View style={styles.header}>
       <View style={styles.headerContent}>
+        {onBackPress && (
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={onBackPress}
+          >
+            <MaterialIcons name="arrow-back" size={24} color="#FF6B6B" />
+          </TouchableOpacity>
+        )}
         <View style={styles.titleContainer}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
@@ -33,6 +43,14 @@ const styles = StyleSheet.create({
   headerContent: {
     alignItems: 'center',
     paddingHorizontal: 16,
+    position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    top: 0,
+    padding: 8,
+    zIndex: 1,
   },
   titleContainer: {
     alignItems: 'center',

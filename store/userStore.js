@@ -104,7 +104,7 @@ const useUserStore = create(
       getDistanceToUser: (uuid) => {
         const { nearbyDistances } = get();
         const distance = nearbyDistances[uuid] || null;
-        console.log(`Getting distance for ${uuid}:`, distance);
+        // console.log(`Getting distance for ${uuid}:`, distance);
         return distance;
       },
 

@@ -15,11 +15,11 @@ export const PhotoItem = ({
   onRemove,
   disabled
 }) => {
-  const { uri, empty, isAddable } = item;
+  const { uri, empty, isAddable, isAddButton } = item;
   const isMainPhoto = index === 0;
 
   const handlePress = () => {
-    if (!disabled) {
+    if (!disabled && (isAddButton || uri)) {
       onPress(index);
     }
   };
@@ -30,15 +30,16 @@ export const PhotoItem = ({
         style={[
           styles.container, 
           styles.emptyContainer,
+          isAddButton && styles.addButtonContainer,
           disabled && styles.disabledContainer
         ]}
         onPress={handlePress}
-        disabled={disabled}
+        disabled={disabled || !isAddButton}
       >
         <Ionicons 
           name="add-circle-outline" 
           size={32} 
-          color={disabled ? "#ccc" : "#666"}
+          color={isAddButton ? "#FF6B6B" : "#ccc"}
         />
       </TouchableOpacity>
     );
@@ -94,6 +95,17 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderStyle: 'dashed',
     borderRadius: 12,
+  },
+  addButtonContainer: {
+    borderColor: '#FF6B6B',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    backgroundColor: '#FFF5F5',
+    elevation: 3,
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   disabledContainer: {
     opacity: 0.5,

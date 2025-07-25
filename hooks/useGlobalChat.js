@@ -22,13 +22,13 @@ export const useGlobalChat = () => {
   // 현재 채팅방 ID 설정
   const setCurrentChatRoomId = (chatRoomId) => {
     currentChatRoomId.current = chatRoomId;
-    console.log('전역 채팅 - 현재 채팅방 설정:', chatRoomId);
+    // console.log('전역 채팅 - 현재 채팅방 설정:', chatRoomId);
   };
 
   // 현재 채팅방 ID 제거
   const clearCurrentChatRoomId = () => {
     currentChatRoomId.current = null;
-    console.log('전역 채팅 - 현재 채팅방 제거');
+    // console.log('전역 채팅 - 현재 채팅방 제거');
   };
 
   // 앱 상태 변경 감지
@@ -54,7 +54,7 @@ export const useGlobalChat = () => {
   useEffect(() => {
     if (!user?.uuid || !isMonitoring) return;
 
-    console.log('전역 채팅 모니터링 시작:', user.uuid);
+    // console.log('전역 채팅 모니터링 시작:', user.uuid);
 
     // 최근 메시지들을 모니터링 (지난 1시간)
     const oneHourAgo = new Date();
@@ -118,7 +118,7 @@ export const useGlobalChat = () => {
     });
 
     return () => {
-      console.log('전역 채팅 모니터링 종료');
+      // console.log('전역 채팅 모니터링 종료');
       unsubscribe();
     };
   }, [user?.uuid, isMonitoring]);
@@ -205,14 +205,14 @@ export const useGlobalChat = () => {
   const startMonitoring = () => {
     if (user?.uuid) {
       setIsMonitoring(true);
-      console.log('전역 채팅 모니터링 시작');
+      // console.log('전역 채팅 모니터링 시작');
     }
   };
 
   // 모니터링 중지
   const stopMonitoring = () => {
     setIsMonitoring(false);
-    console.log('전역 채팅 모니터링 중지');
+    // console.log('전역 채팅 모니터링 중지');
   };
 
   // 초기화
