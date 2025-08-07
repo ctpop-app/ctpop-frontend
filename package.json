@@ -10,7 +10,6 @@
     "crypto-js": "^4.2.0",
     "expo": "53.0.12",
     "expo-av": "^15.1.6",
-    "expo-device": "~7.1.4",
     "expo-firebase-recaptcha": "^1.4.4",
     "expo-image-manipulator": "~13.1.7",
     "expo-image-picker": "~16.1.4",
@@ -51,8 +50,5 @@
     "start": "expo start",
     "web": "expo start --web",
     "clear": "expo start --clear"
-  },
-  "devDependencies": {
-    "@react-native-community/cli": "^19.1.1"
   }
 }
