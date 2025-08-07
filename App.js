@@ -14,6 +14,9 @@ import { useAuth } from './hooks/useAuth';
 import { useSocket } from './hooks/useSocket';
 import { useNotifications } from './hooks/useNotifications';
 import { useGlobalChat } from './hooks/useGlobalChat';
+import { useAccessLogger } from './hooks/useAccessLogger';
+import useIp from './hooks/useIp';
+import { useUserAgent } from './hooks/useUserAgent';
 
 // 서버 설정
 import { discoverServer } from './utils/discovery';
@@ -87,8 +90,10 @@ export default function App() {
   // 알림 및 글로벌 채팅 훅
   const { isInitialized: notificationInitialized, pushToken } = useNotifications();
   const { isMonitoring, setCurrentChatRoomId, clearCurrentChatRoomId } = useGlobalChat();
-  
-  // Zustand store 사용
+  const { log } = useAccessLogger();
+  const ipAddress = useIp();
+  const userAgent = useUserAgent();
+ 
   const userStore = useUserStore();
   const isAuthenticated = userStore.isAuthenticated;
   const hasProfile = userStore.hasProfile;
@@ -107,6 +112,19 @@ export default function App() {
     
     init();
   }, [checkAuth, clearTokens, connect]);
+
+  useEffect(() => {
+    if (ipAddress) {
+      log({
+        uuid: userStore.user?.uuid || 'guest',
+        eventType: 'APP_START',
+        ipAddress,
+        userAgent,
+        success: true,
+        message: '앱 실행'
+      });
+    }
+  }, [userStore.user, ipAddress, userAgent]);
 
   // 앱 종료 시 소켓 연결 해제
   useEffect(() => {
