@@ -1,10 +1,9 @@
-import { v4 as uuidv4 } from 'uuid';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { getCurrentKST } from '../utils/dateUtils';
 
 class Message {
   constructor(data = {}) {
-    this.id = data.id || uuidv4();
+    this.id = data.id || null; // Firestore에서 자동 생성
     this.chatId = data.chatId;
     this.content = data.content;
     this.uuid = data.uuid;
@@ -43,9 +42,9 @@ class Message {
       type: 'image',
       metadata: {
         imageUrl,
-        imageSize,
-        imageWidth,
-        imageHeight
+        imageSize: imageSize || null,
+        imageWidth: imageWidth || null,
+        imageHeight: imageHeight || null
       }
     });
   }
@@ -86,14 +85,24 @@ class Message {
 
   // Firestore 데이터로 변환
   toFirestore() {
+    // undefined 값들을 필터링하여 Firestore 오류 방지
+    const cleanMetadata = {};
+    if (this.metadata) {
+      Object.keys(this.metadata).forEach(key => {
+        if (this.metadata[key] !== undefined) {
+          cleanMetadata[key] = this.metadata[key];
+        }
+      });
+    }
+
     return {
       chatId: this.chatId,
       content: this.content,
       uuid: this.uuid,
-      timestamp: this.timestamp,
+      timestamp: serverTimestamp(), // 서버 시간 기준으로 저장
       isRead: this.isRead,
       type: this.type,
-      metadata: this.metadata,
+      metadata: cleanMetadata,
       status: this.status,
       error: this.error
     };
@@ -103,7 +112,9 @@ class Message {
   static fromFirestore(id, data) {
     return new Message({
       id,
-      ...data
+      ...data,
+      // Firebase Timestamp를 JavaScript Date로 변환
+      timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : data.timestamp
     });
   }
 

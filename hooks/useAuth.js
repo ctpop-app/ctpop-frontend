@@ -10,6 +10,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_KEYS } from '../utils/constants';
 import * as authService from '../services/authService';
 import { useProfile } from './useProfile';
+import { useAccessLogger } from "../hooks/useAccessLogger";
+import { handleError } from '../utils/errorHandler';
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -21,6 +23,7 @@ export const useAuth = () => {
   // Zustand store 사용
   const { user, isAuthenticated, hasProfile, setUser, setUserProfile, setHasProfile, clearUser, userProfile } = useUserStore();
   const { exists: checkProfileExists, get: loadUserProfile } = useProfile();
+  const { log } = useAccessLogger();
 
   // 슈퍼패스 인증 (개발용)
   const handleSuperPass = useCallback(async () => {
@@ -136,6 +139,14 @@ export const useAuth = () => {
       if (result.success) {
         const user = await authService.getStoredUser();
         setUser(user);
+        await log({
+          uuid: user?.uuid || "unknown",
+          eventType: "LOGIN",
+          ipAddress: "",
+          userAgent: "",
+          success: true,
+          message: "OTP 인증"
+        });
         Alert.alert('성공', '인증되었습니다.');
         return { success: true };
       } else {
@@ -145,13 +156,10 @@ export const useAuth = () => {
         return { success: false };
       }
     } catch (error) {
-      console.error('OTP 검증 에러:', error);
-      const errorMessage = '인증 중 오류가 발생했습니다.';
-      setError(errorMessage);
-      Alert.alert('오류', errorMessage);
+      await handleError(error);
       return { success: false };
     }
-  }, [phoneNumber, verificationCode]);
+  }, [phoneNumber, verificationCode, user, setUser, log]);
 
   // 리프레시 토큰으로 인증
   const authenticateWithRefreshToken = useCallback(async () => {
@@ -166,17 +174,25 @@ export const useAuth = () => {
           createdAt: user?.createdAt || getCurrentKST()
         };
         setUser(user);
+        await log({
+          uuid: user?.uuid || "unknown",
+          eventType: "REFRESH",
+          ipAddress: "",
+          userAgent: "",
+          success: true,
+          message: "리프레시 토큰 인증"
+        });
       } else {
         setError(result.message);
       }
       return result;
     } catch (error) {
-      setError(error.message);
+      await handleError(error);
       return { success: false };
     } finally {
       setIsLoading(false);
     }
-  }, [setUser]);
+  }, [setUser, user, log]);
 
   // 액세스 토큰 발급
   const getAccessToken = useCallback(async () => {
@@ -205,6 +221,14 @@ export const useAuth = () => {
       const result = await authService.logout();
       console.log('authService.logout 결과:', result);
       if (result.success) {
+        await log({
+          uuid: user?.uuid || "unknown",
+          eventType: "LOGOUT",
+          ipAddress: "",
+          userAgent: "",
+          success: true,
+          message: "로그아웃"
+        });
         console.log('clearUser 호출 전');
         clearUser();
         console.log('clearUser 호출 후');
@@ -216,13 +240,12 @@ export const useAuth = () => {
       }
       return result.success;
     } catch (error) {
-      console.error('handleLogout 에러:', error);
-      setError(error.message);
+      await handleError(error);
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [clearUser]);
+  }, [clearUser, user, log]);
 
   // 인증 상태 확인
   const checkAuth = useCallback(async () => {
@@ -239,23 +262,23 @@ export const useAuth = () => {
         return false;
       }
 
-      // 🚨 서버 검증
-      let serverValidation = await authService.validateAndRefreshToken();
+      // // 🚨 서버 검증
+      // let serverValidation = await authService.validateAndRefreshToken();
       
-      if (!serverValidation.success) {
-        console.log('서버 검증 실패, 잠시 후 재시도...');
-        setIsLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 4000));
+      // if (!serverValidation.success) {
+      //   console.log('서버 검증 실패, 잠시 후 재시도...');
+      //   setIsLoading(true);
+      //   await new Promise(resolve => setTimeout(resolve, 4000));
         
-        // 1회 재시도
-        serverValidation = await authService.validateAndRefreshToken();
+      //   // 1회 재시도
+      //   serverValidation = await authService.validateAndRefreshToken();
         
-        if (!serverValidation.success) {
-          console.log('서버 검증 최종 실패, 오류 화면 표시');
-          await authService.clearTokens(); // 토큰만 삭제
-          throw new Error('서버 연결에 실패했습니다. 네트워크 연결을 확인해주세요.');
-        }
-      }
+      //   if (!serverValidation.success) {
+      //     console.log('서버 검증 최종 실패, 오류 화면 표시');
+      //     await authService.clearTokens(); // 토큰만 삭제
+      //     throw new Error('서버 연결에 실패했습니다. 네트워크 연결을 확인해주세요.');
+      //   }
+      // }
 
       setUser(user);
       const hasProfile = await checkProfileExists();

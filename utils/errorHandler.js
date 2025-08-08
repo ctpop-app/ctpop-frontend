@@ -1,4 +1,6 @@
 import { Alert } from 'react-native';
+import useUserStore from '../store/userStore';
+import { logAccessLog } from '../services/accessLogService';
 
 // 에러 타입 정의
 export const ErrorTypes = {
@@ -56,6 +58,22 @@ export const handleError = async (error, options = {}) => {
   const message = customMessage || errorMessages[errorType];
 
   console.error(`[${errorType}]`, error);
+
+  // Firestore에 에러 로그 자동 저장
+  try {
+    const uuid = useUserStore.getState().user?.uuid || "unknown";
+    await logAccessLog({
+      uuid,
+      eventType: "ERROR",
+      ipAddress: "",
+      userAgent: "",
+      success: false,
+      message: error.message || String(error)
+    });
+  } catch (e) {
+    // 로그 저장 실패 시 무시
+    console.error("에러 로그 저장 실패:", e);
+  }
 
   if (showAlert) {
     Alert.alert('오류', message);

@@ -165,12 +165,29 @@ export const createChatRoom = async (roomData) => {
 /**
  * 채팅방에서 나갑니다.
  * @param {string} roomId - 채팅방 ID
+ * @param {string} userUuid - 나가는 사용자 UUID
  * @returns {Promise<Object>} - 성공 여부
  */
-export const leaveChatRoom = async (roomId) => {
+export const leaveChatRoom = async (roomId, userUuid) => {
   return withNetworkRetry(async () => {
     try {
-      await deleteDoc(doc(db, 'chats', roomId));
+      const chatRef = doc(db, 'chatRooms', roomId);
+      const chatDoc = await getDoc(chatRef);
+      
+      if (!chatDoc.exists()) {
+        throw new Error('채팅방을 찾을 수 없습니다.');
+      }
+
+      const chat = Chat.fromFirestore(chatDoc.id, chatDoc.data());
+      chat.removeParticipant(userUuid);
+      
+      // 참여자가 1명 이하가 되면 채팅방을 삭제
+      if (chat.participants.length <= 1) {
+        await deleteDoc(chatRef);
+      } else {
+        await updateDoc(chatRef, chat.toFirestore());
+      }
+      
       return { success: true, data: {} };
     } catch (error) {
       return handleError(error, '채팅방 나가기 오류');
@@ -288,31 +305,74 @@ export const getChatRoomDetails = async (roomId, currentUserUuid) => {
 
       const chatData = chatDoc.data();
       
-      // 마지막 메시지 정보 가져오기
-      const messagesQuery = query(
-        collection(db, 'messages'),
-        where('chatId', '==', roomId),
-        orderBy('timestamp', 'desc'),
-        limit(1)
-      );
-      
-      const messagesSnapshot = await getDocs(messagesQuery);
-      const lastMessage = messagesSnapshot.empty ? null : messagesSnapshot.docs[0].data();
+      // 마지막 메시지 정보 가져오기 (인덱스 문제로 임시 비활성화)
+      let lastMessage = null;
+      try {
+        const messagesQuery = query(
+          collection(db, 'messages'),
+          where('chatId', '==', roomId),
+          orderBy('timestamp', 'desc'),
+          limit(1)
+        );
+        
+        const messagesSnapshot = await getDocs(messagesQuery);
+        lastMessage = messagesSnapshot.empty ? null : messagesSnapshot.docs[0].data();
+      } catch (error) {
+        console.warn('메시지 쿼리 실패 (인덱스 필요):', error.message);
+        // 인덱스가 없으면 메시지 정보 없이 진행
+        lastMessage = null;
+      }
 
       // 상대방 정보 가져오기
-      const otherParticipantId = chatData.participants.find(p => p !== currentUserUuid);
+      let otherUser = null;
       
-      const otherUserProfile = await profileApi.get(otherParticipantId);
-      const otherUser = otherUserProfile ? otherUserProfile.data() : null;
+      if (chatData.participants && Array.isArray(chatData.participants)) {
+        // 중복 제거하고 현재 사용자가 아닌 참가자 찾기
+        const uniqueParticipants = [...new Set(chatData.participants)];
+        const otherParticipantId = uniqueParticipants.find(p => p !== currentUserUuid);
+        
+        if (otherParticipantId) {
+          try {
+            const otherUserProfile = await profileApi.get(otherParticipantId);
+            if (otherUserProfile && otherUserProfile.exists && otherUserProfile.exists()) {
+              // profileApi.get()이 DocumentSnapshot을 반환하는 경우
+              const otherUserData = otherUserProfile.data();
+              otherUser = {
+                uuid: otherUserProfile.id,
+                nickname: otherUserData?.nickname || '알 수 없는 사용자',
+                mainPhotoURL: otherUserData?.mainPhotoURL
+              };
+            } else {
+              // 프로필이 없거나 비활성화된 경우
+              otherUser = {
+                uuid: otherParticipantId,
+                nickname: '알 수 없는 사용자',
+                mainPhotoURL: null
+              };
+            }
+          } catch (error) {
+            console.warn('상대방 프로필 조회 실패:', error.message);
+            otherUser = {
+              uuid: otherParticipantId,
+              nickname: '알 수 없는 사용자',
+              mainPhotoURL: null
+            };
+          }
+        } else {
+          // 상대방을 찾을 수 없는 경우 (자기 자신과의 채팅방 등)
+          console.warn('상대방을 찾을 수 없음:', { 
+            participants: chatData.participants, 
+            currentUser: currentUserUuid 
+          });
+          // null을 반환하여 필터링되도록 함
+          otherUser = null;
+        }
+      }
 
       return {
         ...chatData,
         lastMessage,
-        otherUser: otherUser ? {
-          uuid: otherUserProfile.id,
-          nickname: otherUser.nickname,
-          mainPhotoURL: otherUser.mainPhotoURL
-        } : null
+        otherUser
       };
     } catch (error) {
       return handleError(error, '채팅방 상세 정보 가져오기 오류');

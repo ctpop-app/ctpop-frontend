@@ -21,7 +21,8 @@
         "NSUserTrackingUsageDescription": "인증번호를 자동으로 입력하기 위해 SMS 접근 권한이 필요합니다.",
         "NSCameraUsageDescription": "프로필 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다.",
         "NSPhotoLibraryUsageDescription": "프로필 사진을 선택하기 위해 사진 라이브러리 접근 권한이 필요합니다.",
-        "NSLocationWhenInUseUsageDescription": "서버 검색을 위해 위치 정보 접근 권한이 필요합니다."
+        "NSLocationWhenInUseUsageDescription": "서버 검색을 위해 위치 정보 접근 권한이 필요합니다.",
+        "NSUserNotificationsUsageDescription": "새로운 메시지 알림을 위해 알림 권한이 필요합니다."
       },
       "runtimeVersion": {
         "policy": "appVersion"
@@ -33,6 +34,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.anonymous.ctpop",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "RECEIVE_SMS",
         "READ_SMS",
@@ -51,7 +53,11 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "POST_NOTIFICATIONS"
       ],
       "runtimeVersion": "1.0.0"
     },
@@ -62,10 +68,16 @@
     },
     "owner": "ktw1398",
     "plugins": [
-      "expo-web-browser"
-    ],
-    "updates": {
-      "url": "https://u.expo.dev/188021df-21e9-47be-8d76-53035ad41d65"
-    }
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default",
+          "sounds": ["./assets/notification.wav"]
+        }
+      ]
+    ]
   }
 }

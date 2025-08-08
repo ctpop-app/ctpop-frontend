@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../../services/imageService';
 
-const MessageInput = ({ onSend, onSendImage, uuid }) => {
+const MessageInput = ({ onSend, onSendImage, uuid, bottomInset = 0 }) => {
   const [message, setMessage] = useState('');
   const [appState, setAppState] = useState(AppState.currentState);
   const keyboardTimeoutRef = useRef(null);
@@ -18,7 +18,7 @@ const MessageInput = ({ onSend, onSendImage, uuid }) => {
           clearTimeout(keyboardTimeoutRef.current);
         }
         keyboardTimeoutRef.current = setTimeout(() => {
-          if (inputRef.current) {
+          if (inputRef.current && Platform.OS !== 'web') {
             inputRef.current.blur();
           }
         }, 100);
@@ -26,11 +26,25 @@ const MessageInput = ({ onSend, onSendImage, uuid }) => {
       setAppState(nextAppState);
     });
 
+    // 키보드 이벤트 리스너 추가
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {});
+    
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      // 키보드가 닫힐 때 입력창 포커스 제거 (Android)
+      if (Platform.OS === 'android' && inputRef.current) {
+        setTimeout(() => {
+          inputRef.current.blur();
+        }, 50);
+      }
+    });
+
     return () => {
       if (keyboardTimeoutRef.current) {
         clearTimeout(keyboardTimeoutRef.current);
       }
       subscription.remove();
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
     };
   }, [appState]);
 
@@ -45,6 +59,22 @@ const MessageInput = ({ onSend, onSendImage, uuid }) => {
     }
   };
 
+  // 웹에서 Enter 키 처리
+  const handleKeyPress = (event) => {
+    if (Platform.OS === 'web') {
+      if (event.nativeEvent.key === 'Enter') {
+        if (event.nativeEvent.shiftKey) {
+          // Shift + Enter: 줄바꿈
+          return;
+        } else {
+          // Enter: 메시지 전송
+          event.preventDefault();
+          handleSend();
+        }
+      }
+    }
+  };
+
   const handleImagePick = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -55,14 +85,31 @@ const MessageInput = ({ onSend, onSendImage, uuid }) => {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: false,
         quality: 0.8,
       });
 
       if (!result.canceled) {
-        const imageUrl = await uploadImage(result.assets[0].uri, 'chat', uuid);
-        await onSendImage(imageUrl);
+        // 즉시 스켈레톤 메시지 표시
+        const tempImageId = Date.now().toString();
+        await onSendImage(null, tempImageId, result.assets[0].uri);
+        
+        // 업로드 진행률 콜백
+        const onProgress = (progress) => {
+          if (onSendImage.updateProgress) {
+            onSendImage.updateProgress(tempImageId, progress);
+          }
+        };
+
+        try {
+          const imageUrl = await uploadImage(result.assets[0].uri, 'chat', uuid, onProgress);
+          await onSendImage(imageUrl, tempImageId);
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError);
+          if (onSendImage.onError) {
+            onSendImage.onError(tempImageId, uploadError.message);
+          }
+        }
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -71,7 +118,15 @@ const MessageInput = ({ onSend, onSendImage, uuid }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View 
+      style={[styles.container, { paddingBottom: Math.max(bottomInset, 8) }]}
+      onLayout={(event) => {
+        const { width, height, x, y } = event.nativeEvent.layout;
+        console.log('💬 MessageInput 레이아웃:', { width, height, x, y });
+        console.log('  - bottomInset:', bottomInset);
+        console.log('  - 계산된 paddingBottom:', Math.max(bottomInset, 8));
+      }}
+    >
       <TouchableOpacity onPress={handleImagePick} style={styles.imageButton}>
         <Ionicons name="image-outline" size={24} color="#007AFF" />
       </TouchableOpacity>
@@ -85,6 +140,7 @@ const MessageInput = ({ onSend, onSendImage, uuid }) => {
         maxLength={1000}
         returnKeyType="send"
         onSubmitEditing={handleSend}
+        onKeyPress={handleKeyPress}
         blurOnSubmit={false}
         keyboardType="default"
         autoCapitalize="none"

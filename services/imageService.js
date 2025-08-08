@@ -143,13 +143,15 @@ export const uploadChatImage = async (photo, uuid) => {
  * @param {string} uri - 이미지 URI
  * @param {string} path - 저장할 경로 (예: 'profile', 'chat')
  * @param {string} uuid - 사용자 UUID
+ * @param {function} onProgress - 업로드 진행률 콜백 함수
  * @returns {Promise<string>} - 업로드된 이미지의 URL
  */
-export const uploadImage = async (uri, path = 'profile', uuid = null) => {
+export const uploadImage = async (uri, path = 'profile', uuid = null, onProgress = null) => {
   try {
     console.log('이미지 업로드 시작:', { uri, path, uuid });
 
     // 이미지 압축 및 리사이징
+    if (onProgress) onProgress(10);
     console.log('이미지 압축 시작...');
     const manipResult = await ImageManipulator.manipulateAsync(
       uri,
@@ -163,6 +165,7 @@ export const uploadImage = async (uri, path = 'profile', uuid = null) => {
     });
 
     // Blob으로 변환
+    if (onProgress) onProgress(30);
     console.log('Blob 변환 시작...');
     const response = await fetch(manipResult.uri);
     const blob = await response.blob();
@@ -192,8 +195,21 @@ export const uploadImage = async (uri, path = 'profile', uuid = null) => {
     };
     console.log('메타데이터 준비 완료:', metadata);
 
+    if (onProgress) onProgress(50);
     console.log('Storage 업로드 시작...');
+    
+    // 업로드 진행률 시뮬레이션
+    let uploadProgress = 50;
+    const progressInterval = setInterval(() => {
+      if (uploadProgress < 90) {
+        uploadProgress += 10;
+        if (onProgress) onProgress(uploadProgress);
+      }
+    }, 200);
+
     await uploadBytes(storageRef, blob, metadata);
+    clearInterval(progressInterval);
+    if (onProgress) onProgress(95);
     console.log('Storage 업로드 완료');
 
     // 다운로드 URL 반환
@@ -201,6 +217,7 @@ export const uploadImage = async (uri, path = 'profile', uuid = null) => {
     const downloadURL = await getDownloadURL(storageRef);
     console.log('다운로드 URL 가져오기 완료:', downloadURL);
     
+    if (onProgress) onProgress(100);
     return downloadURL;
   } catch (error) {
     console.error('이미지 업로드 실패:', {
